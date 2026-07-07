@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, StyleSheet, Switch, Text, View } from 'react-native';
+import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
@@ -22,7 +23,7 @@ export default function SettingsScreen() {
   const toggleBiometric = async (next: boolean) => {
     if (next) {
       if (!(await isBiometricAvailable())) {
-        Alert.alert(
+        notify(
           'Biométrie indisponible',
           'Aucune biométrie (Face ID, Touch ID ou empreinte) n’est configurée sur cet appareil.',
         );
@@ -43,38 +44,34 @@ export default function SettingsScreen() {
     try {
       await exporter();
     } catch (error) {
-      Alert.alert('Export impossible', error instanceof Error ? error.message : String(error));
+      notify('Export impossible', error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
   };
 
   const eraseAllData = () => {
-    Alert.alert(
-      'Tout effacer',
-      'Toutes vos données (transactions, budgets, épargne, factures) seront définitivement supprimées de cet appareil. Cette action est irréversible.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Tout effacer',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              await db.execAsync(`
-                DELETE FROM bill_payments;
-                DELETE FROM bills;
-                DELETE FROM savings_entries;
-                DELETE FROM savings_goals;
-                DELETE FROM budgets;
-                DELETE FROM transactions;
-              `);
-              invalidateQueries();
-              Alert.alert('Données effacées', 'Toutes vos données ont été supprimées.');
-            })();
-          },
-        },
-      ],
-    );
+    confirmAction({
+      title: 'Tout effacer',
+      message:
+        'Toutes vos données (transactions, budgets, épargne, factures) seront définitivement supprimées de cet appareil. Cette action est irréversible.',
+      confirmLabel: 'Tout effacer',
+      destructive: true,
+      onConfirm: () => {
+        void (async () => {
+          await db.execAsync(`
+            DELETE FROM bill_payments;
+            DELETE FROM bills;
+            DELETE FROM savings_entries;
+            DELETE FROM savings_goals;
+            DELETE FROM budgets;
+            DELETE FROM transactions;
+          `);
+          invalidateQueries();
+          notify('Données effacées', 'Toutes vos données ont été supprimées.');
+        })();
+      },
+    });
   };
 
   return (
@@ -88,13 +85,14 @@ export default function SettingsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.securityTitle, { color: theme.colors.text }]}>Vos données sont protégées</Text>
           <Text style={[styles.securityText, { color: theme.colors.textMuted }]}>
-            Tout est stocké uniquement sur cet appareil, dans une base chiffrée (SQLCipher, AES-256). La clé de
-            chiffrement est gardée dans l’enclave sécurisée du téléphone (Keychain iOS / Keystore Android).
-            Aucune donnée ne quitte votre téléphone : pas de compte, pas de serveur, pas de suivi.
+            {Platform.OS === 'web'
+              ? 'Tout est stocké uniquement sur cet appareil, dans le stockage privé du navigateur (isolé par site et protégé par le verrouillage de votre appareil). Aucune donnée ne part sur un serveur : pas de compte, pas de suivi. Pensez à exporter régulièrement une sauvegarde JSON.'
+              : 'Tout est stocké uniquement sur cet appareil, dans une base chiffrée (SQLCipher, AES-256). La clé de chiffrement est gardée dans l’enclave sécurisée du téléphone (Keychain iOS / Keystore Android). Aucune donnée ne quitte votre téléphone : pas de compte, pas de serveur, pas de suivi.'}
           </Text>
         </View>
       </Card>
 
+      {Platform.OS !== 'web' ? (
       <Card style={{ gap: spacing.md }}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Sécurité</Text>
         <View style={styles.toggleRow}>
@@ -113,6 +111,7 @@ export default function SettingsScreen() {
           />
         </View>
       </Card>
+      ) : null}
 
       <Card style={{ gap: spacing.md }}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Exporter mes données</Text>

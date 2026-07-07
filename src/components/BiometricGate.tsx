@@ -1,6 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, type PropsWithChildren } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSecurity } from '@/src/store/security';
 import { radius, spacing, useTheme } from '@/src/theme';
 
@@ -8,8 +16,18 @@ import { radius, spacing, useTheme } from '@/src/theme';
  * Verrouille l'application derrière Face ID / Touch ID / empreinte quand
  * l'option est activée dans les réglages. L'app se reverrouille à chaque
  * passage en arrière-plan.
+ *
+ * Sur le web (PWA), la biométrie native n'est pas disponible : la porte
+ * est transparente et l'accès repose sur le verrouillage de l'appareil.
  */
 export function BiometricGate({ children }: PropsWithChildren) {
+  if (Platform.OS === 'web') {
+    return <>{children}</>;
+  }
+  return <NativeBiometricGate>{children}</NativeBiometricGate>;
+}
+
+function NativeBiometricGate({ children }: PropsWithChildren) {
   const theme = useTheme();
   const { biometricEnabled, unlocked, hydrate, lock, tryUnlock } = useSecurity();
   const attemptedRef = useRef(false);

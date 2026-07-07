@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { CategoryPicker } from '@/src/components/ui/CategoryPicker';
@@ -24,15 +25,15 @@ export default function NewBillScreen() {
     const amountCents = parseAmountToCents(amount);
     const day = Number.parseInt(dueDay, 10);
     if (!name.trim()) {
-      Alert.alert('Nom manquant', 'Donnez un nom à cette facture (ex : Loyer).');
+      notify('Nom manquant', 'Donnez un nom à cette facture (ex : Loyer).');
       return;
     }
     if (!amountCents || amountCents <= 0) {
-      Alert.alert('Montant invalide', 'Saisissez un montant valide, par exemple 45,99.');
+      notify('Montant invalide', 'Saisissez un montant valide, par exemple 45,99.');
       return;
     }
     if (!Number.isInteger(day) || day < 1 || day > 31) {
-      Alert.alert('Échéance invalide', 'Le jour d’échéance doit être entre 1 et 31.');
+      notify('Échéance invalide', 'Le jour d’échéance doit être entre 1 et 31.');
       return;
     }
     setSaving(true);

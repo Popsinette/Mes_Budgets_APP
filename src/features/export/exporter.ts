@@ -1,15 +1,42 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { Platform } from 'react-native';
 import { todayIso } from '@/src/utils/dates';
 
 /**
  * Export des données via la feuille de partage du système (AirDrop, Fichiers,
  * mail…). Le fichier est écrit en clair dans le cache le temps du partage :
  * c'est un déchiffrement volontaire, déclenché uniquement par l'utilisateur.
+ *
+ * Sur le web (PWA), on passe par la feuille de partage du navigateur quand
+ * elle accepte les fichiers (Safari iOS), sinon par un téléchargement direct.
  */
 
 async function shareFile(fileName: string, content: string, mimeType: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const blob = new Blob([content], { type: mimeType });
+    const webFile = new globalThis.File([blob], fileName, { type: mimeType });
+    if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [webFile] })) {
+      try {
+        await navigator.share({ files: [webFile], title: fileName });
+        return;
+      } catch (error) {
+        // Partage annulé par l'utilisateur : ne pas déclencher le téléchargement.
+        if (error instanceof Error && error.name === 'AbortError') return;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    return;
+  }
+
   const file = new File(Paths.cache, fileName);
   if (file.exists) file.delete();
   file.write(content);

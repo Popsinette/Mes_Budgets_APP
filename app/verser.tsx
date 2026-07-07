@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -31,7 +32,7 @@ export default function AddSavingsEntryScreen() {
     const amountCents = parseAmountToCents(amount);
     if (!goal) return;
     if (!amountCents || amountCents === 0) {
-      Alert.alert('Montant invalide', 'Saisissez le montant du versement, par exemple 150.');
+      notify('Montant invalide', 'Saisissez le montant du versement, par exemple 150.');
       return;
     }
     setSaving(true);

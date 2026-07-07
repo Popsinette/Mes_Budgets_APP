@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { confirmAction } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { EmptyState } from '@/src/components/ui/EmptyState';
@@ -41,10 +42,13 @@ export default function BillsScreen() {
   };
 
   const confirmDelete = (bill: BillWithStatus) => {
-    Alert.alert('Supprimer la facture', `Supprimer « ${bill.name} » définitivement ?`, [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => void deleteBill(db, bill.id) },
-    ]);
+    confirmAction({
+      title: 'Supprimer la facture',
+      message: `Supprimer « ${bill.name} » définitivement ?`,
+      confirmLabel: 'Supprimer',
+      destructive: true,
+      onConfirm: () => void deleteBill(db, bill.id),
+    });
   };
 
   const renderBill = (bill: BillWithStatus) => {

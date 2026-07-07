@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
@@ -45,15 +46,15 @@ export default function NewSavingsGoalScreen() {
     const targetCents = parseAmountToCents(target);
     const monthlyCents = monthly.trim() ? parseAmountToCents(monthly) : null;
     if (!name.trim()) {
-      Alert.alert('Nom manquant', 'Donnez un nom à cet objectif (ex : Vacances).');
+      notify('Nom manquant', 'Donnez un nom à cet objectif (ex : Vacances).');
       return;
     }
     if (!targetCents || targetCents <= 0) {
-      Alert.alert('Objectif invalide', 'Saisissez le montant à atteindre, par exemple 2000.');
+      notify('Objectif invalide', 'Saisissez le montant à atteindre, par exemple 2000.');
       return;
     }
     if (monthly.trim() && (!monthlyCents || monthlyCents <= 0)) {
-      Alert.alert('Versement invalide', 'Le versement mensuel prévu est invalide.');
+      notify('Versement invalide', 'Le versement mensuel prévu est invalide.');
       return;
     }
     setSaving(true);

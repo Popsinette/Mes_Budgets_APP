@@ -1,6 +1,6 @@
 # Mes Budgets 💜
 
-Application mobile de suivi budgétaire **100 % locale et chiffrée**, pour iOS et Android.
+Application mobile de suivi budgétaire **100 % locale et chiffrée**, pour iOS et Android — et aussi en **PWA installable** (utilisable sur iPhone sans compte développeur Apple).
 Une seule base de code (React Native + Expo), une interface soignée, et aucune donnée qui ne quitte jamais votre téléphone.
 
 ## ✨ Fonctionnalités
@@ -112,7 +112,40 @@ npm run typecheck
 > ⚠️ **Important** : le chiffrement SQLCipher nécessite un *development build*
 > (`expo prebuild` + `expo run:*` ou EAS Build). L'app ne fonctionnera pas dans Expo Go.
 
-## 📲 Publication
+## 📱 Utiliser sur iPhone sans compte développeur Apple (PWA)
+
+Apple facture 99 €/an pour installer des apps natives durablement. La parade : la **version web installable (PWA)**, qui se comporte comme une app native une fois épinglée sur l'écran d'accueil.
+
+### 1. Publier la PWA (une seule fois)
+
+Le dépôt contient un workflow GitHub Actions (`.github/workflows/deploy-web.yml`) qui construit et déploie la version web à chaque push :
+
+1. Rendre le dépôt **public** (GitHub Pages gratuit ne fonctionne pas sur un dépôt privé), ou utiliser Netlify (gratuit, dépôts privés acceptés).
+2. Sur GitHub : **Settings → Pages → Source : « GitHub Actions »**.
+3. Pousser (ou relancer le workflow depuis l'onglet Actions).
+4. L'app est en ligne sur `https://<votre-compte>.github.io/Mes_Budgets_APP/`.
+
+Alternative sans GitHub Pages : `npx expo export --platform web` puis glisser le dossier `dist/` sur [Netlify Drop](https://app.netlify.com/drop).
+
+### 2. Installer sur l'iPhone
+
+1. Ouvrir l'URL dans **Safari**.
+2. Bouton **Partager** → **« Sur l'écran d'accueil »**.
+3. L'icône Mes Budgets apparaît : l'app s'ouvre en plein écran, fonctionne **hors ligne** (service worker) et garde ses données **localement sur le téléphone** (stockage OPFS du navigateur, isolé par site).
+
+### Différences avec la version native
+
+| | Native (iOS/Android) | PWA (web) |
+|---|---|---|
+| Stockage local | ✅ SQLite + SQLCipher (AES-256) | ✅ SQLite (wasm) dans le stockage privé du navigateur |
+| Face ID au lancement | ✅ | ➖ (protégé par le verrouillage de l'iPhone) |
+| Hors ligne | ✅ | ✅ |
+| Export JSON/CSV | ✅ feuille de partage | ✅ partage ou téléchargement |
+| Installation | Compte développeur requis (iOS) | ✅ gratuite, depuis Safari |
+
+> 💡 Pensez à exporter régulièrement une sauvegarde JSON depuis les réglages : si Mes Budgets est supprimé de l'écran d'accueil ou les données de Safari effacées, le stockage local part avec.
+
+## 📲 Publication native (App Store / Play Store)
 
 ```bash
 npm install -g eas-cli

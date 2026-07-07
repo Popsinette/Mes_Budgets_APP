@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { confirmAction } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -28,14 +29,13 @@ export default function SavingsScreen() {
   const target = totals?.target_cents ?? 0;
 
   const confirmDelete = (id: number, name: string) => {
-    Alert.alert(
-      'Supprimer l’objectif',
-      `Supprimer « ${name} » et tout son historique de versements ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: () => void deleteSavingsGoal(db, id) },
-      ],
-    );
+    confirmAction({
+      title: 'Supprimer l’objectif',
+      message: `Supprimer « ${name} » et tout son historique de versements ?`,
+      confirmLabel: 'Supprimer',
+      destructive: true,
+      onConfirm: () => void deleteSavingsGoal(db, id),
+    });
   };
 
   return (

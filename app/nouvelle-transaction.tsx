@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { CategoryPicker } from '@/src/components/ui/CategoryPicker';
@@ -26,11 +27,11 @@ export default function NewTransactionScreen() {
   const save = async () => {
     const amountCents = parseAmountToCents(amount);
     if (!amountCents || amountCents <= 0) {
-      Alert.alert('Montant invalide', 'Saisissez un montant valide, par exemple 12,50.');
+      notify('Montant invalide', 'Saisissez un montant valide, par exemple 12,50.');
       return;
     }
     if (!label.trim()) {
-      Alert.alert('Libellé manquant', 'Donnez un nom à cette opération.');
+      notify('Libellé manquant', 'Donnez un nom à cette opération.');
       return;
     }
     setSaving(true);

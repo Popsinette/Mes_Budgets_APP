@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -31,16 +32,19 @@ export default function BudgetsScreen() {
   const globalRatio = totalBudget > 0 ? totalSpent / totalBudget : 0;
 
   const confirmDelete = (id: number, name: string) => {
-    Alert.alert('Supprimer le budget', `Supprimer le budget « ${name} » pour ce mois ?`, [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => void deleteBudget(db, id) },
-    ]);
+    confirmAction({
+      title: 'Supprimer le budget',
+      message: `Supprimer le budget « ${name} » pour ce mois ?`,
+      confirmLabel: 'Supprimer',
+      destructive: true,
+      onConfirm: () => void deleteBudget(db, id),
+    });
   };
 
   const copyPreviousMonth = async () => {
     const copied = await copyBudgetsFromMonth(db, shiftMonthKey(month, -1), month);
     if (copied === 0) {
-      Alert.alert('Rien à copier', 'Aucun budget du mois précédent à recopier.');
+      notify('Rien à copier', 'Aucun budget du mois précédent à recopier.');
     }
   };
 

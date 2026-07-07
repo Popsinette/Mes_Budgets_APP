@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { CategoryPicker } from '@/src/components/ui/CategoryPicker';
@@ -25,11 +26,11 @@ export default function NewBudgetScreen() {
   const save = async () => {
     const amountCents = parseAmountToCents(amount);
     if (!categoryId) {
-      Alert.alert('Catégorie manquante', 'Choisissez la catégorie à budgéter.');
+      notify('Catégorie manquante', 'Choisissez la catégorie à budgéter.');
       return;
     }
     if (!amountCents || amountCents <= 0) {
-      Alert.alert('Montant invalide', 'Saisissez un montant valide, par exemple 300.');
+      notify('Montant invalide', 'Saisissez un montant valide, par exemple 300.');
       return;
     }
     setSaving(true);

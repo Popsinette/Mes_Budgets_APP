@@ -1,0 +1,20 @@
+{
+  "name": "Mes Budgets",
+  "short_name": "Mes Budgets",
+  "description": "Suivi de budgets mensuels, plan d'épargne et factures — 100 % local.",
+  "lang": "fr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F6FA",
+  "theme_color": "#6C5CE7",
+  "icons": [
+    {
+      "src": "icons/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
