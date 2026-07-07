@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { invalidateQueries } from '@/src/store/invalidation';
-import type { MonthKey } from '@/src/utils/dates';
+import { isoDayInMonth, type MonthKey } from '@/src/utils/dates';
 
 export type Bill = {
   id: number;
@@ -54,6 +54,11 @@ export async function listBillsForMonth(
   );
 }
 
+/**
+ * Pointe/dé-pointe une facture pour un mois donné.
+ * Pointer crée automatiquement la dépense correspondante dans les opérations
+ * (datée du jour d'échéance) ; dé-pointer la supprime.
+ */
 export async function setBillPaid(
   db: SQLiteDatabase,
   billId: number,
@@ -61,11 +66,31 @@ export async function setBillPaid(
   paid: boolean,
 ): Promise<void> {
   if (paid) {
-    await db.runAsync(
-      `INSERT OR IGNORE INTO bill_payments (bill_id, month, paid_at) VALUES (?, ?, datetime('now'))`,
+    const bill = await db.getFirstAsync<Bill>('SELECT * FROM bills WHERE id = ?', [billId]);
+    if (!bill) return;
+    const existing = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM bill_payments WHERE bill_id = ? AND month = ?',
       [billId, month],
     );
+    if (existing) return;
+
+    const result = await db.runAsync(
+      `INSERT INTO transactions (category_id, label, amount_cents, type, date, month, note)
+       VALUES (?, ?, ?, 'expense', ?, ?, 'Facture récurrente')`,
+      [bill.category_id, bill.name, bill.amount_cents, isoDayInMonth(month, bill.due_day), month],
+    );
+    await db.runAsync(
+      `INSERT INTO bill_payments (bill_id, month, paid_at, transaction_id) VALUES (?, ?, datetime('now'), ?)`,
+      [billId, month, result.lastInsertRowId],
+    );
   } else {
+    const payment = await db.getFirstAsync<{ id: number; transaction_id: number | null }>(
+      'SELECT id, transaction_id FROM bill_payments WHERE bill_id = ? AND month = ?',
+      [billId, month],
+    );
+    if (payment?.transaction_id) {
+      await db.runAsync('DELETE FROM transactions WHERE id = ?', [payment.transaction_id]);
+    }
     await db.runAsync('DELETE FROM bill_payments WHERE bill_id = ? AND month = ?', [billId, month]);
   }
   invalidateQueries();

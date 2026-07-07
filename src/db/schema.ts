@@ -1,6 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-const SCHEMA_VERSION = 1;
 
 const MIGRATION_V1 = `
 CREATE TABLE IF NOT EXISTS categories (
@@ -84,6 +83,12 @@ const DEFAULT_CATEGORIES: Array<[string, string, string]> = [
   ['Autre', 'ellipsis-horizontal-outline', '#64748B'],
 ];
 
+// V2 : le pointage d'une facture crée la dépense correspondante ; on garde
+// le lien pour pouvoir la retirer si on dé-pointe la facture.
+const MIGRATION_V2 = `
+ALTER TABLE bill_payments ADD COLUMN transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL;
+`;
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -91,7 +96,11 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   if (current < 1) {
     await db.execAsync(MIGRATION_V1);
     await seedDefaultCategories(db);
-    await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    await db.execAsync('PRAGMA user_version = 1');
+  }
+  if (current < 2) {
+    await db.execAsync(MIGRATION_V2);
+    await db.execAsync('PRAGMA user_version = 2');
   }
 }
 

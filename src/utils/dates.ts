@@ -1,4 +1,4 @@
-import { addMonths, format, parse } from 'date-fns';
+import { addMonths, format, getDaysInMonth, parse, setDate } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 /** Clé de mois au format 'YYYY-MM', utilisée partout en base. */
@@ -42,6 +42,13 @@ export function shortDayLabel(isoDay: string): string {
 export function shortMonthLabel(month: MonthKey): string {
   const date = parse(month, 'yyyy-MM', new Date());
   return format(date, 'MMM', { locale: fr });
+}
+
+/** Date ISO du jour `day` dans le mois donné, bornée à la fin du mois (le 31 → le 28 en février). */
+export function isoDayInMonth(month: MonthKey, day: number): string {
+  const start = parse(month, 'yyyy-MM', new Date());
+  const lastDay = getDaysInMonth(start);
+  return format(setDate(start, Math.min(Math.max(1, day), lastDay)), 'yyyy-MM-dd');
 }
 
 /** "mars 2027" — le mois situé à `offset` mois d'aujourd'hui. */

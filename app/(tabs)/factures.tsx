@@ -89,7 +89,7 @@ export default function BillsScreen() {
             ) : null}
           </View>
           <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
-            Échéance le {bill.due_day} du mois
+            Se répète le {bill.due_day} de chaque mois
             {bill.category_name ? ` · ${bill.category_name}` : ''}
           </Text>
         </View>
@@ -142,7 +142,8 @@ export default function BillsScreen() {
               </>
             ) : null}
             <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
-              Touchez une facture pour la pointer · appui long pour la supprimer
+              Touchez une facture pour la pointer payée — la dépense est ajoutée automatiquement à votre
+              activité et vos budgets. Appui long pour la supprimer.
             </Text>
           </>
         )}
