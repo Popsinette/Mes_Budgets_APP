@@ -51,8 +51,13 @@ export default function BillsScreen() {
     });
   };
 
+  const isCurrentMonth = month === currentMonthKey();
+  const today = new Date().getDate();
+
   const renderBill = (bill: BillWithStatus) => {
     const isPaid = Boolean(bill.paid_at);
+    const isLate = !isPaid && isCurrentMonth && bill.due_day < today;
+    const isSoon = !isPaid && isCurrentMonth && !isLate && bill.due_day - today <= 5;
     return (
       <Card key={bill.id} style={styles.billCard} onPress={() => togglePaid(bill)} onLongPress={() => confirmDelete(bill)}>
         <Pressable hitSlop={6} onPress={() => togglePaid(bill)}>
@@ -63,15 +68,26 @@ export default function BillsScreen() {
           />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text
-            style={[
-              styles.billName,
-              { color: theme.colors.text, textDecorationLine: isPaid ? 'line-through' : 'none' },
-            ]}
-            numberOfLines={1}
-          >
-            {bill.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Text
+              style={[
+                styles.billName,
+                { color: theme.colors.text, textDecorationLine: isPaid ? 'line-through' : 'none' },
+              ]}
+              numberOfLines={1}
+            >
+              {bill.name}
+            </Text>
+            {isLate ? (
+              <View style={[styles.badge, { backgroundColor: theme.colors.dangerSoft }]}>
+                <Text style={[styles.badgeText, { color: theme.colors.danger }]}>En retard</Text>
+              </View>
+            ) : isSoon ? (
+              <View style={[styles.badge, { backgroundColor: theme.colors.warningSoft }]}>
+                <Text style={[styles.badgeText, { color: theme.colors.warning }]}>Bientôt</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
             Échéance le {bill.due_day} du mois
             {bill.category_name ? ` · ${bill.category_name}` : ''}
@@ -162,5 +178,14 @@ const styles = StyleSheet.create({
   billAmount: {
     fontSize: 15,
     fontWeight: '800',
+  },
+  badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

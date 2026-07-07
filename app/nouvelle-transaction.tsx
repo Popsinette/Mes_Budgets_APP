@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { notify } from '@/src/utils/dialogs';
@@ -17,7 +17,8 @@ import { Pressable } from 'react-native';
 export default function NewTransactionScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const [type, setType] = useState<TransactionType>('expense');
+  const params = useLocalSearchParams<{ type?: string }>();
+  const [type, setType] = useState<TransactionType>(params.type === 'income' ? 'income' : 'expense');
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
   const [note, setNote] = useState('');

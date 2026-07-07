@@ -91,6 +91,36 @@ export default function DashboardScreen() {
           </View>
         </LinearGradient>
 
+        <View style={styles.quickActions}>
+          <Pressable
+            onPress={() => router.push({ pathname: '/nouvelle-transaction', params: { type: 'expense' } })}
+            style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.dangerSoft }]}>
+              <Ionicons name="remove" size={18} color={theme.colors.danger} />
+            </View>
+            <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Dépense</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: '/nouvelle-transaction', params: { type: 'income' } })}
+            style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.successSoft }]}>
+              <Ionicons name="add" size={18} color={theme.colors.success} />
+            </View>
+            <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Revenu</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/epargne')}
+            style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.primarySoft }]}>
+              <Ionicons name="trending-up" size={18} color={theme.colors.primary} />
+            </View>
+            <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Épargner</Text>
+          </Pressable>
+        </View>
+
         <SectionHeader title="Dépenses par catégorie" />
         <Card style={styles.donutCard}>
           {(spending ?? []).length === 0 ? (
@@ -107,17 +137,18 @@ export default function DashboardScreen() {
                 centerSubLabel="dépensés"
               />
               <View style={styles.legend}>
-                {(spending ?? []).slice(0, 5).map((s) => (
-                  <View key={String(s.category_id)} style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: s.category_color }]} />
-                    <Text style={[styles.legendName, { color: theme.colors.text }]} numberOfLines={1}>
-                      {s.category_name}
-                    </Text>
-                    <Text style={[styles.legendValue, { color: theme.colors.textMuted }]}>
-                      {formatCents(s.spent_cents)}
-                    </Text>
-                  </View>
-                ))}
+                {(spending ?? []).slice(0, 5).map((s) => {
+                  const pct = expense > 0 ? Math.round((s.spent_cents / expense) * 100) : 0;
+                  return (
+                    <View key={String(s.category_id)} style={styles.legendItem}>
+                      <View style={[styles.legendDot, { backgroundColor: s.category_color }]} />
+                      <Text style={[styles.legendName, { color: theme.colors.text }]} numberOfLines={1}>
+                        {s.category_name}
+                      </Text>
+                      <Text style={[styles.legendValue, { color: s.category_color }]}>{pct} %</Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -241,7 +272,11 @@ export default function DashboardScreen() {
 
         {recentTransactions.length > 0 ? (
           <>
-            <SectionHeader title="Dernières opérations" />
+            <SectionHeader
+              title="Dernières opérations"
+              actionLabel="Tout voir"
+              onAction={() => router.push('/operations')}
+            />
             <Card style={{ gap: spacing.md }}>
               {recentTransactions.map((t) => (
                 <View key={t.id} style={styles.txRow}>
@@ -325,6 +360,29 @@ const styles = StyleSheet.create({
   balanceItemText: {
     color: '#FFFFFF',
     fontSize: 15,
+    fontWeight: '700',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  quickActionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionLabel: {
+    fontSize: 12,
     fontWeight: '700',
   },
   donutCard: {

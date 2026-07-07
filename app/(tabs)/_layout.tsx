@@ -28,6 +28,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="operations"
+        options={{
+          title: 'Activité',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'swap-vertical' : 'swap-vertical-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="budgets"
         options={{
           title: 'Budgets',

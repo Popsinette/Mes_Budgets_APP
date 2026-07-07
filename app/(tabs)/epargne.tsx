@@ -4,8 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { confirmAction } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
-import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { EmptyState } from '@/src/components/ui/EmptyState';
+import { ProgressRing } from '@/src/components/charts/ProgressRing';
 import { FAB } from '@/src/components/ui/FAB';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
@@ -17,6 +17,7 @@ import {
   listGoalsWithProgress,
 } from '@/src/features/savings/repository';
 import { spacing, useTheme } from '@/src/theme';
+import { monthLabelFromNow } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 export default function SavingsScreen() {
@@ -72,6 +73,11 @@ export default function SavingsScreen() {
           (goals ?? []).map((goal) => {
             const ratio = goal.target_cents > 0 ? goal.saved_cents / goal.target_cents : 0;
             const done = ratio >= 1;
+            const remaining = goal.target_cents - goal.saved_cents;
+            const monthsLeft =
+              !done && goal.monthly_cents && goal.monthly_cents > 0
+                ? Math.ceil(remaining / goal.monthly_cents)
+                : null;
             return (
               <Card
                 key={goal.id}
@@ -80,13 +86,24 @@ export default function SavingsScreen() {
                 onLongPress={() => confirmDelete(goal.id, goal.name)}
               >
                 <View style={styles.goalRow}>
-                  <CategoryIcon icon={goal.icon} color={goal.color} />
+                  <ProgressRing ratio={ratio} color={done ? theme.colors.success : goal.color}>
+                    <Ionicons
+                      name={done ? 'checkmark' : (goal.icon as keyof typeof Ionicons.glyphMap)}
+                      size={20}
+                      color={done ? theme.colors.success : goal.color}
+                    />
+                  </ProgressRing>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.goalName, { color: theme.colors.text }]}>{goal.name}</Text>
                     <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
                       {formatCents(goal.saved_cents)} / {formatCents(goal.target_cents)}
-                      {goal.monthly_cents ? ` · ${formatCents(goal.monthly_cents)}/mois prévu` : ''}
+                      {goal.monthly_cents ? ` · ${formatCents(goal.monthly_cents)}/mois` : ''}
                     </Text>
+                    {monthsLeft !== null ? (
+                      <Text style={{ color: goal.color, fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                        À ce rythme, objectif atteint en {monthLabelFromNow(monthsLeft)}
+                      </Text>
+                    ) : null}
                   </View>
                   {done ? (
                     <Ionicons name="checkmark-circle" size={26} color={theme.colors.success} />

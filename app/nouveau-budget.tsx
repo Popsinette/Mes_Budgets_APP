@@ -16,11 +16,14 @@ import { parseAmountToCents } from '@/src/utils/money';
 export default function NewBudgetScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const params = useLocalSearchParams<{ month?: string }>();
+  const params = useLocalSearchParams<{ month?: string; categoryId?: string; amount?: string }>();
   const month = typeof params.month === 'string' && params.month ? params.month : currentMonthKey();
 
-  const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [amount, setAmount] = useState('');
+  // Pré-remplissage quand on modifie un budget existant depuis l'écran Budgets.
+  const initialCategoryId = params.categoryId ? Number(params.categoryId) : null;
+  const initialAmount = params.amount ? String(Number(params.amount) / 100).replace('.', ',') : '';
+  const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId);
+  const [amount, setAmount] = useState(initialAmount);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {

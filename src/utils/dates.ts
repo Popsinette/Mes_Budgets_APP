@@ -44,6 +44,11 @@ export function shortMonthLabel(month: MonthKey): string {
   return format(date, 'MMM', { locale: fr });
 }
 
+/** "mars 2027" — le mois situé à `offset` mois d'aujourd'hui. */
+export function monthLabelFromNow(offset: number): string {
+  return format(addMonths(new Date(), offset), 'MMMM yyyy', { locale: fr });
+}
+
 /** Les n derniers mois (mois courant inclus), du plus ancien au plus récent. */
 export function lastMonthKeys(n: number): MonthKey[] {
   const current = currentMonthKey();
