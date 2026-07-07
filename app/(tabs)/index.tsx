@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { BarChart } from '@/src/components/charts/BarChart';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { DonutChart } from '@/src/components/charts/DonutChart';
@@ -15,12 +16,19 @@ import { getBillsSummary, listBillsForMonth } from '@/src/features/bills/reposit
 import { listBudgetsWithSpending } from '@/src/features/budgets/repository';
 import { getTotalSavings } from '@/src/features/savings/repository';
 import {
+  getMonthlySeries,
   getMonthTotals,
   getSpendingByCategory,
   listTransactionsForMonth,
 } from '@/src/features/transactions/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, monthKeyLabel, shortDayLabel } from '@/src/utils/dates';
+import {
+  currentMonthKey,
+  lastMonthKeys,
+  monthKeyLabel,
+  shortDayLabel,
+  shortMonthLabel,
+} from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 export default function DashboardScreen() {
@@ -34,6 +42,7 @@ export default function DashboardScreen() {
   const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
   const { data: savings } = useLiveQuery((db) => getTotalSavings(db));
   const { data: transactions } = useLiveQuery((db) => listTransactionsForMonth(db, month), [month]);
+  const { data: series } = useLiveQuery((db) => getMonthlySeries(db, lastMonthKeys(6)), [month]);
 
   const income = totals?.income_cents ?? 0;
   const expense = totals?.expense_cents ?? 0;
@@ -111,6 +120,43 @@ export default function DashboardScreen() {
                 ))}
               </View>
             </View>
+          )}
+        </Card>
+
+        <SectionHeader title="Évolution sur 6 mois" />
+        <Card style={{ gap: spacing.md }}>
+          {(series ?? []).every((p) => p.income_cents === 0 && p.expense_cents === 0) ? (
+            <EmptyState
+              icon="bar-chart-outline"
+              title="Pas encore d'historique"
+              subtitle="Le graphique se remplira au fil de vos opérations"
+            />
+          ) : (
+            <>
+              <BarChart
+                groups={(series ?? []).map((point) => ({
+                  label: shortMonthLabel(point.month),
+                  bars: [
+                    { value: point.income_cents, color: theme.colors.income },
+                    { value: point.expense_cents, color: theme.colors.primary },
+                  ],
+                }))}
+              />
+              <View style={styles.chartLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: theme.colors.income }]} />
+                  <Text style={{ color: theme.colors.textMuted, fontSize: 12, fontWeight: '600' }}>
+                    Revenus
+                  </Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} />
+                  <Text style={{ color: theme.colors.textMuted, fontSize: 12, fontWeight: '600' }}>
+                    Dépenses
+                  </Text>
+                </View>
+              </View>
+            </>
           )}
         </Card>
 
@@ -297,6 +343,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  chartLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xl,
   },
   legendDot: {
     width: 10,

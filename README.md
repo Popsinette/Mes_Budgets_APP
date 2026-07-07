@@ -5,11 +5,13 @@ Une seule base de code (React Native + Expo), une interface soignée, et aucune 
 
 ## ✨ Fonctionnalités
 
-- **Tableau de bord** — solde du mois (revenus − dépenses), répartition des dépenses par catégorie (graphique en anneau), aperçu des budgets, factures à venir et épargne.
+- **Tableau de bord** — solde du mois (revenus − dépenses), répartition des dépenses par catégorie (graphique en anneau), **évolution revenus/dépenses sur 6 mois** (histogramme), aperçu des budgets, factures à venir et épargne.
 - **Budgets mensuels** — un budget par catégorie et par mois, barres de progression avec alertes visuelles (orange à 85 %, rouge en dépassement), navigation de mois en mois, recopie des budgets du mois précédent en un geste.
 - **Plan d'épargne** — objectifs d'épargne (vacances, voiture, fonds d'urgence…) avec montant cible, versement mensuel prévu, progression et historique des versements.
 - **Factures** — factures récurrentes avec jour d'échéance, pointage payé/à payer mois par mois, total réglé sur le mois.
 - **Transactions** — dépenses et revenus, catégorisés, avec notes.
+- **Export des données** — sauvegarde complète en JSON ou transactions en CSV (compatible Excel/Numbers), via la feuille de partage du système (AirDrop, Fichiers, mail…).
+- **Verrouillage biométrique** — Face ID / Touch ID / empreinte exigé à chaque ouverture (option activable dans les réglages) ; l'app se reverrouille dès qu'elle passe en arrière-plan.
 - **Mode sombre** automatique, montants au format français (€), interface entièrement en français.
 
 ## 🔒 Sécurité et confidentialité
@@ -17,6 +19,7 @@ Une seule base de code (React Native + Expo), une interface soignée, et aucune 
 - **Stockage 100 % local** : aucune donnée n'est envoyée sur un serveur. Pas de compte, pas de cloud, pas de suivi.
 - **Base chiffrée** : toutes les données sont stockées dans SQLite chiffré par **SQLCipher (AES-256)**, via `expo-sqlite` (option `useSQLCipher`).
 - **Clé de chiffrement protégée** : une clé aléatoire de 32 octets est générée au premier lancement (`expo-crypto`) et conservée exclusivement dans le **Keychain iOS / Keystore Android** (`expo-secure-store`). Elle ne figure ni dans le code, ni dans un fichier.
+- **Verrouillage biométrique** : Face ID / Touch ID / empreinte via `expo-local-authentication`, avec reverrouillage automatique en arrière-plan.
 - **Montants en centimes** (entiers) : aucun risque d'erreur d'arrondi en virgule flottante.
 
 ## 🛠 Stack technique
@@ -26,7 +29,8 @@ Une seule base de code (React Native + Expo), une interface soignée, et aucune 
 | Framework | [Expo](https://expo.dev) SDK 57 · React Native 0.86 · TypeScript strict |
 | Navigation | [expo-router](https://docs.expo.dev/router/introduction/) (onglets + modales) |
 | Base de données | `expo-sqlite` + SQLCipher, migrations versionnées (`PRAGMA user_version`) |
-| Sécurité | `expo-secure-store` (Keychain/Keystore) + `expo-crypto` |
+| Sécurité | `expo-secure-store` (Keychain/Keystore) + `expo-crypto` + `expo-local-authentication` |
+| Export | `expo-file-system` + `expo-sharing` (feuille de partage système) |
 | État | Zustand (invalidation des requêtes) + hooks `useLiveQuery` |
 | Graphiques | `react-native-svg` (anneau des dépenses, léger et sans dépendance lourde) |
 | Dates | `date-fns` (locale française) |
@@ -60,13 +64,17 @@ Mes_Budgets_APP/
 │   │   ├── transactions/repository.ts
 │   │   ├── budgets/repository.ts
 │   │   ├── savings/repository.ts
-│   │   └── bills/repository.ts
+│   │   ├── bills/repository.ts
+│   │   └── export/exporter.ts    # Export JSON complet / CSV des transactions
 │   ├── components/
+│   │   ├── BiometricGate.tsx     # Écran de verrouillage Face ID / empreinte
 │   │   ├── ui/                   # Card, Button, FAB, ProgressBar, MonthSwitcher,
 │   │   │                         # CategoryPicker, FormField, EmptyState…
-│   │   └── charts/DonutChart.tsx # Anneau SVG des dépenses par catégorie
+│   │   └── charts/               # DonutChart (anneau SVG), BarChart (évolution mensuelle)
 │   ├── theme/index.ts            # Palette clair/sombre, espacements, rayons
-│   ├── store/invalidation.ts     # Compteur global d'invalidation (Zustand)
+│   ├── store/
+│   │   ├── invalidation.ts       # Compteur global d'invalidation (Zustand)
+│   │   └── security.ts           # Préférence et état du verrouillage biométrique
 │   └── utils/
 │       ├── money.ts              # Format € (fr-FR), parsing de saisie, centimes
 │       └── dates.ts              # Clés de mois 'yyyy-MM', libellés français

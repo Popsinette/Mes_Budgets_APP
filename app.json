@@ -26,6 +26,12 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Mes Budgets utilise Face ID pour déverrouiller vos données financières."
+        }
+      ],
+      [
         "expo-sqlite",
         {
           "useSQLCipher": true

@@ -76,6 +76,35 @@ export async function getMonthTotals(db: SQLiteDatabase, month: MonthKey): Promi
   return row ?? { income_cents: 0, expense_cents: 0 };
 }
 
+export type MonthlyPoint = {
+  month: MonthKey;
+  income_cents: number;
+  expense_cents: number;
+};
+
+/** Revenus/dépenses agrégés pour chaque mois demandé (0 pour les mois sans opération). */
+export async function getMonthlySeries(
+  db: SQLiteDatabase,
+  months: MonthKey[],
+): Promise<MonthlyPoint[]> {
+  if (months.length === 0) return [];
+  const placeholders = months.map(() => '?').join(', ');
+  const rows = await db.getAllAsync<MonthlyPoint>(
+    `SELECT
+       month,
+       COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS income_cents,
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expense_cents
+     FROM transactions
+     WHERE month IN (${placeholders})
+     GROUP BY month`,
+    months,
+  );
+  const byMonth = new Map(rows.map((r) => [r.month, r]));
+  return months.map(
+    (month) => byMonth.get(month) ?? { month, income_cents: 0, expense_cents: 0 },
+  );
+}
+
 export type CategorySpending = {
   category_id: number | null;
   category_name: string;

@@ -37,3 +37,19 @@ export function shortDayLabel(isoDay: string): string {
   const date = parse(isoDay, 'yyyy-MM-dd', new Date());
   return format(date, 'd MMMM', { locale: fr });
 }
+
+/** "juil." — libellé court du mois pour les axes de graphique. */
+export function shortMonthLabel(month: MonthKey): string {
+  const date = parse(month, 'yyyy-MM', new Date());
+  return format(date, 'MMM', { locale: fr });
+}
+
+/** Les n derniers mois (mois courant inclus), du plus ancien au plus récent. */
+export function lastMonthKeys(n: number): MonthKey[] {
+  const current = currentMonthKey();
+  const keys: MonthKey[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    keys.push(shiftMonthKey(current, -i));
+  }
+  return keys;
+}

@@ -4,6 +4,7 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { Suspense } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { BiometricGate } from '@/src/components/BiometricGate';
 import { DATABASE_NAME, onDatabaseInit } from '@/src/db';
 import { spacing, useTheme } from '@/src/theme';
 
@@ -22,25 +23,27 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Suspense fallback={<DatabaseLoading />}>
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={onDatabaseInit} useSuspense>
-          <StatusBar style={theme.dark ? 'light' : 'dark'} />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="nouvelle-transaction" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="nouveau-budget" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="nouvel-objectif" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="verser" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="nouvelle-facture" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="reglages" options={{ presentation: 'modal' }} />
-          </Stack>
-        </SQLiteProvider>
-      </Suspense>
+      <BiometricGate>
+        <Suspense fallback={<DatabaseLoading />}>
+          <SQLiteProvider databaseName={DATABASE_NAME} onInit={onDatabaseInit} useSuspense>
+            <StatusBar style={theme.dark ? 'light' : 'dark'} />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: theme.colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="nouvelle-transaction" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="nouveau-budget" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="nouvel-objectif" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="verser" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="nouvelle-facture" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="reglages" options={{ presentation: 'modal' }} />
+            </Stack>
+          </SQLiteProvider>
+        </Suspense>
+      </BiometricGate>
     </SafeAreaProvider>
   );
 }

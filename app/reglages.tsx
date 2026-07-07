@@ -1,17 +1,53 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
+import { exportAllDataAsJson, exportTransactionsAsCsv } from '@/src/features/export/exporter';
 import { invalidateQueries } from '@/src/store/invalidation';
+import { isBiometricAvailable, useSecurity } from '@/src/store/security';
 import { spacing, useTheme } from '@/src/theme';
 
 export default function SettingsScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
+  const { biometricEnabled, setBiometricEnabled, tryUnlock } = useSecurity();
+  const [exportingJson, setExportingJson] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+
+  const toggleBiometric = async (next: boolean) => {
+    if (next) {
+      if (!(await isBiometricAvailable())) {
+        Alert.alert(
+          'Biométrie indisponible',
+          'Aucune biométrie (Face ID, Touch ID ou empreinte) n’est configurée sur cet appareil.',
+        );
+        return;
+      }
+      // On vérifie que l'utilisateur peut bien se déverrouiller avant d'activer.
+      const ok = await tryUnlock();
+      if (!ok) return;
+    }
+    await setBiometricEnabled(next);
+  };
+
+  const runExport = async (
+    exporter: () => Promise<void>,
+    setBusy: (busy: boolean) => void,
+  ) => {
+    setBusy(true);
+    try {
+      await exporter();
+    } catch (error) {
+      Alert.alert('Export impossible', error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const eraseAllData = () => {
     Alert.alert(
@@ -60,6 +96,44 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={{ gap: spacing.md }}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Sécurité</Text>
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>
+              Verrouillage biométrique
+            </Text>
+            <Text style={{ color: theme.colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+              Exige Face ID / Touch ID / empreinte à chaque ouverture de l’application.
+            </Text>
+          </View>
+          <Switch
+            value={Boolean(biometricEnabled)}
+            onValueChange={(next) => void toggleBiometric(next)}
+            trackColor={{ true: theme.colors.primary }}
+          />
+        </View>
+      </Card>
+
+      <Card style={{ gap: spacing.md }}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Exporter mes données</Text>
+        <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
+          Sauvegarde complète (JSON) ou transactions seules (CSV, pour Excel/Numbers), via la feuille de
+          partage : AirDrop, Fichiers, mail…
+        </Text>
+        <Button
+          label="Exporter tout (JSON)"
+          onPress={() => void runExport(() => exportAllDataAsJson(db), setExportingJson)}
+          loading={exportingJson}
+        />
+        <Button
+          label="Exporter les transactions (CSV)"
+          variant="secondary"
+          onPress={() => void runExport(() => exportTransactionsAsCsv(db), setExportingCsv)}
+          loading={exportingCsv}
+        />
+      </Card>
+
+      <Card style={{ gap: spacing.md }}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Données</Text>
         <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
           Supprime définitivement toutes les données de l’application sur cet appareil.
@@ -104,5 +178,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  toggleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
   },
 });
