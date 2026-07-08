@@ -99,6 +99,44 @@ UPDATE transactions SET bill_id = (
 WHERE id IN (SELECT transaction_id FROM bill_payments WHERE transaction_id IS NOT NULL);
 `;
 
+// V4 : l'épargne passe d'« objectifs » à de vrais « comptes » (Livret A, LDDS…)
+// avec une valeur de départ (épargne déjà cumulée), et les versements deviennent
+// des virements datés, rattachés à un compte, marquables « effectués » (coche).
+const MIGRATION_V4 = `
+CREATE TABLE savings_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT 'wallet-outline',
+  color TEXT NOT NULL DEFAULT '#6C5CE7',
+  initial_cents INTEGER NOT NULL DEFAULT 0,   -- valeur de départ (épargne déjà cumulée)
+  target_cents INTEGER,                       -- objectif optionnel
+  monthly_cents INTEGER,                      -- virement mensuel prévu (prévisionnel)
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+INSERT INTO savings_accounts (id, name, icon, color, initial_cents, target_cents, monthly_cents, sort_order, created_at)
+  SELECT id, name, icon, color, 0, target_cents, monthly_cents, id, created_at FROM savings_goals;
+
+CREATE TABLE savings_transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL REFERENCES savings_accounts(id) ON DELETE CASCADE,
+  amount_cents INTEGER NOT NULL,
+  month TEXT NOT NULL,       -- 'yyyy-MM'
+  date TEXT NOT NULL,        -- 'yyyy-MM-dd'
+  done INTEGER NOT NULL DEFAULT 1,   -- 0 = prévu, 1 = effectué (coché)
+  note TEXT
+);
+CREATE INDEX idx_savings_transfers_account ON savings_transfers(account_id);
+CREATE INDEX idx_savings_transfers_month ON savings_transfers(month);
+
+INSERT INTO savings_transfers (account_id, amount_cents, month, date, done, note)
+  SELECT goal_id, amount_cents, substr(date, 1, 7), date, 1, note FROM savings_entries;
+
+DROP TABLE savings_entries;
+DROP TABLE savings_goals;
+`;
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -115,6 +153,10 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   if (current < 3) {
     await db.execAsync(MIGRATION_V3);
     await db.execAsync('PRAGMA user_version = 3');
+  }
+  if (current < 4) {
+    await db.execAsync(MIGRATION_V4);
+    await db.execAsync('PRAGMA user_version = 4');
   }
 }
 

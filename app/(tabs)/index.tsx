@@ -14,7 +14,11 @@ import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getBillsSummary, listBillsForMonth } from '@/src/features/bills/repository';
 import { listBudgetsWithSpending } from '@/src/features/budgets/repository';
-import { getPlannedMonthlySavings, getTotalSavings } from '@/src/features/savings/repository';
+import {
+  getPlannedSavingsForMonth,
+  getRealSavingsForMonth,
+  getSavingsOverview,
+} from '@/src/features/savings/repository';
 import {
   getMonthlySeries,
   getMonthTotals,
@@ -40,8 +44,9 @@ export default function DashboardScreen() {
   const { data: budgets } = useLiveQuery((db) => listBudgetsWithSpending(db, month), [month]);
   const { data: bills } = useLiveQuery((db) => listBillsForMonth(db, month), [month]);
   const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
-  const { data: savings } = useLiveQuery((db) => getTotalSavings(db));
-  const { data: plannedSavings } = useLiveQuery((db) => getPlannedMonthlySavings(db));
+  const { data: savings } = useLiveQuery((db) => getSavingsOverview(db));
+  const { data: plannedSavings } = useLiveQuery((db) => getPlannedSavingsForMonth(db, month), [month]);
+  const { data: realSavings } = useLiveQuery((db) => getRealSavingsForMonth(db, month), [month]);
   const { data: transactions } = useLiveQuery((db) => listTransactionsForMonth(db, month), [month]);
   const { data: series } = useLiveQuery((db) => getMonthlySeries(db, lastMonthKeys(6)), [month]);
 
@@ -53,11 +58,14 @@ export default function DashboardScreen() {
   const topBudgets = (budgets ?? []).slice(0, 3);
   const recentTransactions = (transactions ?? []).slice(0, 4);
 
-  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue
+  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue du mois
   const billsTotal = billsSummary?.total_cents ?? 0;
   const budgetsTotal = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
   const savingsPlanned = plannedSavings ?? 0;
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
+  // Reste à vivre réel : solde réel du mois − épargne réellement virée ce mois
+  const savingsReal = realSavings ?? 0;
+  const remainingReal = balance - savingsReal;
 
   return (
     <View style={{ flex: 1 }}>
@@ -128,22 +136,41 @@ export default function DashboardScreen() {
           </Pressable>
         </View>
 
-        <SectionHeader title="Reste à vivre prévisionnel" />
+        <SectionHeader title="Reste à vivre" />
         <Card style={{ gap: spacing.md }}>
-          <Text
-            style={[
-              styles.remainingValue,
-              { color: remainingToLive < 0 ? theme.colors.danger : theme.colors.success },
-            ]}
-          >
-            {formatCents(remainingToLive)}
-          </Text>
+          <View style={styles.rtvRow}>
+            <View style={styles.rtvCol}>
+              <Text style={[styles.rtvColLabel, { color: theme.colors.textMuted }]}>Prévisionnel</Text>
+              <Text
+                style={[
+                  styles.remainingValue,
+                  { color: remainingToLive < 0 ? theme.colors.danger : theme.colors.text },
+                ]}
+              >
+                {formatCents(remainingToLive)}
+              </Text>
+            </View>
+            <View style={[styles.rtvDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.rtvCol}>
+              <Text style={[styles.rtvColLabel, { color: theme.colors.textMuted }]}>Réel à ce jour</Text>
+              <Text
+                style={[
+                  styles.remainingValue,
+                  { color: remainingReal < 0 ? theme.colors.danger : theme.colors.success },
+                ]}
+              >
+                {formatCents(remainingReal)}
+              </Text>
+            </View>
+          </View>
+
           {income === 0 ? (
             <Text style={{ color: theme.colors.textMuted, fontSize: 13, lineHeight: 18 }}>
               Ajoutez vos revenus du mois (bouton « Revenu ») pour un calcul complet.
             </Text>
           ) : null}
-          <View style={{ gap: spacing.xs }}>
+
+          <View style={{ gap: spacing.xs, marginTop: spacing.xs }}>
             {(
               [
                 ['Revenus du mois', income, theme.colors.success],
@@ -161,7 +188,8 @@ export default function DashboardScreen() {
             ))}
           </View>
           <Text style={{ color: theme.colors.textMuted, fontSize: 11, lineHeight: 15 }}>
-            Ce qu'il vous reste pour le mois une fois les factures, les budgets et l'épargne mis de côté.
+            Prévisionnel = revenus − factures − budgets − épargne prévue. Réel = solde du mois − épargne
+            réellement virée.
           </Text>
         </Card>
 
@@ -306,10 +334,10 @@ export default function DashboardScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.savingsValue, { color: theme.colors.text }]}>
-              {formatCents(savings?.saved_cents ?? 0)}
+              {formatCents(savings?.total_real_cents ?? 0)}
             </Text>
             <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
-              épargnés{savings && savings.target_cents > 0 ? ` sur ${formatCents(savings.target_cents)}` : ''}
+              épargnés au total sur vos comptes
             </Text>
           </View>
         </Card>
@@ -430,13 +458,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   remainingValue: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: '800',
   },
   remainingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  rtvRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rtvCol: {
+    flex: 1,
+    gap: 2,
+  },
+  rtvColLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  rtvDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    marginHorizontal: spacing.md,
   },
   donutCard: {
     paddingVertical: spacing.xl,
