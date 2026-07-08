@@ -31,6 +31,21 @@ export async function createBill(
   invalidateQueries();
 }
 
+/** Modifie une facture. N'affecte pas les dépenses déjà créées par les pointages passés. */
+export async function updateBill(
+  db: SQLiteDatabase,
+  input: { id: number; name: string; amountCents: number; dueDay: number; categoryId?: number | null },
+): Promise<void> {
+  await db.runAsync('UPDATE bills SET name = ?, amount_cents = ?, due_day = ?, category_id = ? WHERE id = ?', [
+    input.name,
+    input.amountCents,
+    input.dueDay,
+    input.categoryId ?? null,
+    input.id,
+  ]);
+  invalidateQueries();
+}
+
 export async function deleteBill(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM bills WHERE id = ?', [id]);
   invalidateQueries();
@@ -75,9 +90,9 @@ export async function setBillPaid(
     if (existing) return;
 
     const result = await db.runAsync(
-      `INSERT INTO transactions (category_id, label, amount_cents, type, date, month, note)
-       VALUES (?, ?, ?, 'expense', ?, ?, 'Facture récurrente')`,
-      [bill.category_id, bill.name, bill.amount_cents, isoDayInMonth(month, bill.due_day), month],
+      `INSERT INTO transactions (category_id, label, amount_cents, type, date, month, note, bill_id)
+       VALUES (?, ?, ?, 'expense', ?, ?, 'Facture récurrente', ?)`,
+      [bill.category_id, bill.name, bill.amount_cents, isoDayInMonth(month, bill.due_day), month, billId],
     );
     await db.runAsync(
       `INSERT INTO bill_payments (bill_id, month, paid_at, transaction_id) VALUES (?, ?, datetime('now'), ?)`,

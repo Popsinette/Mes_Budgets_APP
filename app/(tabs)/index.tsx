@@ -14,7 +14,7 @@ import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getBillsSummary, listBillsForMonth } from '@/src/features/bills/repository';
 import { listBudgetsWithSpending } from '@/src/features/budgets/repository';
-import { getTotalSavings } from '@/src/features/savings/repository';
+import { getPlannedMonthlySavings, getTotalSavings } from '@/src/features/savings/repository';
 import {
   getMonthlySeries,
   getMonthTotals,
@@ -41,6 +41,7 @@ export default function DashboardScreen() {
   const { data: bills } = useLiveQuery((db) => listBillsForMonth(db, month), [month]);
   const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
   const { data: savings } = useLiveQuery((db) => getTotalSavings(db));
+  const { data: plannedSavings } = useLiveQuery((db) => getPlannedMonthlySavings(db));
   const { data: transactions } = useLiveQuery((db) => listTransactionsForMonth(db, month), [month]);
   const { data: series } = useLiveQuery((db) => getMonthlySeries(db, lastMonthKeys(6)), [month]);
 
@@ -51,6 +52,12 @@ export default function DashboardScreen() {
   const upcomingBills = (bills ?? []).filter((b) => !b.paid_at).slice(0, 3);
   const topBudgets = (budgets ?? []).slice(0, 3);
   const recentTransactions = (transactions ?? []).slice(0, 4);
+
+  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue
+  const billsTotal = billsSummary?.total_cents ?? 0;
+  const budgetsTotal = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
+  const savingsPlanned = plannedSavings ?? 0;
+  const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
 
   return (
     <View style={{ flex: 1 }}>
@@ -120,6 +127,43 @@ export default function DashboardScreen() {
             <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Épargner</Text>
           </Pressable>
         </View>
+
+        <SectionHeader title="Reste à vivre prévisionnel" />
+        <Card style={{ gap: spacing.md }}>
+          <Text
+            style={[
+              styles.remainingValue,
+              { color: remainingToLive < 0 ? theme.colors.danger : theme.colors.success },
+            ]}
+          >
+            {formatCents(remainingToLive)}
+          </Text>
+          {income === 0 ? (
+            <Text style={{ color: theme.colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+              Ajoutez vos revenus du mois (bouton « Revenu ») pour un calcul complet.
+            </Text>
+          ) : null}
+          <View style={{ gap: spacing.xs }}>
+            {(
+              [
+                ['Revenus du mois', income, theme.colors.success],
+                ['Factures récurrentes', -billsTotal, theme.colors.text],
+                ['Budgets alloués', -budgetsTotal, theme.colors.text],
+                ['Épargne prévue', -savingsPlanned, theme.colors.text],
+              ] as Array<[string, number, string]>
+            ).map(([label, value, color]) => (
+              <View key={label} style={styles.remainingRow}>
+                <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>{label}</Text>
+                <Text style={{ color, fontSize: 13, fontWeight: '700' }}>
+                  {formatCents(value, { signed: true })}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ color: theme.colors.textMuted, fontSize: 11, lineHeight: 15 }}>
+            Ce qu'il vous reste pour le mois une fois les factures, les budgets et l'épargne mis de côté.
+          </Text>
+        </Card>
 
         <SectionHeader title="Dépenses par catégorie" />
         <Card style={styles.donutCard}>
@@ -384,6 +428,15 @@ const styles = StyleSheet.create({
   quickActionLabel: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  remainingValue: {
+    fontSize: 30,
+    fontWeight: '800',
+  },
+  remainingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   donutCard: {
     paddingVertical: spacing.xl,

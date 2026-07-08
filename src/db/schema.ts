@@ -89,6 +89,16 @@ const MIGRATION_V2 = `
 ALTER TABLE bill_payments ADD COLUMN transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL;
 `;
 
+// V3 : les dépenses issues du pointage d'une facture portent bill_id, pour
+// être exclues du suivi des budgets (qui ne concernent que les dépenses libres).
+const MIGRATION_V3 = `
+ALTER TABLE transactions ADD COLUMN bill_id INTEGER REFERENCES bills(id) ON DELETE SET NULL;
+UPDATE transactions SET bill_id = (
+  SELECT bp.bill_id FROM bill_payments bp WHERE bp.transaction_id = transactions.id
+)
+WHERE id IN (SELECT transaction_id FROM bill_payments WHERE transaction_id IS NOT NULL);
+`;
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -101,6 +111,10 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   if (current < 2) {
     await db.execAsync(MIGRATION_V2);
     await db.execAsync('PRAGMA user_version = 2');
+  }
+  if (current < 3) {
+    await db.execAsync(MIGRATION_V3);
+    await db.execAsync('PRAGMA user_version = 3');
   }
 }
 

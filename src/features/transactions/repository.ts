@@ -13,6 +13,8 @@ export type Transaction = {
   date: string;
   month: MonthKey;
   note: string | null;
+  /** Renseigné quand la dépense provient du pointage d'une facture récurrente. */
+  bill_id: number | null;
 };
 
 export type TransactionWithCategory = Transaction & {

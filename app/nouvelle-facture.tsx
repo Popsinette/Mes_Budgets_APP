@@ -1,24 +1,37 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { notify } from '@/src/utils/dialogs';
+import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { CategoryPicker } from '@/src/components/ui/CategoryPicker';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
-import { createBill } from '@/src/features/bills/repository';
+import { createBill, deleteBill, updateBill } from '@/src/features/bills/repository';
 import { spacing, useTheme } from '@/src/theme';
 import { parseAmountToCents } from '@/src/utils/money';
 
 export default function NewBillScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [dueDay, setDueDay] = useState('');
-  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const params = useLocalSearchParams<{
+    billId?: string;
+    name?: string;
+    amount?: string;
+    dueDay?: string;
+    categoryId?: string;
+  }>();
+  const editingId = params.billId ? Number(params.billId) : null;
+
+  const [name, setName] = useState(params.name ?? '');
+  const [amount, setAmount] = useState(
+    params.amount ? String(Number(params.amount) / 100).replace('.', ',') : '',
+  );
+  const [dueDay, setDueDay] = useState(params.dueDay ?? '');
+  const [categoryId, setCategoryId] = useState<number | null>(
+    params.categoryId ? Number(params.categoryId) : null,
+  );
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -37,13 +50,33 @@ export default function NewBillScreen() {
       return;
     }
     setSaving(true);
-    await createBill(db, { name: name.trim(), amountCents, dueDay: day, categoryId });
+    if (editingId) {
+      await updateBill(db, { id: editingId, name: name.trim(), amountCents, dueDay: day, categoryId });
+    } else {
+      await createBill(db, { name: name.trim(), amountCents, dueDay: day, categoryId });
+    }
     router.back();
+  };
+
+  const remove = () => {
+    if (!editingId) return;
+    confirmAction({
+      title: 'Supprimer la facture',
+      message: `Supprimer « ${name} » définitivement ? Les dépenses des mois déjà pointés sont conservées.`,
+      confirmLabel: 'Supprimer',
+      destructive: true,
+      onConfirm: () => {
+        void (async () => {
+          await deleteBill(db, editingId);
+          router.back();
+        })();
+      },
+    });
   };
 
   return (
     <Screen>
-      <ModalHeader title="Nouvelle facture" />
+      <ModalHeader title={editingId ? 'Modifier la facture' : 'Nouvelle facture'} />
       <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
         Facture récurrente mensuelle : loyer, électricité, internet, abonnements…
       </Text>
@@ -74,6 +107,7 @@ export default function NewBillScreen() {
       </View>
 
       <Button label="Enregistrer" onPress={() => void save()} loading={saving} />
+      {editingId ? <Button label="Supprimer la facture" variant="danger" onPress={remove} /> : null}
     </Screen>
   );
 }

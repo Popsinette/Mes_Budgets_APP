@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { listCategories, type Category } from '@/src/features/categories/repository';
@@ -40,6 +42,19 @@ export function CategoryPicker({ selectedId, onSelect, excludeIds = [] }: Catego
           </Pressable>
         );
       })}
+      <Pressable
+        onPress={() => router.push('/nouvelle-categorie')}
+        style={[
+          styles.item,
+          styles.newItem,
+          { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
+        ]}
+      >
+        <View style={[styles.newIcon, { backgroundColor: theme.colors.primary }]}>
+          <Ionicons name="add" size={20} color={theme.colors.onPrimary} />
+        </View>
+        <Text style={[styles.name, { color: theme.colors.primary }]}>Nouvelle</Text>
+      </Pressable>
     </View>
   );
 }
@@ -62,5 +77,15 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  newItem: {
+    borderStyle: 'dashed',
+  },
+  newIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

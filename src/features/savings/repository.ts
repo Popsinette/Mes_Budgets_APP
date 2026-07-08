@@ -67,6 +67,17 @@ export async function listGoalsWithProgress(db: SQLiteDatabase): Promise<Savings
   );
 }
 
+/** Somme des versements mensuels prévus sur les objectifs non encore atteints. */
+export async function getPlannedMonthlySavings(db: SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ planned: number }>(
+    `SELECT COALESCE(SUM(g.monthly_cents), 0) AS planned
+     FROM savings_goals g
+     WHERE g.monthly_cents IS NOT NULL
+       AND (SELECT COALESCE(SUM(e.amount_cents), 0) FROM savings_entries e WHERE e.goal_id = g.id) < g.target_cents`,
+  );
+  return row?.planned ?? 0;
+}
+
 export async function getTotalSavings(db: SQLiteDatabase): Promise<{ saved_cents: number; target_cents: number }> {
   const row = await db.getFirstAsync<{ saved_cents: number; target_cents: number }>(
     `SELECT

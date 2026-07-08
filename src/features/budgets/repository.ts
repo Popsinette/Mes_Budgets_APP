@@ -41,6 +41,7 @@ export async function listBudgetsWithSpending(
        COALESCE((
          SELECT SUM(t.amount_cents) FROM transactions t
          WHERE t.category_id = b.category_id AND t.month = b.month AND t.type = 'expense'
+           AND t.bill_id IS NULL  -- les prélèvements de factures ne comptent pas dans les budgets
        ), 0) AS spent_cents
      FROM budgets b
      JOIN categories c ON c.id = b.category_id

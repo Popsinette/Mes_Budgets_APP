@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, Switch, Text, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
@@ -112,6 +113,14 @@ export default function SettingsScreen() {
         </View>
       </Card>
       ) : null}
+
+      <Card style={{ gap: spacing.md }}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Catégories</Text>
+        <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
+          Créez vos propres catégories et personnalisez leur nom, icône et couleur.
+        </Text>
+        <Button label="Gérer les catégories" variant="secondary" onPress={() => router.push('/categories')} />
+      </Card>
 
       <Card style={{ gap: spacing.md }}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Exporter mes données</Text>

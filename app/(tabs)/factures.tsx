@@ -51,6 +51,19 @@ export default function BillsScreen() {
     });
   };
 
+  const openEdit = (bill: BillWithStatus) => {
+    router.push({
+      pathname: '/nouvelle-facture',
+      params: {
+        billId: String(bill.id),
+        name: bill.name,
+        amount: String(bill.amount_cents),
+        dueDay: String(bill.due_day),
+        ...(bill.category_id ? { categoryId: String(bill.category_id) } : {}),
+      },
+    });
+  };
+
   const isCurrentMonth = month === currentMonthKey();
   const today = new Date().getDate();
 
@@ -59,43 +72,50 @@ export default function BillsScreen() {
     const isLate = !isPaid && isCurrentMonth && bill.due_day < today;
     const isSoon = !isPaid && isCurrentMonth && !isLate && bill.due_day - today <= 5;
     return (
-      <Card key={bill.id} style={styles.billCard} onPress={() => togglePaid(bill)} onLongPress={() => confirmDelete(bill)}>
-        <Pressable hitSlop={6} onPress={() => togglePaid(bill)}>
+      <Card key={bill.id} style={styles.billCard}>
+        <Pressable
+          style={styles.billMain}
+          onPress={() => togglePaid(bill)}
+          onLongPress={() => confirmDelete(bill)}
+        >
           <Ionicons
             name={isPaid ? 'checkmark-circle' : 'ellipse-outline'}
             size={26}
             color={isPaid ? theme.colors.success : theme.colors.textMuted}
           />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text
-              style={[
-                styles.billName,
-                { color: theme.colors.text, textDecorationLine: isPaid ? 'line-through' : 'none' },
-              ]}
-              numberOfLines={1}
-            >
-              {bill.name}
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Text
+                style={[
+                  styles.billName,
+                  { color: theme.colors.text, textDecorationLine: isPaid ? 'line-through' : 'none' },
+                ]}
+                numberOfLines={1}
+              >
+                {bill.name}
+              </Text>
+              {isLate ? (
+                <View style={[styles.badge, { backgroundColor: theme.colors.dangerSoft }]}>
+                  <Text style={[styles.badgeText, { color: theme.colors.danger }]}>En retard</Text>
+                </View>
+              ) : isSoon ? (
+                <View style={[styles.badge, { backgroundColor: theme.colors.warningSoft }]}>
+                  <Text style={[styles.badgeText, { color: theme.colors.warning }]}>Bientôt</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+              Se répète le {bill.due_day} de chaque mois
+              {bill.category_name ? ` · ${bill.category_name}` : ''}
             </Text>
-            {isLate ? (
-              <View style={[styles.badge, { backgroundColor: theme.colors.dangerSoft }]}>
-                <Text style={[styles.badgeText, { color: theme.colors.danger }]}>En retard</Text>
-              </View>
-            ) : isSoon ? (
-              <View style={[styles.badge, { backgroundColor: theme.colors.warningSoft }]}>
-                <Text style={[styles.badgeText, { color: theme.colors.warning }]}>Bientôt</Text>
-              </View>
-            ) : null}
           </View>
-          <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
-            Se répète le {bill.due_day} de chaque mois
-            {bill.category_name ? ` · ${bill.category_name}` : ''}
+          <Text style={[styles.billAmount, { color: isPaid ? theme.colors.textMuted : theme.colors.text }]}>
+            {formatCents(bill.amount_cents)}
           </Text>
-        </View>
-        <Text style={[styles.billAmount, { color: isPaid ? theme.colors.textMuted : theme.colors.text }]}>
-          {formatCents(bill.amount_cents)}
-        </Text>
+        </Pressable>
+        <Pressable hitSlop={8} onPress={() => openEdit(bill)} style={styles.billEdit}>
+          <Ionicons name="create-outline" size={20} color={theme.colors.textMuted} />
+        </Pressable>
       </Card>
     );
   };
@@ -143,7 +163,7 @@ export default function BillsScreen() {
             ) : null}
             <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
               Touchez une facture pour la pointer payée — la dépense est ajoutée automatiquement à votre
-              activité et vos budgets. Appui long pour la supprimer.
+              activité (hors budgets). Icône ✎ pour la modifier, appui long pour la supprimer.
             </Text>
           </>
         )}
@@ -170,7 +190,16 @@ const styles = StyleSheet.create({
   billCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  billMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
+  },
+  billEdit: {
+    padding: spacing.xs,
   },
   billName: {
     fontSize: 15,
