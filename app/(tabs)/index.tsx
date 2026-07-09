@@ -90,7 +90,7 @@ export default function DashboardScreen() {
         </View>
 
         <LinearGradient
-          colors={theme.dark ? ['#4C3FD1', '#7C5CE0'] : ['#6C5CE7', '#8E7CF3']}
+          colors={theme.gradients.primary}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.balanceCard}

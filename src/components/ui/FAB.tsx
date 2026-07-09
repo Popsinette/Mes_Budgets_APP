@@ -24,6 +24,7 @@ export function FAB({ onPress, icon = 'add' }: FABProps) {
         styles.fab,
         {
           backgroundColor: theme.colors.primary,
+          shadowColor: theme.colors.primary,
           bottom: insets.bottom + spacing.lg,
           transform: [{ scale: pressed ? 0.94 : 1 }],
         },
@@ -43,10 +44,9 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
 });

@@ -35,7 +35,7 @@ Flux de données : écrans (`app/`) → `useLiveQuery` → repositories (`src/fe
 - **Web/PWA** : SQLCipher, SecureStore, Face ID et `Alert` n'existent pas sur web. Les gardes `Platform.OS === 'web'` sont dans `src/db/index.ts`, `BiometricGate`, `exporter.ts` et `reglages.tsx`. Utiliser `notify`/`confirmAction` (`src/utils/dialogs.ts`) au lieu de `Alert.alert` (muet sur web). Sur web, la persistance passe par OPFS (wasm) — `metro.config.js` déclare `.wasm` comme asset, ne pas le retirer.
 - **Détail d'un budget** : toucher un budget (`budgets.tsx`) ouvre `app/budget-detail.tsx` (modale) qui liste les dépenses de la catégorie pour le mois via `listBudgetExpenses` (mêmes règles que le calcul du budget : `bill_id IS NULL`, dépenses libres). On peut y pointer/supprimer une dépense, et modifier/supprimer le budget. L'édition du budget reste `nouveau-budget.tsx`.
 - **Navigation** : onglets dans `app/(tabs)/`, formulaires en modales à la racine de `app/` (déclarées dans `app/_layout.tsx`). `app/+html.tsx` porte les balises PWA (manifest, service worker) avec des chemins **relatifs** — requis pour GitHub Pages sous sous-chemin.
-- **Thème** : `useTheme()` (`src/theme/`) clair/sombre automatique ; les couleurs viennent toujours du thème ou de la couleur de catégorie en base, jamais en dur dans les écrans.
+- **Thème** : `useTheme()` (`src/theme/`) clair/sombre automatique ; les couleurs viennent toujours du thème ou de la couleur de catégorie en base, jamais en dur dans les écrans. Les cartes « héro » (dégradés) utilisent `theme.gradients.primary` / `theme.gradients.success` (source unique, ne pas ré-écrire les hex dans les écrans) ; le texte posé dessus utilise `theme.colors.onAccent` / `onAccentMuted`.
 
 ## Déploiement
 

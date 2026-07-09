@@ -34,29 +34,43 @@ export type Theme = {
     dangerSoft: string;
     income: string;
     expense: string;
+    /** Texte/icônes posés sur une surface colorée ou un dégradé (cartes héro). */
+    onAccent: string;
+    onAccentMuted: string;
+  };
+  /** Dégradés des cartes « héro » — source unique, partagée par tous les écrans. */
+  gradients: {
+    primary: readonly [string, string];
+    success: readonly [string, string];
   };
 };
 
 export const lightTheme: Theme = {
   dark: false,
   colors: {
-    background: '#F5F6FA',
+    background: '#F4F4FB',
     card: '#FFFFFF',
-    cardMuted: '#F0F1F7',
-    text: '#17182B',
+    cardMuted: '#F0F0F8',
+    text: '#181A2E',
     textMuted: '#6E7191',
-    border: '#E9EAF2',
+    border: '#EAEAF4',
     primary: palette.violet,
     onPrimary: '#FFFFFF',
     primarySoft: '#EEEBFF',
     success: palette.mint,
-    successSoft: '#E7F8F1',
+    successSoft: '#E6F7F0',
     warning: palette.amber,
     warningSoft: '#FEF3E2',
     danger: palette.red,
     dangerSoft: '#FDECEC',
     income: palette.mint,
     expense: palette.red,
+    onAccent: '#FFFFFF',
+    onAccentMuted: 'rgba(255,255,255,0.82)',
+  },
+  gradients: {
+    primary: ['#6C5CE7', '#9B85F7'],
+    success: ['#10B981', '#3ED9A4'],
   },
 };
 
@@ -80,6 +94,12 @@ export const darkTheme: Theme = {
     dangerSoft: '#3F1D1D',
     income: '#34D399',
     expense: '#F87171',
+    onAccent: '#FFFFFF',
+    onAccentMuted: 'rgba(255,255,255,0.82)',
+  },
+  gradients: {
+    primary: ['#4C3FD1', '#7C5CE0'],
+    success: ['#0E7A5F', '#17A87F'],
   },
 };
 

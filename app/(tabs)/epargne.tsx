@@ -70,7 +70,7 @@ export default function SavingsScreen() {
         <Text style={[styles.title, { color: theme.colors.text }]}>Épargne</Text>
 
         <LinearGradient
-          colors={theme.dark ? ['#0E7A5F', '#12A67E'] : ['#10B981', '#34D399']}
+          colors={theme.gradients.success}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.globalCard}
