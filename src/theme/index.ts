@@ -14,16 +14,27 @@ export const palette = {
   amber: '#B7791F',
   brick: '#BE4A3A',
   slate: '#797A80',
-  // Couleurs proposées pour les pastilles de catégories / comptes (choix utilisateur).
-  violet: '#6C5CE7',
-  mint: '#10B981',
-  red: '#EF4444',
-  blue: '#3B82F6',
-  pink: '#EC4899',
-  teal: '#14B8A6',
-  orange: '#F97316',
-  purple: '#8B5CF6',
 };
+
+/**
+ * Palette des pastilles de catégories / comptes (choix utilisateur). Teintes
+ * sourdes et désaturées, accordées au fond papier et à l'encre — plus de
+ * couleurs criardes. L'ordre sert de séquence par défaut.
+ */
+export const categoryPalette = [
+  '#C56A4E', // terracotta
+  '#C79A3E', // ocre
+  '#8B9150', // olive
+  '#5F9070', // sauge
+  '#3F9195', // sarcelle
+  '#5580A6', // océan
+  '#6E6FA6', // indigo
+  '#7A6E9C', // lavande
+  '#9A6494', // prune
+  '#C57487', // rose
+  '#B5695A', // argile
+  '#857F76', // pierre
+] as const;
 
 /** Familles chargées au démarrage (voir app/_layout.tsx). */
 export const fonts = {

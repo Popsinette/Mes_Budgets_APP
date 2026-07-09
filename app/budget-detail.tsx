@@ -23,7 +23,7 @@ import {
   type TransactionWithCategory,
 } from '@/src/features/transactions/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, monthKeyLabel, shortDayLabel } from '@/src/utils/dates';
+import { currentMonthKey, monthKeyLabel, monthPaceRatio, shortDayLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
@@ -48,6 +48,12 @@ export default function BudgetDetailScreen() {
   const allocated = budget?.amount_cents ?? 0;
   const remaining = allocated - spent;
   const ratio = allocated > 0 ? spent / allocated : 0;
+  const over = ratio > 1;
+  const barColor = over
+    ? theme.colors.danger
+    : ratio > 0.9
+      ? theme.colors.warning
+      : (budget?.category_color ?? theme.colors.text);
 
   const togglePointed = (t: TransactionWithCategory) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -114,11 +120,7 @@ export default function BudgetDetailScreen() {
             </Caption>
           </View>
         </View>
-        <ProgressBar
-          ratio={ratio}
-          color={ratio <= 0.85 ? (budget?.category_color ?? theme.colors.text) : undefined}
-          height={10}
-        />
+        <ProgressBar ratio={ratio} color={barColor} height={11} markerRatio={monthPaceRatio(month)} />
         <View style={styles.actionsRow}>
           <Pressable
             onPress={editBudget}

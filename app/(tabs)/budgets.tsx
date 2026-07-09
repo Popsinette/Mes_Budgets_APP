@@ -19,7 +19,7 @@ import {
   listBudgetsWithSpending,
 } from '@/src/features/budgets/repository';
 import { spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, shiftMonthKey } from '@/src/utils/dates';
+import { currentMonthKey, monthPaceRatio, shiftMonthKey } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 export default function BudgetsScreen() {
@@ -31,6 +31,7 @@ export default function BudgetsScreen() {
   const totalBudget = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
   const totalSpent = (budgets ?? []).reduce((sum, b) => sum + b.spent_cents, 0);
   const globalRatio = totalBudget > 0 ? totalSpent / totalBudget : 0;
+  const pace = monthPaceRatio(month);
 
   const confirmDelete = (id: number, name: string) => {
     confirmAction({
@@ -67,12 +68,30 @@ export default function BudgetsScreen() {
                 <Money cents={totalBudget} size={16} weight="semibold" tone="muted" />
               </View>
             </View>
-            <ProgressBar ratio={globalRatio} height={10} />
-            <Caption>
-              {globalRatio > 1
-                ? `Dépassement de ${formatCents(totalSpent - totalBudget)}`
-                : `Reste ${formatCents(totalBudget - totalSpent)} disponible`}
-            </Caption>
+            <ProgressBar
+              ratio={globalRatio}
+              height={11}
+              markerRatio={pace}
+              color={
+                globalRatio > 1
+                  ? theme.colors.danger
+                  : globalRatio > 0.9
+                    ? theme.colors.warning
+                    : theme.colors.success
+              }
+            />
+            <View style={styles.metaRow}>
+              <Caption tone={globalRatio > 1 ? 'danger' : 'muted'}>
+                {globalRatio > 1
+                  ? `Dépassement de ${formatCents(totalSpent - totalBudget)}`
+                  : `Reste ${formatCents(totalBudget - totalSpent)} disponible`}
+              </Caption>
+              {pace != null ? (
+                <Caption>
+                  {'▏'} rythme · jour {new Date().getDate()}
+                </Caption>
+              ) : null}
+            </View>
           </Card>
         ) : null}
 
@@ -94,6 +113,12 @@ export default function BudgetsScreen() {
           (budgets ?? []).map((budget) => {
             const ratio = budget.amount_cents > 0 ? budget.spent_cents / budget.amount_cents : 0;
             const remaining = budget.amount_cents - budget.spent_cents;
+            const over = ratio > 1;
+            const barColor = over
+              ? theme.colors.danger
+              : ratio > 0.9
+                ? theme.colors.warning
+                : budget.category_color;
             return (
               <Card
                 key={budget.id}
@@ -116,12 +141,23 @@ export default function BudgetsScreen() {
                         : `Dépassé de ${formatCents(-remaining)}`}
                     </Caption>
                   </View>
-                  <View style={{ alignItems: 'flex-end', gap: 1 }}>
-                    <Money cents={budget.spent_cents} size={16} weight="bold" />
-                    <Caption>sur {formatCents(budget.amount_cents)}</Caption>
+                  <View style={styles.pct}>
+                    <View
+                      style={[
+                        styles.pctPill,
+                        {
+                          backgroundColor: over ? theme.colors.dangerSoft : theme.colors.cardMuted,
+                        },
+                      ]}
+                    >
+                      <Body weight="semibold" size={12} tone={over ? 'danger' : 'muted'}>
+                        {Math.round(ratio * 100)}%
+                      </Body>
+                    </View>
+                    <Money cents={budget.spent_cents} size={15} weight="bold" />
                   </View>
                 </View>
-                <ProgressBar ratio={ratio} color={ratio <= 0.85 ? budget.category_color : undefined} />
+                <ProgressBar ratio={ratio} color={barColor} markerRatio={pace} />
               </Card>
             );
           })
@@ -142,9 +178,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   budgetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+  },
+  pct: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  pctPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
   },
 });

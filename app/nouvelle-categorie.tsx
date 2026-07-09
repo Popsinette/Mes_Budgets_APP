@@ -8,7 +8,7 @@ import { FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { createCategory, deleteCategory, updateCategory } from '@/src/features/categories/repository';
-import { fonts, palette, spacing, useTheme } from '@/src/theme';
+import { categoryPalette, fonts, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 
 const CATEGORY_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
@@ -32,18 +32,7 @@ const CATEGORY_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   'construct-outline',
 ];
 
-const CATEGORY_COLORS = [
-  palette.violet,
-  palette.mint,
-  palette.blue,
-  palette.pink,
-  palette.orange,
-  palette.teal,
-  palette.amber,
-  palette.red,
-  palette.purple,
-  palette.slate,
-];
+const CATEGORY_COLORS = categoryPalette;
 
 export default function NewCategoryScreen() {
   const theme = useTheme();

@@ -8,7 +8,7 @@ import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { createAccount, deleteAccount, updateAccount } from '@/src/features/savings/repository';
-import { fonts, palette, spacing, useTheme } from '@/src/theme';
+import { categoryPalette, fonts, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { parseAmountToCents } from '@/src/utils/money';
 
@@ -27,16 +27,7 @@ const ACCOUNT_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   'diamond-outline',
 ];
 
-const ACCOUNT_COLORS = [
-  palette.mint,
-  palette.violet,
-  palette.blue,
-  palette.pink,
-  palette.orange,
-  palette.teal,
-  palette.amber,
-  palette.purple,
-];
+const ACCOUNT_COLORS = categoryPalette;
 
 export default function NewAccountScreen() {
   const theme = useTheme();

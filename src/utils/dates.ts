@@ -56,6 +56,17 @@ export function monthLabelFromNow(offset: number): string {
   return format(addMonths(new Date(), offset), 'MMMM yyyy', { locale: fr });
 }
 
+/**
+ * Fraction du mois écoulée (0..1) pour le mois courant — sert de repère de
+ * rythme sur les jauges de budget. `undefined` pour tout autre mois (pas de
+ * rythme pertinent sur un mois passé ou futur).
+ */
+export function monthPaceRatio(month: MonthKey): number | undefined {
+  if (month !== currentMonthKey()) return undefined;
+  const now = new Date();
+  return now.getDate() / getDaysInMonth(now);
+}
+
 /** Les n derniers mois (mois courant inclus), du plus ancien au plus récent. */
 export function lastMonthKeys(n: number): MonthKey[] {
   const current = currentMonthKey();

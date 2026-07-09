@@ -71,16 +71,16 @@ CREATE TABLE IF NOT EXISTS bill_payments (
 `;
 
 const DEFAULT_CATEGORIES: Array<[string, string, string]> = [
-  ['Alimentation', 'cart-outline', '#10B981'],
-  ['Logement', 'home-outline', '#6C5CE7'],
-  ['Transport', 'car-outline', '#3B82F6'],
-  ['Restaurants', 'restaurant-outline', '#F97316'],
-  ['Loisirs', 'game-controller-outline', '#EC4899'],
-  ['Santé', 'heart-outline', '#EF4444'],
-  ['Abonnements', 'tv-outline', '#8B5CF6'],
-  ['Vêtements', 'shirt-outline', '#14B8A6'],
-  ['Épargne', 'trending-up-outline', '#F59E0B'],
-  ['Autre', 'ellipsis-horizontal-outline', '#64748B'],
+  ['Alimentation', 'cart-outline', '#5F9070'],
+  ['Logement', 'home-outline', '#6E6FA6'],
+  ['Transport', 'car-outline', '#5580A6'],
+  ['Restaurants', 'restaurant-outline', '#C56A4E'],
+  ['Loisirs', 'game-controller-outline', '#9A6494'],
+  ['Santé', 'heart-outline', '#C57487'],
+  ['Abonnements', 'tv-outline', '#7A6E9C'],
+  ['Vêtements', 'shirt-outline', '#3F9195'],
+  ['Épargne', 'trending-up-outline', '#C79A3E'],
+  ['Autre', 'ellipsis-horizontal-outline', '#857F76'],
 ];
 
 // V2 : le pointage d'une facture crée la dépense correspondante ; on garde
@@ -148,6 +148,23 @@ ALTER TABLE transactions ADD COLUMN cleared INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS idx_transactions_cleared ON transactions(cleared);
 `;
 
+// V6 : reteinte des catégories et comptes vers la palette sourde (accordée au
+// thème « précision tranquille »). On ne touche qu'aux lignes portant encore
+// une couleur par défaut historique — les couleurs choisies à la main autres
+// que ces hex sont conservées.
+const COLOR_REMAP: Array<[string, string]> = [
+  ['#10B981', '#5F9070'],
+  ['#6C5CE7', '#6E6FA6'],
+  ['#3B82F6', '#5580A6'],
+  ['#F97316', '#C56A4E'],
+  ['#EC4899', '#9A6494'],
+  ['#EF4444', '#C57487'],
+  ['#8B5CF6', '#7A6E9C'],
+  ['#14B8A6', '#3F9195'],
+  ['#F59E0B', '#C79A3E'],
+  ['#64748B', '#857F76'],
+];
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -172,6 +189,13 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   if (current < 5) {
     await db.execAsync(MIGRATION_V5);
     await db.execAsync('PRAGMA user_version = 5');
+  }
+  if (current < 6) {
+    for (const [from, to] of COLOR_REMAP) {
+      await db.runAsync('UPDATE categories SET color = ? WHERE color = ?', [to, from]);
+      await db.runAsync('UPDATE savings_accounts SET color = ? WHERE color = ?', [to, from]);
+    }
+    await db.execAsync('PRAGMA user_version = 6');
   }
 }
 

@@ -30,6 +30,7 @@ import {
   currentMonthKey,
   lastMonthKeys,
   monthKeyLabel,
+  monthPaceRatio,
   shortDayLabel,
   shortMonthLabel,
 } from '@/src/utils/dates';
@@ -271,6 +272,12 @@ export default function DashboardScreen() {
         ) : (
           topBudgets.map((budget) => {
             const ratio = budget.amount_cents > 0 ? budget.spent_cents / budget.amount_cents : 0;
+            const over = ratio > 1;
+            const barColor = over
+              ? theme.colors.danger
+              : ratio > 0.9
+                ? theme.colors.warning
+                : budget.category_color;
             return (
               <Card key={budget.id} style={styles.budgetCard}>
                 <View style={styles.budgetRow}>
@@ -281,11 +288,11 @@ export default function DashboardScreen() {
                       {formatCents(budget.spent_cents)} sur {formatCents(budget.amount_cents)}
                     </Caption>
                   </View>
-                  <Body weight="semibold" size={13} tone={ratio > 1 ? 'danger' : 'muted'}>
+                  <Body weight="semibold" size={13} tone={over ? 'danger' : 'muted'}>
                     {Math.round(ratio * 100)}%
                   </Body>
                 </View>
-                <ProgressBar ratio={ratio} color={ratio <= 0.85 ? budget.category_color : undefined} />
+                <ProgressBar ratio={ratio} color={barColor} markerRatio={monthPaceRatio(month)} />
               </Card>
             );
           })
