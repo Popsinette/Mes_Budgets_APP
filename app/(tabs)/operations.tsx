@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -10,11 +11,13 @@ import { EmptyState } from '@/src/components/ui/EmptyState';
 import { FAB } from '@/src/components/ui/FAB';
 import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { Screen } from '@/src/components/ui/Screen';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deleteTransaction,
   getMonthTotals,
   listTransactionsForMonth,
+  setTransactionCleared,
   type TransactionWithCategory,
 } from '@/src/features/transactions/repository';
 import { spacing, useTheme } from '@/src/theme';
@@ -38,16 +41,17 @@ export default function OperationsScreen() {
     [transactions, filter],
   );
 
-  /** Regroupe par jour, du plus récent au plus ancien. */
-  const sections = useMemo(() => {
-    const byDay = new Map<string, TransactionWithCategory[]>();
-    for (const t of filtered) {
-      const list = byDay.get(t.date) ?? [];
-      list.push(t);
-      byDay.set(t.date, list);
-    }
-    return [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [filtered]);
+  const pending = useMemo(() => filtered.filter((t) => t.cleared === 0), [filtered]);
+  const clearedTx = useMemo(() => filtered.filter((t) => t.cleared === 1), [filtered]);
+
+  // Solde réel = opérations pointées ; prévisionnel = tout (pointé + à venir).
+  const realBalance = (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0);
+  const plannedBalance = (totals?.income_cents ?? 0) - (totals?.expense_cents ?? 0);
+
+  const togglePointed = (t: TransactionWithCategory) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void setTransactionCleared(db, t.id, t.cleared === 0);
+  };
 
   const confirmDelete = (t: TransactionWithCategory) => {
     confirmAction({
@@ -59,6 +63,53 @@ export default function OperationsScreen() {
     });
   };
 
+  const renderRow = (t: TransactionWithCategory) => {
+    const isPending = t.cleared === 0;
+    return (
+      <View key={t.id} style={styles.txRow}>
+        <Pressable hitSlop={8} onPress={() => togglePointed(t)}>
+          <Ionicons
+            name={isPending ? 'ellipse-outline' : 'checkmark-circle'}
+            size={26}
+            color={isPending ? theme.colors.textMuted : theme.colors.success}
+          />
+        </Pressable>
+        <CategoryIcon
+          icon={t.type === 'income' ? 'arrow-down-outline' : (t.category_icon ?? 'pricetag-outline')}
+          color={t.type === 'income' ? theme.colors.success : (t.category_color ?? theme.colors.primary)}
+          size={38}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.txLabel, { color: theme.colors.text }]} numberOfLines={1}>
+            {t.label}
+          </Text>
+          <Text style={{ color: theme.colors.textMuted, fontSize: 12 }} numberOfLines={1}>
+            {shortDayLabel(t.date)}
+            {' · '}
+            {t.type === 'income' ? 'Revenu' : (t.category_name ?? 'Sans catégorie')}
+            {t.note ? ` · ${t.note}` : ''}
+          </Text>
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          <Text
+            style={[
+              styles.txAmount,
+              { color: t.type === 'income' ? theme.colors.income : theme.colors.text },
+            ]}
+          >
+            {formatCents(t.type === 'income' ? t.amount_cents : -t.amount_cents, { signed: true })}
+          </Text>
+          <Text
+            onPress={() => confirmDelete(t)}
+            style={{ color: theme.colors.textMuted, fontSize: 11, fontWeight: '600' }}
+          >
+            Supprimer
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <Screen bottomInset={72}>
@@ -68,21 +119,31 @@ export default function OperationsScreen() {
         <View style={styles.totalsRow}>
           <Card style={styles.totalCard}>
             <View style={[styles.totalIcon, { backgroundColor: theme.colors.successSoft }]}>
-              <Ionicons name="arrow-down" size={16} color={theme.colors.success} />
+              <Ionicons name="checkmark-done" size={16} color={theme.colors.success} />
             </View>
-            <Text style={[styles.totalValue, { color: theme.colors.text }]}>
-              {formatCents(totals?.income_cents ?? 0)}
+            <Text
+              style={[
+                styles.totalValue,
+                { color: realBalance < 0 ? theme.colors.danger : theme.colors.text },
+              ]}
+            >
+              {formatCents(realBalance)}
             </Text>
-            <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Revenus</Text>
+            <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Réel (pointé)</Text>
           </Card>
           <Card style={styles.totalCard}>
-            <View style={[styles.totalIcon, { backgroundColor: theme.colors.dangerSoft }]}>
-              <Ionicons name="arrow-up" size={16} color={theme.colors.danger} />
+            <View style={[styles.totalIcon, { backgroundColor: theme.colors.primarySoft }]}>
+              <Ionicons name="hourglass-outline" size={16} color={theme.colors.primary} />
             </View>
-            <Text style={[styles.totalValue, { color: theme.colors.text }]}>
-              {formatCents(totals?.expense_cents ?? 0)}
+            <Text
+              style={[
+                styles.totalValue,
+                { color: plannedBalance < 0 ? theme.colors.danger : theme.colors.text },
+              ]}
+            >
+              {formatCents(plannedBalance)}
             </Text>
-            <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Dépenses</Text>
+            <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Prévisionnel</Text>
           </Card>
         </View>
 
@@ -102,7 +163,7 @@ export default function OperationsScreen() {
           />
         </View>
 
-        {sections.length === 0 ? (
+        {filtered.length === 0 ? (
           <Card>
             <EmptyState
               icon="swap-vertical"
@@ -111,47 +172,28 @@ export default function OperationsScreen() {
             />
           </Card>
         ) : (
-          sections.map(([day, items]) => (
-            <View key={day} style={{ gap: spacing.sm }}>
-              <Text style={[styles.dayLabel, { color: theme.colors.textMuted }]}>{shortDayLabel(day)}</Text>
-              <Card style={{ gap: spacing.md, paddingVertical: spacing.md }}>
-                {items.map((t) => (
-                  <View key={t.id} style={styles.txRow}>
-                    <CategoryIcon
-                      icon={t.type === 'income' ? 'arrow-down-outline' : (t.category_icon ?? 'pricetag-outline')}
-                      color={t.type === 'income' ? theme.colors.success : (t.category_color ?? theme.colors.primary)}
-                      size={38}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.txLabel, { color: theme.colors.text }]} numberOfLines={1}>
-                        {t.label}
-                      </Text>
-                      <Text style={{ color: theme.colors.textMuted, fontSize: 12 }} numberOfLines={1}>
-                        {t.type === 'income' ? 'Revenu' : (t.category_name ?? 'Sans catégorie')}
-                        {t.note ? ` · ${t.note}` : ''}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                      <Text
-                        style={[
-                          styles.txAmount,
-                          { color: t.type === 'income' ? theme.colors.income : theme.colors.text },
-                        ]}
-                      >
-                        {formatCents(t.type === 'income' ? t.amount_cents : -t.amount_cents, { signed: true })}
-                      </Text>
-                      <Text
-                        onPress={() => confirmDelete(t)}
-                        style={{ color: theme.colors.textMuted, fontSize: 11, fontWeight: '600' }}
-                      >
-                        Supprimer
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </Card>
-            </View>
-          ))
+          <>
+            {pending.length > 0 ? (
+              <>
+                <SectionHeader title={`À pointer (${pending.length})`} />
+                <Card style={{ gap: spacing.md, paddingVertical: spacing.md }}>
+                  {pending.map(renderRow)}
+                </Card>
+                <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
+                  Touchez le cercle pour pointer une opération dès qu’elle passe sur votre compte.
+                </Text>
+              </>
+            ) : null}
+
+            {clearedTx.length > 0 ? (
+              <>
+                <SectionHeader title={`Pointées (${clearedTx.length})`} />
+                <Card style={{ gap: spacing.md, paddingVertical: spacing.md }}>
+                  {clearedTx.map(renderRow)}
+                </Card>
+              </>
+            ) : null}
+          </>
         )}
       </Screen>
       <FAB onPress={() => router.push('/nouvelle-transaction')} />
@@ -190,11 +232,6 @@ const styles = StyleSheet.create({
   filters: {
     flexDirection: 'row',
     gap: spacing.sm,
-  },
-  dayLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'capitalize',
   },
   txRow: {
     flexDirection: 'row',

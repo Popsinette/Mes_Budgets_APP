@@ -23,6 +23,9 @@ export default function NewTransactionScreen() {
   const [label, setLabel] = useState('');
   const [note, setNote] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  // Par défaut « en attente » : on saisit l'opération dès qu'on la fait, puis on
+  // la pointe quand elle passe sur le compte.
+  const [cleared, setCleared] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -44,6 +47,7 @@ export default function NewTransactionScreen() {
       date: todayIso(),
       month: currentMonthKey(),
       note: note.trim() || undefined,
+      cleared,
     });
     router.back();
   };
@@ -97,6 +101,40 @@ export default function NewTransactionScreen() {
       ) : null}
 
       <FormField label="Note (optionnel)" value={note} onChangeText={setNote} placeholder="Détail…" />
+
+      <View style={{ gap: spacing.sm }}>
+        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>État</Text>
+        <View style={[styles.typeToggle, { backgroundColor: theme.colors.cardMuted }]}>
+          {(
+            [
+              [false, 'À venir'],
+              [true, 'Déjà passée'],
+            ] as Array<[boolean, string]>
+          ).map(([value, optionLabel]) => (
+            <Pressable
+              key={String(value)}
+              onPress={() => setCleared(value)}
+              style={[
+                styles.typeOption,
+                cleared === value && { backgroundColor: theme.colors.primary },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.typeLabel,
+                  { color: cleared === value ? '#FFFFFF' : theme.colors.textMuted },
+                ]}
+              >
+                {optionLabel}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={{ color: theme.colors.textMuted, fontSize: 12, lineHeight: 16 }}>
+          « À venir » : en attente sur le compte, comptée dans le prévisionnel. Pointez-la depuis
+          Opérations quand elle passe.
+        </Text>
+      </View>
 
       <Button label="Enregistrer" onPress={() => void save()} loading={saving} />
     </Screen>

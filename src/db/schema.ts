@@ -137,6 +137,17 @@ DROP TABLE savings_entries;
 DROP TABLE savings_goals;
 `;
 
+// V5 : pointage des opérations. `cleared` = 0 (à venir / en attente sur le
+// compte) ou 1 (passée / pointée). On saisit une dépense dès qu'on la fait,
+// puis on la pointe quand elle apparaît sur le relevé. Le solde « réel » ne
+// compte que les opérations pointées ; le « prévisionnel » compte tout.
+// Défaut 1 : l'historique et les dépenses de factures (déjà réglées) comptent
+// comme passées.
+const MIGRATION_V5 = `
+ALTER TABLE transactions ADD COLUMN cleared INTEGER NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS idx_transactions_cleared ON transactions(cleared);
+`;
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -157,6 +168,10 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   if (current < 4) {
     await db.execAsync(MIGRATION_V4);
     await db.execAsync('PRAGMA user_version = 4');
+  }
+  if (current < 5) {
+    await db.execAsync(MIGRATION_V5);
+    await db.execAsync('PRAGMA user_version = 5');
   }
 }
 

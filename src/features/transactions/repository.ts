@@ -15,6 +15,8 @@ export type Transaction = {
   note: string | null;
   /** Renseigné quand la dépense provient du pointage d'une facture récurrente. */
   bill_id: number | null;
+  /** 0 = à venir (en attente sur le compte), 1 = passée (pointée). */
+  cleared: number;
 };
 
 export type TransactionWithCategory = Transaction & {
@@ -24,8 +26,14 @@ export type TransactionWithCategory = Transaction & {
 };
 
 export type MonthTotals = {
+  /** Prévisionnel : toutes les opérations du mois (pointées ou non). */
   income_cents: number;
   expense_cents: number;
+  /** Réel : uniquement les opérations pointées (passées sur le compte). */
+  cleared_income_cents: number;
+  cleared_expense_cents: number;
+  /** Nombre d'opérations encore en attente de pointage. */
+  pending_count: number;
 };
 
 export async function addTransaction(
@@ -38,13 +46,34 @@ export async function addTransaction(
     date: string;
     month: MonthKey;
     note?: string;
+    /** false = à venir (en attente sur le compte). Défaut true (déjà passée). */
+    cleared?: boolean;
   },
 ): Promise<void> {
   await db.runAsync(
-    `INSERT INTO transactions (category_id, label, amount_cents, type, date, month, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [input.categoryId, input.label, input.amountCents, input.type, input.date, input.month, input.note ?? null],
+    `INSERT INTO transactions (category_id, label, amount_cents, type, date, month, note, cleared)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.categoryId,
+      input.label,
+      input.amountCents,
+      input.type,
+      input.date,
+      input.month,
+      input.note ?? null,
+      input.cleared === false ? 0 : 1,
+    ],
   );
+  invalidateQueries();
+}
+
+/** Pointe (ou dé-pointe) une opération : passée sur le compte ou de nouveau à venir. */
+export async function setTransactionCleared(
+  db: SQLiteDatabase,
+  id: number,
+  cleared: boolean,
+): Promise<void> {
+  await db.runAsync('UPDATE transactions SET cleared = ? WHERE id = ?', [cleared ? 1 : 0, id]);
   invalidateQueries();
 }
 
@@ -71,11 +100,22 @@ export async function getMonthTotals(db: SQLiteDatabase, month: MonthKey): Promi
   const row = await db.getFirstAsync<MonthTotals>(
     `SELECT
        COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS income_cents,
-       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expense_cents
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expense_cents,
+       COALESCE(SUM(CASE WHEN type = 'income' AND cleared = 1 THEN amount_cents ELSE 0 END), 0) AS cleared_income_cents,
+       COALESCE(SUM(CASE WHEN type = 'expense' AND cleared = 1 THEN amount_cents ELSE 0 END), 0) AS cleared_expense_cents,
+       COALESCE(SUM(CASE WHEN cleared = 0 THEN 1 ELSE 0 END), 0) AS pending_count
      FROM transactions WHERE month = ?`,
     [month],
   );
-  return row ?? { income_cents: 0, expense_cents: 0 };
+  return (
+    row ?? {
+      income_cents: 0,
+      expense_cents: 0,
+      cleared_income_cents: 0,
+      cleared_expense_cents: 0,
+      pending_count: 0,
+    }
+  );
 }
 
 export type MonthlyPoint = {

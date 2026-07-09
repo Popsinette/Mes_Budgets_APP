@@ -53,6 +53,9 @@ export default function DashboardScreen() {
   const income = totals?.income_cents ?? 0;
   const expense = totals?.expense_cents ?? 0;
   const balance = income - expense;
+  // Solde réel = opérations pointées uniquement (ce qui est passé sur le compte).
+  const realBalance = (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0);
+  const pendingCount = totals?.pending_count ?? 0;
   const monthLabel = monthKeyLabel(month);
   const upcomingBills = (bills ?? []).filter((b) => !b.paid_at).slice(0, 3);
   const topBudgets = (budgets ?? []).slice(0, 3);
@@ -63,9 +66,9 @@ export default function DashboardScreen() {
   const budgetsTotal = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
   const savingsPlanned = plannedSavings ?? 0;
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
-  // Reste à vivre réel : solde réel du mois − épargne réellement virée ce mois
+  // Reste à vivre réel : solde pointé du mois − épargne réellement virée ce mois
   const savingsReal = realSavings ?? 0;
-  const remainingReal = balance - savingsReal;
+  const remainingReal = realBalance - savingsReal;
 
   return (
     <View style={{ flex: 1 }}>
@@ -92,8 +95,16 @@ export default function DashboardScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.balanceCard}
         >
-          <Text style={styles.balanceLabel}>Solde du mois</Text>
-          <Text style={styles.balanceValue}>{formatCents(balance)}</Text>
+          <Text style={styles.balanceLabel}>Solde réel (pointé)</Text>
+          <Text style={styles.balanceValue}>{formatCents(realBalance)}</Text>
+          {pendingCount > 0 ? (
+            <Pressable style={styles.pendingPill} onPress={() => router.push('/operations')}>
+              <Ionicons name="hourglass-outline" size={14} color="#FFFFFF" />
+              <Text style={styles.pendingText}>
+                {pendingCount} à venir · {formatCents(balance)} prévu
+              </Text>
+            </Pressable>
+          ) : null}
           <View style={styles.balanceRow}>
             <View style={styles.balanceItem}>
               <Ionicons name="arrow-down-circle" size={18} color="#B9F6D3" />
@@ -361,8 +372,19 @@ export default function DashboardScreen() {
                     <Text style={[styles.txLabel, { color: theme.colors.text }]} numberOfLines={1}>
                       {t.label}
                     </Text>
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>{shortDayLabel(t.date)}</Text>
+                    <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+                      {shortDayLabel(t.date)}
+                      {t.cleared === 0 ? ' · à venir' : ''}
+                    </Text>
                   </View>
+                  {t.cleared === 0 ? (
+                    <Ionicons
+                      name="hourglass-outline"
+                      size={14}
+                      color={theme.colors.textMuted}
+                      style={{ marginRight: spacing.xs }}
+                    />
+                  ) : null}
                   <Text
                     style={[
                       styles.txAmount,
@@ -418,6 +440,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 36,
     fontWeight: '800',
+  },
+  pendingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginTop: spacing.xs,
+  },
+  pendingText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   balanceRow: {
     flexDirection: 'row',
