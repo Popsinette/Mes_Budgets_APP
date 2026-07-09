@@ -8,7 +8,7 @@ import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { createAccount, deleteAccount, updateAccount } from '@/src/features/savings/repository';
-import { palette, spacing, useTheme } from '@/src/theme';
+import { fonts, palette, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { parseAmountToCents } from '@/src/utils/money';
 
@@ -174,10 +174,10 @@ export default function NewAccountScreen() {
 
 const styles = StyleSheet.create({
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 1,
   },
   optionsRow: {
     flexDirection: 'row',

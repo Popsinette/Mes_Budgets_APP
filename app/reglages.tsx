@@ -2,13 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, StyleSheet, Switch, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
+import { Body, Caption, Heading } from '@/src/components/ui/Text';
 import { exportAllDataAsJson, exportTransactionsAsCsv } from '@/src/features/export/exporter';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { isBiometricAvailable, useSecurity } from '@/src/store/security';
@@ -83,27 +84,25 @@ export default function SettingsScreen() {
         <View style={[styles.securityIcon, { backgroundColor: theme.colors.successSoft }]}>
           <Ionicons name="lock-closed" size={22} color={theme.colors.success} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.securityTitle, { color: theme.colors.text }]}>Vos données sont protégées</Text>
-          <Text style={[styles.securityText, { color: theme.colors.textMuted }]}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Body weight="semibold">Vos données sont protégées</Body>
+          <Caption>
             {Platform.OS === 'web'
               ? 'Tout est stocké uniquement sur cet appareil, dans le stockage privé du navigateur (isolé par site et protégé par le verrouillage de votre appareil). Aucune donnée ne part sur un serveur : pas de compte, pas de suivi. Pensez à exporter régulièrement une sauvegarde JSON.'
               : 'Tout est stocké uniquement sur cet appareil, dans une base chiffrée (SQLCipher, AES-256). La clé de chiffrement est gardée dans l’enclave sécurisée du téléphone (Keychain iOS / Keystore Android). Aucune donnée ne quitte votre téléphone : pas de compte, pas de serveur, pas de suivi.'}
-          </Text>
+          </Caption>
         </View>
       </Card>
 
       {Platform.OS !== 'web' ? (
       <Card style={{ gap: spacing.md }}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Sécurité</Text>
+        <Heading>Sécurité</Heading>
         <View style={styles.toggleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.toggleLabel, { color: theme.colors.text }]}>
-              Verrouillage biométrique
-            </Text>
-            <Text style={{ color: theme.colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Body weight="semibold">Verrouillage biométrique</Body>
+            <Caption>
               Exige Face ID / Touch ID / empreinte à chaque ouverture de l’application.
-            </Text>
+            </Caption>
           </View>
           <Switch
             value={Boolean(biometricEnabled)}
@@ -115,19 +114,19 @@ export default function SettingsScreen() {
       ) : null}
 
       <Card style={{ gap: spacing.md }}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Catégories</Text>
-        <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
+        <Heading>Catégories</Heading>
+        <Body tone="muted" size={13.5}>
           Créez vos propres catégories et personnalisez leur nom, icône et couleur.
-        </Text>
+        </Body>
         <Button label="Gérer les catégories" variant="secondary" onPress={() => router.push('/categories')} />
       </Card>
 
       <Card style={{ gap: spacing.md }}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Exporter mes données</Text>
-        <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
+        <Heading>Exporter mes données</Heading>
+        <Body tone="muted" size={13.5}>
           Sauvegarde complète (JSON) ou transactions seules (CSV, pour Excel/Numbers), via la feuille de
           partage : AirDrop, Fichiers, mail…
-        </Text>
+        </Body>
         <Button
           label="Exporter tout (JSON)"
           onPress={() => void runExport(() => exportAllDataAsJson(db), setExportingJson)}
@@ -142,21 +141,21 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={{ gap: spacing.md }}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Données</Text>
-        <Text style={{ color: theme.colors.textMuted, fontSize: 14, lineHeight: 20 }}>
+        <Heading>Données</Heading>
+        <Body tone="muted" size={13.5}>
           Supprime définitivement toutes les données de l’application sur cet appareil.
-        </Text>
+        </Body>
         <Button label="Tout effacer" variant="danger" onPress={eraseAllData} />
       </Card>
 
       <Card style={{ gap: spacing.xs }}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>À propos</Text>
-        <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
+        <Heading>À propos</Heading>
+        <Body tone="muted" size={13.5}>
           Mes Budgets · version {Constants.expoConfig?.version ?? '0.1.0'}
-        </Text>
-        <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
+        </Body>
+        <Body tone="muted" size={13.5}>
           Suivi de budgets mensuels, plan d’épargne et factures — 100 % local.
-        </Text>
+        </Body>
       </Card>
     </Screen>
   );
@@ -174,27 +173,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  securityTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  securityText: {
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  toggleLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2,
   },
 });

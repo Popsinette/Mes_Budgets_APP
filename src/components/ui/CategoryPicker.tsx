@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { radius, spacing, useTheme } from '@/src/theme';
+import { fonts, radius, spacing, useTheme } from '@/src/theme';
 import { listCategories, type Category } from '@/src/features/categories/repository';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { CategoryIcon } from './CategoryIcon';
@@ -75,8 +75,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   name: {
+    fontFamily: fonts.bodyMedium,
     fontSize: 12,
-    fontWeight: '600',
   },
   newItem: {
     borderStyle: 'dashed',

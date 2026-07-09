@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { spacing, useTheme } from '@/src/theme';
+import { fonts, spacing, useTheme } from '@/src/theme';
 import { formatCents } from '@/src/utils/money';
 
 export type BarGroup = {
@@ -61,8 +61,8 @@ export function BarChart({ groups, height = 140 }: BarChartProps) {
 
 const styles = StyleSheet.create({
   maxLabel: {
+    fontFamily: fonts.body,
     fontSize: 11,
-    fontWeight: '600',
   },
   chart: {
     flexDirection: 'row',
@@ -88,8 +88,8 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
+    fontFamily: fonts.bodyMedium,
     fontSize: 11,
-    fontWeight: '600',
     textAlign: 'center',
     textTransform: 'capitalize',
   },

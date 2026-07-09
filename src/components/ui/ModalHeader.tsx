@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { spacing, useTheme } from '@/src/theme';
+import { fonts, spacing, useTheme } from '@/src/theme';
 
 export function ModalHeader({ title }: { title: string }) {
   const theme = useTheme();
@@ -27,13 +27,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontFamily: fonts.displayBold,
+    fontSize: 23,
+    letterSpacing: -0.5,
+    flex: 1,
   },
   close: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

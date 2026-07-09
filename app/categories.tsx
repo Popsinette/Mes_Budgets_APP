@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
+import { Body } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { listCategories } from '@/src/features/categories/repository';
 import { spacing, useTheme } from '@/src/theme';
@@ -16,9 +17,9 @@ export default function CategoriesScreen() {
   return (
     <Screen>
       <ModalHeader title="Catégories" />
-      <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
+      <Body tone="muted" size={13.5}>
         Touchez une catégorie pour la modifier (nom, icône, couleur) ou la supprimer.
-      </Text>
+      </Body>
 
       {(categories ?? []).map((category) => (
         <Card
@@ -37,19 +38,23 @@ export default function CategoriesScreen() {
           }
         >
           <CategoryIcon icon={category.icon} color={category.color} />
-          <Text style={[styles.name, { color: theme.colors.text }]}>{category.name}</Text>
+          <Body weight="semibold" style={{ flex: 1 }}>
+            {category.name}
+          </Body>
           <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
         </Card>
       ))}
 
       <Card
-        style={[styles.row, { borderStyle: 'dashed', borderColor: theme.colors.primary }]}
+        style={[styles.row, { borderStyle: 'dashed', borderColor: theme.colors.border }]}
         onPress={() => router.push('/nouvelle-categorie')}
       >
         <View style={[styles.addIcon, { backgroundColor: theme.colors.primary }]}>
           <Ionicons name="add" size={20} color={theme.colors.onPrimary} />
         </View>
-        <Text style={[styles.name, { color: theme.colors.primary }]}>Nouvelle catégorie</Text>
+        <Body weight="semibold" style={{ flex: 1 }}>
+          Nouvelle catégorie
+        </Body>
       </Card>
     </Screen>
   );

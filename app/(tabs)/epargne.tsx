@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -13,6 +12,7 @@ import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deleteTransfer,
@@ -66,34 +66,22 @@ export default function SavingsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen bottomInset={72}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Épargne</Text>
+      <Screen bottomInset={80}>
+        <Title>Épargne</Title>
 
-        <LinearGradient
-          colors={theme.gradients.success}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.globalCard}
-        >
-          <View style={styles.globalTop}>
-            <View style={styles.globalIcon}>
-              <Ionicons name="trending-up" size={22} color="#FFFFFF" />
-            </View>
-            <Text style={styles.globalLabel}>Épargne totale</Text>
-          </View>
-          <Text style={styles.globalValue}>{formatCents(totalReal)}</Text>
-          {totalPlanned > totalReal ? (
-            <Text style={styles.globalSub}>
-              {formatCents(totalPlanned)} avec les virements prévus
-            </Text>
-          ) : (
-            <Text style={styles.globalSub}>Somme de tous vos comptes</Text>
-          )}
-        </LinearGradient>
+        <View style={styles.hero}>
+          <Eyebrow tone="success">Épargne totale</Eyebrow>
+          <Money cents={totalReal} size={44} weight="xbold" tone="success" style={{ marginTop: 2 }} />
+          <Caption style={{ marginTop: 4 }}>
+            {totalPlanned > totalReal
+              ? `${formatCents(totalPlanned)} avec les virements prévus`
+              : 'Somme de tous vos comptes'}
+          </Caption>
+        </View>
 
         <MonthSwitcher month={month} onChange={setMonth} />
 
-        <SectionHeader title="Mes comptes" actionLabel="Nouveau" onAction={() => router.push('/nouveau-compte')} />
+        <SectionHeader title="Mes comptes" actionLabel="Nouveau compte" onAction={() => router.push('/nouveau-compte')} />
 
         {(accounts ?? []).length === 0 ? (
           <Card>
@@ -129,21 +117,21 @@ export default function SavingsScreen() {
               >
                 <View style={styles.accountRow}>
                   <CategoryIcon icon={account.icon} color={account.color} size={44} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.accountName, { color: theme.colors.text }]}>{account.name}</Text>
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Body weight="semibold" size={15.5}>
+                      {account.name}
+                    </Body>
+                    <Caption>
                       dont {formatCents(account.initial_cents)} de départ
                       {account.monthly_cents ? ` · ${formatCents(account.monthly_cents)}/mois prévu` : ''}
-                    </Text>
+                    </Caption>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.accountBalance, { color: theme.colors.text }]}>
-                      {formatCents(account.real_cents)}
-                    </Text>
+                  <View style={{ alignItems: 'flex-end', gap: 1 }}>
+                    <Money cents={account.real_cents} size={17} weight="bold" />
                     {account.target_cents ? (
-                      <Text style={{ color: account.color, fontSize: 12, fontWeight: '700' }}>
+                      <Caption color={account.color}>
                         {Math.round(ratio * 100)} % · {formatCents(account.target_cents)}
-                      </Text>
+                      </Caption>
                     ) : null}
                   </View>
                 </View>
@@ -167,20 +155,17 @@ export default function SavingsScreen() {
                         size={22}
                         color={isDone ? theme.colors.success : theme.colors.textMuted}
                       />
-                      <Text style={{ flex: 1, color: theme.colors.textMuted, fontSize: 13 }}>
+                      <Caption style={{ flex: 1 }}>
                         Virement du {shortDayLabel(t.date)}
                         {t.note ? ` · ${t.note}` : ''}
                         {isDone ? '' : ' · prévu'}
-                      </Text>
-                      <Text
-                        style={{
-                          color: isDone ? theme.colors.success : theme.colors.textMuted,
-                          fontWeight: '700',
-                          fontSize: 14,
-                        }}
-                      >
-                        +{formatCents(t.amount_cents)}
-                      </Text>
+                      </Caption>
+                      <Money
+                        cents={t.amount_cents}
+                        size={14}
+                        signed
+                        tone={isDone ? 'success' : 'muted'}
+                      />
                     </Pressable>
                   );
                 })}
@@ -191,20 +176,20 @@ export default function SavingsScreen() {
                     router.push({ pathname: '/virement', params: { accountId: String(account.id), month } })
                   }
                 >
-                  <Ionicons name="add" size={18} color={account.color} />
-                  <Text style={{ color: account.color, fontWeight: '700', fontSize: 14 }}>
+                  <Ionicons name="add" size={17} color={theme.colors.text} />
+                  <Body weight="semibold" size={13.5}>
                     Virement de {monthKeyLabel(month).split(' ')[0]}
-                  </Text>
+                  </Body>
                 </Pressable>
               </Card>
             );
           })
         )}
 
-        <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
+        <Caption style={{ textAlign: 'center' }}>
           Touchez un compte pour le modifier · cochez un virement quand il est fait · appui long pour le
           supprimer
-        </Text>
+        </Caption>
       </Screen>
       <FAB onPress={() => router.push({ pathname: '/virement', params: { month } })} />
     </View>
@@ -212,55 +197,13 @@ export default function SavingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  globalCard: {
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    gap: spacing.xs,
-  },
-  globalTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  globalIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  globalLabel: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  globalValue: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '800',
-  },
-  globalSub: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 13,
-    fontWeight: '600',
+  hero: {
+    paddingTop: spacing.xs,
   },
   accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  accountName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  accountBalance: {
-    fontSize: 17,
-    fontWeight: '800',
   },
   transferRow: {
     flexDirection: 'row',
@@ -272,9 +215,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 2,
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderStyle: 'dashed',
   },
 });

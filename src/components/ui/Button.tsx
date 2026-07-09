@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { radius, spacing, useTheme } from '@/src/theme';
+import { fonts, radius, spacing, useTheme } from '@/src/theme';
 
 type ButtonProps = {
   label: string;
@@ -30,7 +30,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: background, opacity: disabled ? 0.5 : pressed ? 0.85 : 1 },
+        { backgroundColor: background, opacity: disabled ? 0.4 : pressed ? 0.88 : 1 },
       ]}
     >
       {loading ? (
@@ -45,12 +45,13 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
 const styles = StyleSheet.create({
   button: {
     borderRadius: radius.md,
-    paddingVertical: spacing.lg - 2,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 15.5,
+    letterSpacing: 0.2,
   },
 });

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -10,6 +10,7 @@ import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { Body, Caption, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deleteBudget,
@@ -21,7 +22,7 @@ import {
   setTransactionCleared,
   type TransactionWithCategory,
 } from '@/src/features/transactions/repository';
-import { spacing, useTheme } from '@/src/theme';
+import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, monthKeyLabel, shortDayLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
@@ -92,38 +93,30 @@ export default function BudgetDetailScreen() {
   return (
     <Screen>
       <ModalHeader title={budget?.category_name ?? 'Budget'} />
-      <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>{monthKeyLabel(month)}</Text>
+      <Caption>{monthKeyLabel(month)}</Caption>
 
-      <Card style={{ gap: spacing.md }}>
+      <Card style={{ gap: spacing.lg }}>
         <View style={styles.headerRow}>
           <CategoryIcon
             icon={budget?.category_icon ?? 'pricetag-outline'}
-            color={budget?.category_color ?? theme.colors.primary}
+            color={budget?.category_color ?? theme.colors.textMuted}
             size={44}
           />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.spentValue, { color: theme.colors.text }]}>
-              {formatCents(spent)}{' '}
-              <Text style={{ color: theme.colors.textMuted, fontSize: 15, fontWeight: '600' }}>
-                / {formatCents(allocated)}
-              </Text>
-            </Text>
-            <Text
-              style={{
-                color: remaining >= 0 ? theme.colors.textMuted : theme.colors.danger,
-                fontSize: 13,
-                fontWeight: '600',
-              }}
-            >
+          <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
+              <Money cents={spent} size={22} weight="bold" />
+              <Caption>sur {formatCents(allocated)}</Caption>
+            </View>
+            <Caption tone={remaining >= 0 ? 'muted' : 'danger'}>
               {remaining >= 0
                 ? `Reste ${formatCents(remaining)}`
                 : `Dépassé de ${formatCents(-remaining)}`}
-            </Text>
+            </Caption>
           </View>
         </View>
         <ProgressBar
           ratio={ratio}
-          color={ratio <= 0.85 ? (budget?.category_color ?? theme.colors.primary) : undefined}
+          color={ratio <= 0.85 ? (budget?.category_color ?? theme.colors.text) : undefined}
           height={10}
         />
         <View style={styles.actionsRow}>
@@ -131,20 +124,24 @@ export default function BudgetDetailScreen() {
             onPress={editBudget}
             style={[styles.action, { backgroundColor: theme.colors.cardMuted }]}
           >
-            <Ionicons name="create-outline" size={18} color={theme.colors.text} />
-            <Text style={[styles.actionLabel, { color: theme.colors.text }]}>Modifier</Text>
+            <Ionicons name="create-outline" size={17} color={theme.colors.text} />
+            <Body weight="semibold" size={14}>
+              Modifier
+            </Body>
           </Pressable>
           <Pressable
             onPress={confirmDeleteBudget}
             style={[styles.action, { backgroundColor: theme.colors.dangerSoft }]}
           >
-            <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
-            <Text style={[styles.actionLabel, { color: theme.colors.danger }]}>Supprimer</Text>
+            <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
+            <Body weight="semibold" size={14} tone="danger">
+              Supprimer
+            </Body>
           </Pressable>
         </View>
       </Card>
 
-      <SectionHeader title={`Dépenses (${items.length})`} />
+      <SectionHeader title={`Dépenses · ${items.length}`} />
 
       {items.length === 0 ? (
         <Card>
@@ -163,30 +160,25 @@ export default function BudgetDetailScreen() {
                 <Pressable hitSlop={8} onPress={() => togglePointed(t)}>
                   <Ionicons
                     name={isPending ? 'ellipse-outline' : 'checkmark-circle'}
-                    size={24}
+                    size={23}
                     color={isPending ? theme.colors.textMuted : theme.colors.success}
                   />
                 </Pressable>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.txLabel, { color: theme.colors.text }]} numberOfLines={1}>
+                  <Body weight="medium" numberOfLines={1}>
                     {t.label}
-                  </Text>
-                  <Text style={{ color: theme.colors.textMuted, fontSize: 12 }} numberOfLines={1}>
+                  </Body>
+                  <Caption numberOfLines={1}>
                     {shortDayLabel(t.date)}
                     {isPending ? ' · à venir' : ''}
                     {t.note ? ` · ${t.note}` : ''}
-                  </Text>
+                  </Caption>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={[styles.txAmount, { color: theme.colors.text }]}>
-                    {formatCents(-t.amount_cents, { signed: true })}
-                  </Text>
-                  <Text
-                    onPress={() => confirmDeleteTx(t)}
-                    style={{ color: theme.colors.textMuted, fontSize: 11, fontWeight: '600' }}
-                  >
+                  <Money cents={-t.amount_cents} size={15} signed />
+                  <Caption onPress={() => confirmDeleteTx(t)} style={{ fontSize: 11 }}>
                     Supprimer
-                  </Text>
+                  </Caption>
                 </View>
               </View>
             );
@@ -194,9 +186,9 @@ export default function BudgetDetailScreen() {
         </Card>
       )}
 
-      <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
+      <Caption style={{ textAlign: 'center' }}>
         Touchez le cercle pour pointer une dépense passée sur votre compte.
-      </Text>
+      </Caption>
     </Screen>
   );
 }
@@ -206,10 +198,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  spentValue: {
-    fontSize: 22,
-    fontWeight: '800',
   },
   actionsRow: {
     flexDirection: 'row',
@@ -222,23 +210,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.md,
-    borderRadius: 12,
-  },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
+    borderRadius: radius.md,
   },
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  txLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  txAmount: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

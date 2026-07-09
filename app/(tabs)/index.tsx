@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { BarChart } from '@/src/components/charts/BarChart';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -11,6 +10,7 @@ import { FAB } from '@/src/components/ui/FAB';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getBillsSummary, listBillsForMonth } from '@/src/features/bills/repository';
 import { listBudgetsWithSpending } from '@/src/features/budgets/repository';
@@ -72,136 +72,125 @@ export default function DashboardScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen bottomInset={72}>
+      <Screen bottomInset={80}>
         <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.hello, { color: theme.colors.textMuted }]}>Bonjour 👋</Text>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-              {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
-            </Text>
+          <View style={{ gap: 2 }}>
+            <Eyebrow>Bonjour</Eyebrow>
+            <Title>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</Title>
           </View>
           <Pressable
             hitSlop={8}
             onPress={() => router.push('/reglages')}
             style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
           >
-            <Ionicons name="settings-outline" size={20} color={theme.colors.text} />
+            <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
           </Pressable>
         </View>
 
-        <LinearGradient
-          colors={theme.gradients.primary}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.balanceCard}
-        >
-          <Text style={styles.balanceLabel}>Solde réel (pointé)</Text>
-          <Text style={styles.balanceValue}>{formatCents(realBalance)}</Text>
-          {pendingCount > 0 ? (
-            <Pressable style={styles.pendingPill} onPress={() => router.push('/operations')}>
-              <Ionicons name="hourglass-outline" size={14} color="#FFFFFF" />
-              <Text style={styles.pendingText}>
-                {pendingCount} à venir · {formatCents(balance)} prévu
-              </Text>
+        {/* Héros typographique : le montant porte la page, pas une carte en dégradé. */}
+        <View style={styles.hero}>
+          <Eyebrow>Solde réel · pointé</Eyebrow>
+          <Money
+            cents={realBalance}
+            size={46}
+            weight="xbold"
+            tone={realBalance < 0 ? 'danger' : 'text'}
+            style={{ marginTop: 2 }}
+          />
+          <View style={styles.heroMeta}>
+            <View style={styles.heroStat}>
+              <Caption>Prévisionnel</Caption>
+              <Money cents={balance} size={16} weight="semibold" tone="muted" />
+            </View>
+            <View style={[styles.heroDivider, { backgroundColor: theme.colors.border }]} />
+            <Pressable
+              style={styles.heroStat}
+              onPress={() => (pendingCount > 0 ? router.push('/operations') : undefined)}
+            >
+              <Caption>À venir</Caption>
+              <Body weight="semibold" size={16} tone={pendingCount > 0 ? 'warning' : 'muted'}>
+                {pendingCount > 0 ? `${pendingCount} opération${pendingCount > 1 ? 's' : ''}` : 'À jour'}
+              </Body>
             </Pressable>
-          ) : null}
-          <View style={styles.balanceRow}>
-            <View style={styles.balanceItem}>
-              <Ionicons name="arrow-down-circle" size={18} color="#B9F6D3" />
-              <Text style={styles.balanceItemText}>{formatCents(income)}</Text>
-            </View>
-            <View style={styles.balanceItem}>
-              <Ionicons name="arrow-up-circle" size={18} color="#FFD1D1" />
-              <Text style={styles.balanceItemText}>{formatCents(expense)}</Text>
-            </View>
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.quickActions}>
-          <Pressable
-            onPress={() => router.push({ pathname: '/nouvelle-transaction', params: { type: 'expense' } })}
-            style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.dangerSoft }]}>
-              <Ionicons name="remove" size={18} color={theme.colors.danger} />
-            </View>
-            <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Dépense</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push({ pathname: '/nouvelle-transaction', params: { type: 'income' } })}
-            style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.successSoft }]}>
-              <Ionicons name="add" size={18} color={theme.colors.success} />
-            </View>
-            <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Revenu</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/epargne')}
-            style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-          >
-            <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.primarySoft }]}>
-              <Ionicons name="trending-up" size={18} color={theme.colors.primary} />
-            </View>
-            <Text style={[styles.quickActionLabel, { color: theme.colors.text }]}>Épargner</Text>
-          </Pressable>
+          {(
+            [
+              ['Dépense', 'remove', 'expense', { pathname: '/nouvelle-transaction', params: { type: 'expense' } }],
+              ['Revenu', 'add', 'income', { pathname: '/nouvelle-transaction', params: { type: 'income' } }],
+              ['Épargner', 'trending-up', 'primary', '/epargne'],
+            ] as const
+          ).map(([label, icon, tone, target]) => {
+            const color =
+              tone === 'expense'
+                ? theme.colors.expense
+                : tone === 'income'
+                  ? theme.colors.income
+                  : theme.colors.text;
+            return (
+              <Pressable
+                key={label}
+                onPress={() => router.push(target as never)}
+                style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+              >
+                <Ionicons name={icon} size={18} color={color} />
+                <Body weight="semibold" size={13.5}>
+                  {label}
+                </Body>
+              </Pressable>
+            );
+          })}
         </View>
 
         <SectionHeader title="Reste à vivre" />
-        <Card style={{ gap: spacing.md }}>
+        <Card style={{ gap: spacing.lg }}>
           <View style={styles.rtvRow}>
             <View style={styles.rtvCol}>
-              <Text style={[styles.rtvColLabel, { color: theme.colors.textMuted }]}>Prévisionnel</Text>
-              <Text
-                style={[
-                  styles.remainingValue,
-                  { color: remainingToLive < 0 ? theme.colors.danger : theme.colors.text },
-                ]}
-              >
-                {formatCents(remainingToLive)}
-              </Text>
+              <Caption>Prévisionnel</Caption>
+              <Money
+                cents={remainingToLive}
+                size={26}
+                weight="bold"
+                tone={remainingToLive < 0 ? 'danger' : 'text'}
+              />
             </View>
             <View style={[styles.rtvDivider, { backgroundColor: theme.colors.border }]} />
             <View style={styles.rtvCol}>
-              <Text style={[styles.rtvColLabel, { color: theme.colors.textMuted }]}>Réel à ce jour</Text>
-              <Text
-                style={[
-                  styles.remainingValue,
-                  { color: remainingReal < 0 ? theme.colors.danger : theme.colors.success },
-                ]}
-              >
-                {formatCents(remainingReal)}
-              </Text>
+              <Caption>Réel à ce jour</Caption>
+              <Money
+                cents={remainingReal}
+                size={26}
+                weight="bold"
+                tone={remainingReal < 0 ? 'danger' : 'success'}
+              />
             </View>
           </View>
 
           {income === 0 ? (
-            <Text style={{ color: theme.colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+            <Body tone="muted" size={13}>
               Ajoutez vos revenus du mois (bouton « Revenu ») pour un calcul complet.
-            </Text>
+            </Body>
           ) : null}
 
-          <View style={{ gap: spacing.xs, marginTop: spacing.xs }}>
+          <View style={{ gap: spacing.sm }}>
             {(
               [
-                ['Revenus du mois', income, theme.colors.success],
-                ['Factures récurrentes', -billsTotal, theme.colors.text],
-                ['Budgets alloués', -budgetsTotal, theme.colors.text],
-                ['Épargne prévue', -savingsPlanned, theme.colors.text],
-              ] as Array<[string, number, string]>
-            ).map(([label, value, color]) => (
-              <View key={label} style={styles.remainingRow}>
-                <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>{label}</Text>
-                <Text style={{ color, fontSize: 13, fontWeight: '700' }}>
-                  {formatCents(value, { signed: true })}
-                </Text>
+                ['Revenus du mois', income],
+                ['Factures récurrentes', -billsTotal],
+                ['Budgets alloués', -budgetsTotal],
+                ['Épargne prévue', -savingsPlanned],
+              ] as Array<[string, number]>
+            ).map(([label, value]) => (
+              <View key={label} style={styles.breakdownRow}>
+                <Body tone="muted" size={13.5}>
+                  {label}
+                </Body>
+                <Money cents={value} size={13.5} weight="semibold" signed tone={value < 0 ? 'text' : 'success'} />
               </View>
             ))}
           </View>
-          <Text style={{ color: theme.colors.textMuted, fontSize: 11, lineHeight: 15 }}>
-            Prévisionnel = revenus − factures − budgets − épargne prévue. Réel = solde du mois − épargne
-            réellement virée.
-          </Text>
         </Card>
 
         <SectionHeader title="Dépenses par catégorie" />
@@ -225,10 +214,10 @@ export default function DashboardScreen() {
                   return (
                     <View key={String(s.category_id)} style={styles.legendItem}>
                       <View style={[styles.legendDot, { backgroundColor: s.category_color }]} />
-                      <Text style={[styles.legendName, { color: theme.colors.text }]} numberOfLines={1}>
+                      <Body size={13} numberOfLines={1} style={{ flex: 1 }}>
                         {s.category_name}
-                      </Text>
-                      <Text style={[styles.legendValue, { color: s.category_color }]}>{pct} %</Text>
+                      </Body>
+                      <Caption color={s.category_color}>{pct} %</Caption>
                     </View>
                   );
                 })}
@@ -252,22 +241,18 @@ export default function DashboardScreen() {
                   label: shortMonthLabel(point.month),
                   bars: [
                     { value: point.income_cents, color: theme.colors.income },
-                    { value: point.expense_cents, color: theme.colors.primary },
+                    { value: point.expense_cents, color: theme.colors.expense },
                   ],
                 }))}
               />
               <View style={styles.chartLegend}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: theme.colors.income }]} />
-                  <Text style={{ color: theme.colors.textMuted, fontSize: 12, fontWeight: '600' }}>
-                    Revenus
-                  </Text>
+                  <Caption>Revenus</Caption>
                 </View>
                 <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} />
-                  <Text style={{ color: theme.colors.textMuted, fontSize: 12, fontWeight: '600' }}>
-                    Dépenses
-                  </Text>
+                  <View style={[styles.legendDot, { backgroundColor: theme.colors.expense }]} />
+                  <Caption>Dépenses</Caption>
                 </View>
               </View>
             </>
@@ -291,19 +276,14 @@ export default function DashboardScreen() {
                 <View style={styles.budgetRow}>
                   <CategoryIcon icon={budget.category_icon} color={budget.category_color} size={36} />
                   <View style={styles.budgetInfo}>
-                    <Text style={[styles.budgetName, { color: theme.colors.text }]}>{budget.category_name}</Text>
-                    <Text style={[styles.budgetAmounts, { color: theme.colors.textMuted }]}>
-                      {formatCents(budget.spent_cents)} / {formatCents(budget.amount_cents)}
-                    </Text>
+                    <Body weight="semibold">{budget.category_name}</Body>
+                    <Caption>
+                      {formatCents(budget.spent_cents)} sur {formatCents(budget.amount_cents)}
+                    </Caption>
                   </View>
-                  <Text
-                    style={[
-                      styles.budgetPercent,
-                      { color: ratio > 1 ? theme.colors.danger : theme.colors.textMuted },
-                    ]}
-                  >
+                  <Body weight="semibold" size={13} tone={ratio > 1 ? 'danger' : 'muted'}>
                     {Math.round(ratio * 100)}%
-                  </Text>
+                  </Body>
                 </View>
                 <ProgressBar ratio={ratio} color={ratio <= 0.85 ? budget.category_color : undefined} />
               </Card>
@@ -314,25 +294,25 @@ export default function DashboardScreen() {
         <SectionHeader title="Factures à venir" actionLabel="Tout voir" onAction={() => router.push('/factures')} />
         {upcomingBills.length === 0 ? (
           <Card>
-            <Text style={{ color: theme.colors.textMuted, textAlign: 'center' }}>
+            <Body tone="muted" style={{ textAlign: 'center' }}>
               {billsSummary && billsSummary.total_cents > 0
-                ? 'Toutes les factures du mois sont réglées ✅'
+                ? 'Toutes les factures du mois sont réglées ✓'
                 : 'Aucune facture enregistrée'}
-            </Text>
+            </Body>
           </Card>
         ) : (
           <Card style={{ gap: spacing.md }}>
             {upcomingBills.map((bill) => (
               <View key={bill.id} style={styles.billRow}>
-                <View style={[styles.billDay, { backgroundColor: theme.colors.warningSoft }]}>
-                  <Text style={[styles.billDayText, { color: theme.colors.warning }]}>{bill.due_day}</Text>
+                <View style={[styles.billDay, { backgroundColor: theme.colors.cardMuted }]}>
+                  <Body weight="bold" size={14}>
+                    {bill.due_day}
+                  </Body>
                 </View>
-                <Text style={[styles.billName, { color: theme.colors.text }]} numberOfLines={1}>
+                <Body weight="medium" numberOfLines={1} style={{ flex: 1 }}>
                   {bill.name}
-                </Text>
-                <Text style={[styles.billAmount, { color: theme.colors.text }]}>
-                  {formatCents(bill.amount_cents)}
-                </Text>
+                </Body>
+                <Money cents={bill.amount_cents} size={15} />
               </View>
             ))}
           </Card>
@@ -341,15 +321,11 @@ export default function DashboardScreen() {
         <SectionHeader title="Épargne" actionLabel="Tout voir" onAction={() => router.push('/epargne')} />
         <Card style={styles.savingsCard}>
           <View style={[styles.savingsIcon, { backgroundColor: theme.colors.successSoft }]}>
-            <Ionicons name="trending-up" size={22} color={theme.colors.success} />
+            <Ionicons name="trending-up" size={20} color={theme.colors.success} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.savingsValue, { color: theme.colors.text }]}>
-              {formatCents(savings?.total_real_cents ?? 0)}
-            </Text>
-            <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
-              épargnés au total sur vos comptes
-            </Text>
+            <Money cents={savings?.total_real_cents ?? 0} size={22} weight="bold" />
+            <Caption>épargnés au total sur vos comptes</Caption>
           </View>
         </Card>
 
@@ -365,34 +341,32 @@ export default function DashboardScreen() {
                 <View key={t.id} style={styles.txRow}>
                   <CategoryIcon
                     icon={t.category_icon ?? 'pricetag-outline'}
-                    color={t.category_color ?? theme.colors.primary}
+                    color={t.category_color ?? theme.colors.textMuted}
                     size={36}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.txLabel, { color: theme.colors.text }]} numberOfLines={1}>
+                    <Body weight="medium" numberOfLines={1}>
                       {t.label}
-                    </Text>
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+                    </Body>
+                    <Caption>
                       {shortDayLabel(t.date)}
                       {t.cleared === 0 ? ' · à venir' : ''}
-                    </Text>
+                    </Caption>
                   </View>
                   {t.cleared === 0 ? (
                     <Ionicons
                       name="hourglass-outline"
-                      size={14}
-                      color={theme.colors.textMuted}
+                      size={13}
+                      color={theme.colors.warning}
                       style={{ marginRight: spacing.xs }}
                     />
                   ) : null}
-                  <Text
-                    style={[
-                      styles.txAmount,
-                      { color: t.type === 'income' ? theme.colors.income : theme.colors.text },
-                    ]}
-                  >
-                    {formatCents(t.type === 'income' ? t.amount_cents : -t.amount_cents, { signed: true })}
-                  </Text>
+                  <Money
+                    cents={t.type === 'income' ? t.amount_cents : -t.amount_cents}
+                    size={15}
+                    signed
+                    tone={t.type === 'income' ? 'income' : 'text'}
+                  />
                 </View>
               ))}
             </Card>
@@ -410,99 +384,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  hello: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
   gearButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
-  balanceCard: {
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    gap: spacing.xs,
+  hero: {
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
   },
-  balanceLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  balanceValue: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    fontWeight: '800',
-  },
-  pendingPill: {
+  heroMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 999,
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
   },
-  pendingText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+  heroStat: {
+    gap: 2,
   },
-  balanceRow: {
-    flexDirection: 'row',
-    gap: spacing.xl,
-    marginTop: spacing.sm,
-  },
-  balanceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  balanceItemText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+  heroDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginHorizontal: spacing.lg,
   },
   quickActions: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   quickAction: {
     flex: 1,
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  quickActionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  remainingValue: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  remainingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md + 2,
+    borderRadius: radius.md,
+    borderWidth: 1,
   },
   rtvRow: {
     flexDirection: 'row',
@@ -510,18 +429,17 @@ const styles = StyleSheet.create({
   },
   rtvCol: {
     flex: 1,
-    gap: 2,
-  },
-  rtvColLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    gap: 3,
   },
   rtvDivider: {
-    width: StyleSheet.hairlineWidth,
+    width: 1,
     alignSelf: 'stretch',
-    marginHorizontal: spacing.md,
+    marginHorizontal: spacing.lg,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   donutCard: {
     paddingVertical: spacing.xl,
@@ -546,18 +464,9 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
   legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  legendValue: {
-    fontSize: 12,
-    fontWeight: '600',
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   budgetCard: {
     gap: spacing.md,
@@ -569,17 +478,7 @@ const styles = StyleSheet.create({
   },
   budgetInfo: {
     flex: 1,
-  },
-  budgetName: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  budgetAmounts: {
-    fontSize: 13,
-  },
-  budgetPercent: {
-    fontSize: 14,
-    fontWeight: '700',
+    gap: 1,
   },
   billRow: {
     flexDirection: 'row',
@@ -587,24 +486,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   billDay: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  billDayText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  billName: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  billAmount: {
-    fontSize: 15,
-    fontWeight: '700',
   },
   savingsCard: {
     flexDirection: 'row',
@@ -618,21 +504,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  savingsValue: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
   txRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  txLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  txAmount: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

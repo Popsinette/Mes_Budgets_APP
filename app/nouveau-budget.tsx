@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
@@ -8,13 +8,13 @@ import { CategoryPicker } from '@/src/components/ui/CategoryPicker';
 import { AmountField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
+import { Body, Eyebrow } from '@/src/components/ui/Text';
 import { upsertBudget } from '@/src/features/budgets/repository';
-import { spacing, useTheme } from '@/src/theme';
+import { spacing } from '@/src/theme';
 import { currentMonthKey, monthKeyLabel } from '@/src/utils/dates';
 import { parseAmountToCents } from '@/src/utils/money';
 
 export default function NewBudgetScreen() {
-  const theme = useTheme();
   const db = useSQLiteContext();
   const params = useLocalSearchParams<{ month?: string; categoryId?: string; amount?: string }>();
   const month = typeof params.month === 'string' && params.month ? params.month : currentMonthKey();
@@ -44,25 +44,15 @@ export default function NewBudgetScreen() {
   return (
     <Screen>
       <ModalHeader title="Nouveau budget" />
-      <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
+      <Body tone="muted" size={13.5}>
         Budget mensuel pour {monthKeyLabel(month)} — si un budget existe déjà pour cette catégorie, il sera
         remplacé.
-      </Text>
+      </Body>
 
       <AmountField label="Montant mensuel" value={amount} onChangeText={setAmount} placeholder="300" autoFocus />
 
       <View style={{ gap: spacing.sm }}>
-        <Text
-          style={{
-            color: theme.colors.textMuted,
-            fontSize: 13,
-            fontWeight: '600',
-            textTransform: 'uppercase',
-            letterSpacing: 0.4,
-          }}
-        >
-          Catégorie
-        </Text>
+        <Eyebrow>Catégorie</Eyebrow>
         <CategoryPicker selectedId={categoryId} onSelect={(c) => setCategoryId(c.id)} />
       </View>
 

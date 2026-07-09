@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { radius, spacing, useTheme } from '@/src/theme';
+import { fonts, radius, spacing, useTheme } from '@/src/theme';
 import { monthKeyLabel, shiftMonthKey, type MonthKey } from '@/src/utils/dates';
 
 type MonthSwitcherProps = {
@@ -14,15 +14,23 @@ export function MonthSwitcher({ month, onChange }: MonthSwitcherProps) {
   const label = monthKeyLabel(month);
 
   return (
-    <View style={[styles.row, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-      <Pressable hitSlop={10} onPress={() => onChange(shiftMonthKey(month, -1))}>
-        <Ionicons name="chevron-back" size={22} color={theme.colors.primary} />
+    <View style={[styles.row, { borderColor: theme.colors.border }]}>
+      <Pressable
+        hitSlop={10}
+        onPress={() => onChange(shiftMonthKey(month, -1))}
+        style={[styles.arrow, { backgroundColor: theme.colors.cardMuted }]}
+      >
+        <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
       </Pressable>
       <Text style={[styles.label, { color: theme.colors.text }]}>
         {label.charAt(0).toUpperCase() + label.slice(1)}
       </Text>
-      <Pressable hitSlop={10} onPress={() => onChange(shiftMonthKey(month, 1))}>
-        <Ionicons name="chevron-forward" size={22} color={theme.colors.primary} />
+      <Pressable
+        hitSlop={10}
+        onPress={() => onChange(shiftMonthKey(month, 1))}
+        style={[styles.arrow, { backgroundColor: theme.colors.cardMuted }]}
+      >
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.text} />
       </Pressable>
     </View>
   );
@@ -33,13 +41,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  arrow: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
+    fontFamily: fonts.displaySemibold,
     fontSize: 16,
-    fontWeight: '700',
+    letterSpacing: -0.2,
   },
 });

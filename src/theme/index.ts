@@ -1,18 +1,41 @@
 import { useColorScheme } from 'react-native';
 
+/**
+ * Direction « Précision tranquille » : palette neutre encre, un seul registre
+ * d'accent fonctionnel (vert = positif, brique = dépense), l'encre comme couleur
+ * d'action. Typographie appariée Schibsted Grotesk (titres + montants) /
+ * Instrument Sans (corps).
+ */
+
 export const palette = {
+  ink: '#191A1E',
+  green: '#1C8A5B',
+  greenDark: '#0F1E1A',
+  amber: '#B7791F',
+  brick: '#BE4A3A',
+  slate: '#797A80',
+  // Couleurs proposées pour les pastilles de catégories / comptes (choix utilisateur).
   violet: '#6C5CE7',
-  violetLight: '#8B7CF7',
   mint: '#10B981',
-  amber: '#F59E0B',
   red: '#EF4444',
   blue: '#3B82F6',
   pink: '#EC4899',
   teal: '#14B8A6',
   orange: '#F97316',
   purple: '#8B5CF6',
-  slate: '#64748B',
 };
+
+/** Familles chargées au démarrage (voir app/_layout.tsx). */
+export const fonts = {
+  body: 'InstrumentSans_400Regular',
+  bodyMedium: 'InstrumentSans_500Medium',
+  bodySemibold: 'InstrumentSans_600SemiBold',
+  bodyBold: 'InstrumentSans_700Bold',
+  display: 'SchibstedGrotesk_500Medium',
+  displaySemibold: 'SchibstedGrotesk_600SemiBold',
+  displayBold: 'SchibstedGrotesk_700Bold',
+  displayXbold: 'SchibstedGrotesk_800ExtraBold',
+} as const;
 
 export type Theme = {
   dark: boolean;
@@ -23,6 +46,8 @@ export type Theme = {
     text: string;
     textMuted: string;
     border: string;
+    /** Séparateur très discret (filets de « grand livre »). */
+    hairline: string;
     primary: string;
     onPrimary: string;
     primarySoft: string;
@@ -34,72 +59,61 @@ export type Theme = {
     dangerSoft: string;
     income: string;
     expense: string;
-    /** Texte/icônes posés sur une surface colorée ou un dégradé (cartes héro). */
+    /** Texte/icônes posés sur une surface encre (boutons, pastilles pleines). */
     onAccent: string;
     onAccentMuted: string;
-  };
-  /** Dégradés des cartes « héro » — source unique, partagée par tous les écrans. */
-  gradients: {
-    primary: readonly [string, string];
-    success: readonly [string, string];
   };
 };
 
 export const lightTheme: Theme = {
   dark: false,
   colors: {
-    background: '#F4F4FB',
+    background: '#F6F6F3',
     card: '#FFFFFF',
-    cardMuted: '#F0F0F8',
-    text: '#181A2E',
-    textMuted: '#6E7191',
-    border: '#EAEAF4',
-    primary: palette.violet,
+    cardMuted: '#F1F1EC',
+    text: '#191A1E',
+    textMuted: '#797A80',
+    border: '#E7E7E1',
+    hairline: '#ECECE6',
+    primary: '#191A1E',
     onPrimary: '#FFFFFF',
-    primarySoft: '#EEEBFF',
-    success: palette.mint,
-    successSoft: '#E6F7F0',
+    primarySoft: '#ECECE6',
+    success: palette.green,
+    successSoft: '#E4F2EA',
     warning: palette.amber,
-    warningSoft: '#FEF3E2',
-    danger: palette.red,
-    dangerSoft: '#FDECEC',
-    income: palette.mint,
-    expense: palette.red,
+    warningSoft: '#F6EEDD',
+    danger: palette.brick,
+    dangerSoft: '#F6E7E3',
+    income: palette.green,
+    expense: palette.brick,
     onAccent: '#FFFFFF',
-    onAccentMuted: 'rgba(255,255,255,0.82)',
-  },
-  gradients: {
-    primary: ['#6C5CE7', '#9B85F7'],
-    success: ['#10B981', '#3ED9A4'],
+    onAccentMuted: 'rgba(255,255,255,0.78)',
   },
 };
 
 export const darkTheme: Theme = {
   dark: true,
   colors: {
-    background: '#0E0F1A',
-    card: '#1A1C2E',
-    cardMuted: '#22243A',
-    text: '#F2F3F7',
-    textMuted: '#9698B0',
-    border: '#282B44',
-    primary: palette.violetLight,
-    onPrimary: '#FFFFFF',
-    primarySoft: '#2A2650',
-    success: '#34D399',
-    successSoft: '#123B2E',
-    warning: '#FBBF24',
-    warningSoft: '#3D2E10',
-    danger: '#F87171',
-    dangerSoft: '#3F1D1D',
-    income: '#34D399',
-    expense: '#F87171',
-    onAccent: '#FFFFFF',
-    onAccentMuted: 'rgba(255,255,255,0.82)',
-  },
-  gradients: {
-    primary: ['#4C3FD1', '#7C5CE0'],
-    success: ['#0E7A5F', '#17A87F'],
+    background: '#0F0F11',
+    card: '#17181B',
+    cardMuted: '#212227',
+    text: '#F3F3F0',
+    textMuted: '#9B9CA1',
+    border: '#26272B',
+    hairline: '#222327',
+    primary: '#F3F3F0',
+    onPrimary: '#17181B',
+    primarySoft: '#26272B',
+    success: '#34B87E',
+    successSoft: '#123227',
+    warning: '#D8A544',
+    warningSoft: '#33280F',
+    danger: '#E0685A',
+    dangerSoft: '#3A211D',
+    income: '#34B87E',
+    expense: '#E0685A',
+    onAccent: '#17181B',
+    onAccentMuted: 'rgba(23,24,27,0.72)',
   },
 };
 
@@ -114,13 +128,13 @@ export const spacing = {
   md: 12,
   lg: 16,
   xl: 24,
-  xxl: 32,
+  xxl: 36,
 } as const;
 
 export const radius = {
   sm: 10,
   md: 14,
-  lg: 20,
-  xl: 28,
+  lg: 18,
+  xl: 24,
   full: 999,
 } as const;

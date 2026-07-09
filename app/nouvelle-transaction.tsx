@@ -9,7 +9,7 @@ import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { addTransaction, type TransactionType } from '@/src/features/transactions/repository';
-import { radius, spacing, useTheme } from '@/src/theme';
+import { fonts, radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, todayIso } from '@/src/utils/dates';
 import { parseAmountToCents } from '@/src/utils/money';
 import { Pressable } from 'react-native';
@@ -122,7 +122,7 @@ export default function NewTransactionScreen() {
               <Text
                 style={[
                   styles.typeLabel,
-                  { color: cleared === value ? '#FFFFFF' : theme.colors.textMuted },
+                  { color: cleared === value ? theme.colors.onAccent : theme.colors.textMuted },
                 ]}
               >
                 {optionLabel}
@@ -154,13 +154,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeLabel: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 14.5,
   },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 1,
   },
 });

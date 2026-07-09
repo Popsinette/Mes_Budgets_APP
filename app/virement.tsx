@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
+import { Body, Caption, Eyebrow } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { addTransfer, listAccountsWithBalance } from '@/src/features/savings/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
@@ -58,9 +59,9 @@ export default function NewTransferScreen() {
     return (
       <Screen>
         <ModalHeader title="Nouveau virement" />
-        <Text style={{ color: theme.colors.textMuted }}>
+        <Body tone="muted">
           Créez d’abord un compte d’épargne pour pouvoir y faire un virement.
-        </Text>
+        </Body>
         <Button label="Créer un compte" onPress={() => router.replace('/nouveau-compte')} />
       </Screen>
     );
@@ -69,12 +70,12 @@ export default function NewTransferScreen() {
   return (
     <Screen>
       <ModalHeader title="Nouveau virement" />
-      <Text style={{ color: theme.colors.textMuted, fontSize: 14 }}>
+      <Body tone="muted" size={13.5}>
         Virement d’épargne pour {monthKeyLabel(month)}.
-      </Text>
+      </Body>
 
       <View style={{ gap: spacing.sm }}>
-        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Compte d’épargne</Text>
+        <Eyebrow>Compte d’épargne</Eyebrow>
         <View style={styles.accounts}>
           {(accounts ?? []).map((account) => {
             const isSel = account.id === accountId;
@@ -91,9 +92,9 @@ export default function NewTransferScreen() {
                 ]}
               >
                 <CategoryIcon icon={account.icon} color={account.color} size={30} />
-                <Text style={[styles.accountName, { color: theme.colors.text }]} numberOfLines={1}>
+                <Body weight="semibold" size={14} numberOfLines={1} style={{ maxWidth: 120 }}>
                   {account.name}
-                </Text>
+                </Body>
               </Pressable>
             );
           })}
@@ -108,13 +109,13 @@ export default function NewTransferScreen() {
       />
 
       <View style={[styles.doneRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.doneLabel, { color: theme.colors.text }]}>Virement déjà effectué</Text>
-          <Text style={{ color: theme.colors.textMuted, fontSize: 12, lineHeight: 16 }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Body weight="semibold">Virement déjà effectué</Body>
+          <Caption>
             {done
               ? 'Compté dans votre épargne réelle et le reste à vivre réel.'
               : 'Simplement prévu : compté dans le prévisionnel seulement.'}
-          </Text>
+          </Caption>
         </View>
         <Switch value={done} onValueChange={setDone} trackColor={{ true: theme.colors.success }} />
       </View>
@@ -122,9 +123,9 @@ export default function NewTransferScreen() {
       <FormField label="Note (optionnel)" value={note} onChangeText={setNote} placeholder="Prime, virement auto…" />
 
       {selected ? (
-        <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>
+        <Caption>
           Solde actuel de « {selected.name} » : {formatCents(selected.real_cents)}
-        </Text>
+        </Caption>
       ) : null}
 
       <Button
@@ -137,12 +138,6 @@ export default function NewTransferScreen() {
 }
 
 const styles = StyleSheet.create({
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
   accounts: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -157,22 +152,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1.5,
   },
-  accountName: {
-    fontSize: 14,
-    fontWeight: '600',
-    maxWidth: 120,
-  },
   doneRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  doneLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
+    borderWidth: 1,
   },
 });

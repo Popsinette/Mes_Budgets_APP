@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
-import { radius, spacing, useTheme } from '@/src/theme';
+import { fonts, radius, spacing, useTheme } from '@/src/theme';
 
 type FormFieldProps = {
   label: string;
@@ -9,6 +9,8 @@ type FormFieldProps = {
   keyboardType?: KeyboardTypeOptions;
   autoFocus?: boolean;
   suffix?: string;
+  /** Rendu « montant » : chiffres Schibsted tabulaires, plus grand. */
+  display?: boolean;
 };
 
 export function FormField({
@@ -19,6 +21,7 @@ export function FormField({
   keyboardType,
   autoFocus,
   suffix,
+  display,
 }: FormFieldProps) {
   const theme = useTheme();
   return (
@@ -31,7 +34,7 @@ export function FormField({
         ]}
       >
         <TextInput
-          style={[styles.input, { color: theme.colors.text }]}
+          style={[display ? styles.inputDisplay : styles.input, { color: theme.colors.text }]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -39,42 +42,59 @@ export function FormField({
           keyboardType={keyboardType}
           autoFocus={autoFocus}
         />
-        {suffix ? <Text style={[styles.suffix, { color: theme.colors.textMuted }]}>{suffix}</Text> : null}
+        {suffix ? (
+          <Text style={[display ? styles.suffixDisplay : styles.suffix, { color: theme.colors.textMuted }]}>
+            {suffix}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
 }
 
 /** Saisie de montant en euros ("12,50"). */
-export function AmountField(props: Omit<FormFieldProps, 'keyboardType' | 'suffix'>) {
-  return <FormField {...props} keyboardType="decimal-pad" suffix="€" />;
+export function AmountField(props: Omit<FormFieldProps, 'keyboardType' | 'suffix' | 'display'>) {
+  return <FormField {...props} keyboardType="decimal-pad" suffix="€" display />;
 }
 
 const styles = StyleSheet.create({
   field: {
-    gap: spacing.xs + 2,
+    gap: spacing.sm,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 1,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     paddingHorizontal: spacing.lg,
   },
   input: {
     flex: 1,
-    fontSize: 17,
+    fontFamily: fonts.body,
+    fontSize: 16,
+    paddingVertical: spacing.md + 2,
+  },
+  inputDisplay: {
+    flex: 1,
+    fontFamily: fonts.displaySemibold,
+    fontSize: 24,
+    letterSpacing: -0.4,
     paddingVertical: spacing.md + 2,
   },
   suffix: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.bodyMedium,
+    fontSize: 15,
+    marginLeft: spacing.sm,
+  },
+  suffixDisplay: {
+    fontFamily: fonts.displaySemibold,
+    fontSize: 20,
     marginLeft: spacing.sm,
   },
 });

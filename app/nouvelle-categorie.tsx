@@ -8,7 +8,7 @@ import { FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { createCategory, deleteCategory, updateCategory } from '@/src/features/categories/repository';
-import { palette, spacing, useTheme } from '@/src/theme';
+import { fonts, palette, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 
 const CATEGORY_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
@@ -143,10 +143,10 @@ export default function NewCategoryScreen() {
 
 const styles = StyleSheet.create({
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 1,
   },
   optionsRow: {
     flexDirection: 'row',

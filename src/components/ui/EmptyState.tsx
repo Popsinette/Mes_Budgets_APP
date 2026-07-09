@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
-import { spacing, useTheme } from '@/src/theme';
+import { fonts, spacing, useTheme } from '@/src/theme';
 
 type EmptyStateProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -28,20 +28,21 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
   title: {
+    fontFamily: fonts.displaySemibold,
     fontSize: 16,
-    fontWeight: '700',
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontFamily: fonts.body,
+    fontSize: 13.5,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: spacing.xl,

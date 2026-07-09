@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { radius, spacing, useTheme } from '@/src/theme';
+import { fonts, radius, spacing, useTheme } from '@/src/theme';
 
 type ChipProps = {
   label: string;
@@ -11,6 +11,7 @@ type ChipProps = {
 export function Chip({ label, selected, onPress, color }: ChipProps) {
   const theme = useTheme();
   const accent = color ?? theme.colors.primary;
+  const textColor = selected ? (color ? '#FFFFFF' : theme.colors.onAccent) : theme.colors.textMuted;
 
   return (
     <Pressable
@@ -18,24 +19,26 @@ export function Chip({ label, selected, onPress, color }: ChipProps) {
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? accent : theme.colors.cardMuted,
-          opacity: pressed ? 0.8 : 1,
+          backgroundColor: selected ? accent : 'transparent',
+          borderColor: selected ? accent : theme.colors.border,
+          opacity: pressed ? 0.7 : 1,
         },
       ]}
     >
-      <Text style={[styles.label, { color: selected ? '#FFFFFF' : theme.colors.text }]}>{label}</Text>
+      <Text style={[styles.label, { color: textColor }]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   chip: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.md + 2,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
+    borderWidth: 1,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemibold,
+    fontSize: 13.5,
   },
 });

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -12,6 +12,7 @@ import { FAB } from '@/src/components/ui/FAB';
 import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deleteTransaction,
@@ -20,7 +21,7 @@ import {
   setTransactionCleared,
   type TransactionWithCategory,
 } from '@/src/features/transactions/repository';
-import { spacing, useTheme } from '@/src/theme';
+import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, shortDayLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
@@ -70,41 +71,36 @@ export default function OperationsScreen() {
         <Pressable hitSlop={8} onPress={() => togglePointed(t)}>
           <Ionicons
             name={isPending ? 'ellipse-outline' : 'checkmark-circle'}
-            size={26}
+            size={25}
             color={isPending ? theme.colors.textMuted : theme.colors.success}
           />
         </Pressable>
         <CategoryIcon
           icon={t.type === 'income' ? 'arrow-down-outline' : (t.category_icon ?? 'pricetag-outline')}
-          color={t.type === 'income' ? theme.colors.success : (t.category_color ?? theme.colors.primary)}
+          color={t.type === 'income' ? theme.colors.success : (t.category_color ?? theme.colors.textMuted)}
           size={38}
         />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.txLabel, { color: theme.colors.text }]} numberOfLines={1}>
+          <Body weight="medium" numberOfLines={1}>
             {t.label}
-          </Text>
-          <Text style={{ color: theme.colors.textMuted, fontSize: 12 }} numberOfLines={1}>
+          </Body>
+          <Caption numberOfLines={1}>
             {shortDayLabel(t.date)}
             {' · '}
             {t.type === 'income' ? 'Revenu' : (t.category_name ?? 'Sans catégorie')}
             {t.note ? ` · ${t.note}` : ''}
-          </Text>
+          </Caption>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <Text
-            style={[
-              styles.txAmount,
-              { color: t.type === 'income' ? theme.colors.income : theme.colors.text },
-            ]}
-          >
-            {formatCents(t.type === 'income' ? t.amount_cents : -t.amount_cents, { signed: true })}
-          </Text>
-          <Text
-            onPress={() => confirmDelete(t)}
-            style={{ color: theme.colors.textMuted, fontSize: 11, fontWeight: '600' }}
-          >
+          <Money
+            cents={t.type === 'income' ? t.amount_cents : -t.amount_cents}
+            size={15}
+            signed
+            tone={t.type === 'income' ? 'income' : 'text'}
+          />
+          <Caption onPress={() => confirmDelete(t)} style={{ fontSize: 11 }}>
             Supprimer
-          </Text>
+          </Caption>
         </View>
       </View>
     );
@@ -112,38 +108,23 @@ export default function OperationsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen bottomInset={72}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Opérations</Text>
+      <Screen bottomInset={80}>
+        <Title>Activité</Title>
         <MonthSwitcher month={month} onChange={setMonth} />
 
         <View style={styles.totalsRow}>
           <Card style={styles.totalCard}>
-            <View style={[styles.totalIcon, { backgroundColor: theme.colors.successSoft }]}>
-              <Ionicons name="checkmark-done" size={16} color={theme.colors.success} />
-            </View>
-            <Text
-              style={[
-                styles.totalValue,
-                { color: realBalance < 0 ? theme.colors.danger : theme.colors.text },
-              ]}
-            >
-              {formatCents(realBalance)}
-            </Text>
-            <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Réel (pointé)</Text>
+            <Eyebrow>Réel · pointé</Eyebrow>
+            <Money cents={realBalance} size={22} weight="bold" tone={realBalance < 0 ? 'danger' : 'text'} />
           </Card>
           <Card style={styles.totalCard}>
-            <View style={[styles.totalIcon, { backgroundColor: theme.colors.primarySoft }]}>
-              <Ionicons name="hourglass-outline" size={16} color={theme.colors.primary} />
-            </View>
-            <Text
-              style={[
-                styles.totalValue,
-                { color: plannedBalance < 0 ? theme.colors.danger : theme.colors.text },
-              ]}
-            >
-              {formatCents(plannedBalance)}
-            </Text>
-            <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Prévisionnel</Text>
+            <Eyebrow>Prévisionnel</Eyebrow>
+            <Money
+              cents={plannedBalance}
+              size={22}
+              weight="bold"
+              tone={plannedBalance < 0 ? 'danger' : 'muted'}
+            />
           </Card>
         </View>
 
@@ -152,13 +133,13 @@ export default function OperationsScreen() {
           <Chip
             label="Dépenses"
             selected={filter === 'expense'}
-            color={theme.colors.danger}
+            color={theme.colors.expense}
             onPress={() => setFilter('expense')}
           />
           <Chip
             label="Revenus"
             selected={filter === 'income'}
-            color={theme.colors.success}
+            color={theme.colors.income}
             onPress={() => setFilter('income')}
           />
         </View>
@@ -175,19 +156,19 @@ export default function OperationsScreen() {
           <>
             {pending.length > 0 ? (
               <>
-                <SectionHeader title={`À pointer (${pending.length})`} />
+                <SectionHeader title={`À pointer · ${pending.length}`} />
                 <Card style={{ gap: spacing.md, paddingVertical: spacing.md }}>
                   {pending.map(renderRow)}
                 </Card>
-                <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
+                <Caption style={{ textAlign: 'center' }}>
                   Touchez le cercle pour pointer une opération dès qu’elle passe sur votre compte.
-                </Text>
+                </Caption>
               </>
             ) : null}
 
             {clearedTx.length > 0 ? (
               <>
-                <SectionHeader title={`Pointées (${clearedTx.length})`} />
+                <SectionHeader title={`Pointées · ${clearedTx.length}`} />
                 <Card style={{ gap: spacing.md, paddingVertical: spacing.md }}>
                   {clearedTx.map(renderRow)}
                 </Card>
@@ -202,10 +183,6 @@ export default function OperationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
   totalsRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -213,21 +190,6 @@ const styles = StyleSheet.create({
   totalCard: {
     flex: 1,
     gap: spacing.xs,
-  },
-  totalIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  totalValue: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  totalLabel: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   filters: {
     flexDirection: 'row',
@@ -237,13 +199,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  txLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  txAmount: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

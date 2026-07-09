@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Card } from '@/src/components/ui/Card';
@@ -11,6 +11,7 @@ import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
+import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   copyBudgetsFromMonth,
@@ -50,27 +51,28 @@ export default function BudgetsScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen bottomInset={72}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Budgets</Text>
+      <Screen bottomInset={80}>
+        <Title>Budgets</Title>
         <MonthSwitcher month={month} onChange={setMonth} />
 
         {(budgets ?? []).length > 0 ? (
           <Card style={{ gap: spacing.md }}>
             <View style={styles.totalRow}>
-              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Total du mois</Text>
-              <Text style={[styles.totalValue, { color: theme.colors.text }]}>
-                {formatCents(totalSpent)}{' '}
-                <Text style={{ color: theme.colors.textMuted, fontWeight: '600' }}>
-                  / {formatCents(totalBudget)}
-                </Text>
-              </Text>
+              <View style={{ gap: 3 }}>
+                <Eyebrow>Dépensé ce mois</Eyebrow>
+                <Money cents={totalSpent} size={24} weight="bold" />
+              </View>
+              <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                <Eyebrow>Enveloppe</Eyebrow>
+                <Money cents={totalBudget} size={16} weight="semibold" tone="muted" />
+              </View>
             </View>
             <ProgressBar ratio={globalRatio} height={10} />
-            <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+            <Caption>
               {globalRatio > 1
                 ? `Dépassement de ${formatCents(totalSpent - totalBudget)}`
                 : `Reste ${formatCents(totalBudget - totalSpent)} disponible`}
-            </Text>
+            </Caption>
           </Card>
         ) : null}
 
@@ -106,23 +108,17 @@ export default function BudgetsScreen() {
               >
                 <View style={styles.budgetRow}>
                   <CategoryIcon icon={budget.category_icon} color={budget.category_color} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.budgetName, { color: theme.colors.text }]}>
-                      {budget.category_name}
-                    </Text>
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Body weight="semibold">{budget.category_name}</Body>
+                    <Caption tone={remaining >= 0 ? 'muted' : 'danger'}>
                       {remaining >= 0
                         ? `Reste ${formatCents(remaining)}`
                         : `Dépassé de ${formatCents(-remaining)}`}
-                    </Text>
+                    </Caption>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.budgetSpent, { color: theme.colors.text }]}>
-                      {formatCents(budget.spent_cents)}
-                    </Text>
-                    <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>
-                      sur {formatCents(budget.amount_cents)}
-                    </Text>
+                  <View style={{ alignItems: 'flex-end', gap: 1 }}>
+                    <Money cents={budget.spent_cents} size={16} weight="bold" />
+                    <Caption>sur {formatCents(budget.amount_cents)}</Caption>
                   </View>
                 </View>
                 <ProgressBar ratio={ratio} color={ratio <= 0.85 ? budget.category_color : undefined} />
@@ -131,9 +127,9 @@ export default function BudgetsScreen() {
           })
         )}
 
-        <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
+        <Caption style={{ textAlign: 'center' }}>
           Touchez un budget pour voir ses dépenses · appui long pour le supprimer
-        </Text>
+        </Caption>
       </Screen>
       <FAB onPress={() => router.push({ pathname: '/nouveau-budget', params: { month } })} />
     </View>
@@ -141,34 +137,14 @@ export default function BudgetsScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-  },
   totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  totalLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  totalValue: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
   budgetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  budgetName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  budgetSpent: {
-    fontSize: 16,
-    fontWeight: '800',
   },
 });

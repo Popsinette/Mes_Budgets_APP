@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
-import { useTheme } from '@/src/theme';
+import { fonts, useTheme } from '@/src/theme';
 
 export type DonutSlice = {
   value: number;
@@ -57,7 +57,7 @@ export function DonutChart({
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size}>
-        <G rotation={-90} originX={size / 2} originY={size / 2}>
+        <G transform={`rotate(-90, ${size / 2}, ${size / 2})`}>
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -94,12 +94,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   centerLabel: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontFamily: fonts.displayBold,
+    fontSize: 19,
+    letterSpacing: -0.3,
   },
   centerSubLabel: {
+    fontFamily: fonts.body,
     fontSize: 12,
-    fontWeight: '600',
     marginTop: 2,
   },
 });
