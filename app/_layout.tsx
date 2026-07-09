@@ -36,6 +36,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="nouvelle-transaction" options={{ presentation: 'modal' }} />
               <Stack.Screen name="nouveau-budget" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="budget-detail" options={{ presentation: 'modal' }} />
               <Stack.Screen name="nouveau-compte" options={{ presentation: 'modal' }} />
               <Stack.Screen name="virement" options={{ presentation: 'modal' }} />
               <Stack.Screen name="nouvelle-facture" options={{ presentation: 'modal' }} />

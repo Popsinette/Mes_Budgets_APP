@@ -98,12 +98,8 @@ export default function BudgetsScreen() {
                 style={{ gap: spacing.md }}
                 onPress={() =>
                   router.push({
-                    pathname: '/nouveau-budget',
-                    params: {
-                      month,
-                      categoryId: String(budget.category_id),
-                      amount: String(budget.amount_cents),
-                    },
+                    pathname: '/budget-detail',
+                    params: { month, categoryId: String(budget.category_id) },
                   })
                 }
                 onLongPress={() => confirmDelete(budget.id, budget.category_name)}
@@ -136,7 +132,7 @@ export default function BudgetsScreen() {
         )}
 
         <Text style={{ color: theme.colors.textMuted, fontSize: 12, textAlign: 'center' }}>
-          Touchez un budget pour le modifier · appui long pour le supprimer
+          Touchez un budget pour voir ses dépenses · appui long pour le supprimer
         </Text>
       </Screen>
       <FAB onPress={() => router.push({ pathname: '/nouveau-budget', params: { month } })} />

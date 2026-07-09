@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { invalidateQueries } from '@/src/store/invalidation';
+import type { TransactionWithCategory } from '@/src/features/transactions/repository';
 import type { MonthKey } from '@/src/utils/dates';
 
 export type BudgetWithSpending = {
@@ -48,6 +49,49 @@ export async function listBudgetsWithSpending(
      WHERE b.month = ?
      ORDER BY c.sort_order, c.name`,
     [month],
+  );
+}
+
+/** Un budget précis (catégorie + mois) avec son total dépensé, ou null. */
+export async function getBudgetForCategory(
+  db: SQLiteDatabase,
+  categoryId: number,
+  month: MonthKey,
+): Promise<BudgetWithSpending | null> {
+  const row = await db.getFirstAsync<BudgetWithSpending>(
+    `SELECT
+       b.id, b.category_id, b.month, b.amount_cents,
+       c.name AS category_name, c.icon AS category_icon, c.color AS category_color,
+       COALESCE((
+         SELECT SUM(t.amount_cents) FROM transactions t
+         WHERE t.category_id = b.category_id AND t.month = b.month AND t.type = 'expense'
+           AND t.bill_id IS NULL
+       ), 0) AS spent_cents
+     FROM budgets b
+     JOIN categories c ON c.id = b.category_id
+     WHERE b.category_id = ? AND b.month = ?`,
+    [categoryId, month],
+  );
+  return row ?? null;
+}
+
+/**
+ * Dépenses d'une catégorie pour un mois, telles que comptées dans le budget
+ * (dépenses libres uniquement : les prélèvements de factures, `bill_id`, sont
+ * exclus comme dans `listBudgetsWithSpending`).
+ */
+export async function listBudgetExpenses(
+  db: SQLiteDatabase,
+  categoryId: number,
+  month: MonthKey,
+): Promise<TransactionWithCategory[]> {
+  return db.getAllAsync<TransactionWithCategory>(
+    `SELECT t.*, c.name AS category_name, c.icon AS category_icon, c.color AS category_color
+     FROM transactions t
+     LEFT JOIN categories c ON c.id = t.category_id
+     WHERE t.category_id = ? AND t.month = ? AND t.type = 'expense' AND t.bill_id IS NULL
+     ORDER BY t.date DESC, t.id DESC`,
+    [categoryId, month],
   );
 }
 
