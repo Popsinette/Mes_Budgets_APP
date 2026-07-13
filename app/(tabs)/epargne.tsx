@@ -57,7 +57,7 @@ export default function SavingsScreen() {
   const confirmDeleteTransfer = (t: SavingsTransfer) => {
     confirmAction({
       title: 'Supprimer le virement',
-      message: `Supprimer ce virement de ${formatCents(t.amount_cents)} ?`,
+      message: `Supprimer ce ${t.amount_cents < 0 ? 'retrait' : 'virement'} de ${formatCents(Math.abs(t.amount_cents))} ?`,
       confirmLabel: 'Supprimer',
       destructive: true,
       onConfirm: () => void deleteTransfer(db, t.id),
@@ -140,9 +140,11 @@ export default function SavingsScreen() {
                   <ProgressBar ratio={ratio} color={done ? theme.colors.success : account.color} />
                 ) : null}
 
-                {/* Virements du mois : coche « effectué » comme les factures */}
+                {/* Virements du mois : coche « effectué » comme les factures.
+                    Un montant négatif = retrait vers le compte courant. */}
                 {monthTransfers.map((t) => {
                   const isDone = t.done === 1;
+                  const isWithdraw = t.amount_cents < 0;
                   return (
                     <Pressable
                       key={t.id}
@@ -156,7 +158,8 @@ export default function SavingsScreen() {
                         color={isDone ? theme.colors.success : theme.colors.textMuted}
                       />
                       <Caption style={{ flex: 1 }}>
-                        Virement du {shortDayLabel(t.date)}
+                        {isWithdraw ? 'Retrait' : 'Virement'} du {shortDayLabel(t.date)}
+                        {isWithdraw ? ' → compte courant' : ''}
                         {t.note ? ` · ${t.note}` : ''}
                         {isDone ? '' : ' · prévu'}
                       </Caption>
@@ -164,7 +167,7 @@ export default function SavingsScreen() {
                         cents={t.amount_cents}
                         size={14}
                         signed
-                        tone={isDone ? 'success' : 'muted'}
+                        tone={isDone ? (isWithdraw ? 'expense' : 'success') : 'muted'}
                       />
                     </Pressable>
                   );
