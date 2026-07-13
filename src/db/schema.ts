@@ -70,17 +70,19 @@ CREATE TABLE IF NOT EXISTS bill_payments (
 );
 `;
 
+// Couleurs issues de `categoryPalette` (src/theme) — palette validée
+// contraste/daltonisme sur fond clair et sombre.
 const DEFAULT_CATEGORIES: Array<[string, string, string]> = [
-  ['Alimentation', 'cart-outline', '#5F9070'],
-  ['Logement', 'home-outline', '#6E6FA6'],
-  ['Transport', 'car-outline', '#5580A6'],
-  ['Restaurants', 'restaurant-outline', '#C56A4E'],
-  ['Loisirs', 'game-controller-outline', '#9A6494'],
-  ['Santé', 'heart-outline', '#C57487'],
-  ['Abonnements', 'tv-outline', '#7A6E9C'],
-  ['Vêtements', 'shirt-outline', '#3F9195'],
-  ['Épargne', 'trending-up-outline', '#C79A3E'],
-  ['Autre', 'ellipsis-horizontal-outline', '#857F76'],
+  ['Alimentation', 'cart-outline', '#3F8F63'],
+  ['Logement', 'home-outline', '#6B65B5'],
+  ['Transport', 'car-outline', '#4F8FCB'],
+  ['Restaurants', 'restaurant-outline', '#C25E3F'],
+  ['Loisirs', 'game-controller-outline', '#B85497'],
+  ['Santé', 'heart-outline', '#C05A75'],
+  ['Abonnements', 'tv-outline', '#8A5FA8'],
+  ['Vêtements', 'shirt-outline', '#0E9BAA'],
+  ['Épargne', 'trending-up-outline', '#B8841F'],
+  ['Autre', 'ellipsis-horizontal-outline', '#B0632F'],
 ];
 
 // V2 : le pointage d'une facture crée la dépense correspondante ; on garde

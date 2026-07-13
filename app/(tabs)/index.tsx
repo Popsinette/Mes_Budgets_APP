@@ -73,10 +73,9 @@ export default function DashboardScreen() {
   // moins les factures restant à payer et toute l'épargne du mois (faite + prévue).
   const balance = income - expense - unpaidBillsTotal - savingsPlanned;
 
-  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue du mois
+  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue du mois.
+  // (Le « reste à vivre réel » est le solde réel pointé, affiché en héros — pas de doublon.)
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
-  // Reste à vivre réel : le solde réel pointé, déjà net de l'épargne virée
-  const remainingReal = realBalance;
 
   return (
     <View style={{ flex: 1 }}>
@@ -152,27 +151,19 @@ export default function DashboardScreen() {
           })}
         </View>
 
-        <SectionHeader title="Reste à vivre" />
+        <SectionHeader title="Reste à vivre prévisionnel" />
         <Card style={{ gap: spacing.lg }}>
           <View style={styles.rtvRow}>
             <View style={styles.rtvCol}>
-              <Caption>Prévisionnel</Caption>
               <Money
                 cents={remainingToLive}
-                size={26}
+                size={30}
                 weight="bold"
                 tone={remainingToLive < 0 ? 'danger' : 'text'}
               />
-            </View>
-            <View style={[styles.rtvDivider, { backgroundColor: theme.colors.border }]} />
-            <View style={styles.rtvCol}>
-              <Caption>Réel à ce jour</Caption>
-              <Money
-                cents={remainingReal}
-                size={26}
-                weight="bold"
-                tone={remainingReal < 0 ? 'danger' : 'success'}
-              />
+              <Caption>
+                une fois factures, budgets et épargne du mois mis de côté
+              </Caption>
             </View>
           </View>
 
@@ -225,7 +216,8 @@ export default function DashboardScreen() {
                       <Body size={13} numberOfLines={1} style={{ flex: 1 }}>
                         {s.category_name}
                       </Body>
-                      <Caption color={s.category_color}>{pct} %</Caption>
+                      {/* Le texte reste en encre : la pastille porte l'identité, pas le chiffre. */}
+                      <Caption style={styles.legendPct}>{pct} %</Caption>
                     </View>
                   );
                 })}
@@ -481,6 +473,11 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
+  },
+  legendPct: {
+    width: 38,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
   },
   budgetCard: {
     gap: spacing.md,

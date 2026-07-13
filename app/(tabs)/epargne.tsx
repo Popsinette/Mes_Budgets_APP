@@ -129,8 +129,9 @@ export default function SavingsScreen() {
                   <View style={{ alignItems: 'flex-end', gap: 1 }}>
                     <Money cents={account.real_cents} size={17} weight="bold" />
                     {account.target_cents ? (
-                      <Caption color={account.color}>
-                        {Math.round(ratio * 100)} % · {formatCents(account.target_cents)}
+                      // Texte en encre : la couleur du compte vit sur la barre, pas sur les chiffres.
+                      <Caption>
+                        {Math.round(ratio * 100)} % de {formatCents(account.target_cents)}
                       </Caption>
                     ) : null}
                   </View>

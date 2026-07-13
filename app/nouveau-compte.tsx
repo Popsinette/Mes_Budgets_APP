@@ -7,7 +7,13 @@ import { Button } from '@/src/components/ui/Button';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
-import { createAccount, deleteAccount, updateAccount } from '@/src/features/savings/repository';
+import { useLiveQuery } from '@/src/db/useLiveQuery';
+import {
+  createAccount,
+  deleteAccount,
+  listAccountsWithBalance,
+  updateAccount,
+} from '@/src/features/savings/repository';
 import { categoryPalette, fonts, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { parseAmountToCents } from '@/src/utils/money';
@@ -49,7 +55,13 @@ export default function NewAccountScreen() {
   const [icon, setIcon] = useState<keyof typeof Ionicons.glyphMap>(
     (params.icon as keyof typeof Ionicons.glyphMap) ?? 'wallet-outline',
   );
-  const [color, setColor] = useState(params.color ?? ACCOUNT_COLORS[0]);
+  // Couleur par défaut : la teinte suivante de la palette (ordre fixe), pour
+  // que chaque compte reçoive sa propre couleur sans choix manuel.
+  const { data: existingAccounts } = useLiveQuery((db) => listAccountsWithBalance(db));
+  const [pickedColor, setPickedColor] = useState<string | null>(params.color ?? null);
+  const color =
+    pickedColor ?? ACCOUNT_COLORS[(existingAccounts?.length ?? 0) % ACCOUNT_COLORS.length];
+  const setColor = setPickedColor;
   const [initial, setInitial] = useState(centsToInput(params.initial));
   const [target, setTarget] = useState(centsToInput(params.target));
   const [monthly, setMonthly] = useState(centsToInput(params.monthly));

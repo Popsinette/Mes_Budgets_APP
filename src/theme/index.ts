@@ -17,23 +17,26 @@ export const palette = {
 };
 
 /**
- * Palette des pastilles de catégories / comptes (choix utilisateur). Teintes
- * sourdes et désaturées, accordées au fond papier et à l'encre — plus de
- * couleurs criardes. L'ordre sert de séquence par défaut.
+ * Palette des pastilles de catégories / comptes (choix utilisateur).
+ * Teintes sourdes accordées au papier et à l'encre, mais **validées** :
+ * lisibles sur fond clair et sombre (contraste ≥ 3:1), au-dessus du seuil
+ * de chroma (aucune ne « se lit grise »), et distinguables entre voisines
+ * pour les daltoniens (pire ΔE adjacent 26,8). L'ordre est fixe : il sert
+ * de séquence par défaut — ne pas le réordonner.
  */
 export const categoryPalette = [
-  '#C56A4E', // terracotta
-  '#C79A3E', // ocre
-  '#8B9150', // olive
-  '#5F9070', // sauge
-  '#3F9195', // sarcelle
-  '#5580A6', // océan
-  '#6E6FA6', // indigo
-  '#7A6E9C', // lavande
-  '#9A6494', // prune
-  '#C57487', // rose
-  '#B5695A', // argile
-  '#857F76', // pierre
+  '#C25E3F', // terracotta
+  '#0E9BAA', // sarcelle
+  '#B8841F', // ocre
+  '#6B65B5', // indigo
+  '#7E9A3F', // olive
+  '#B85497', // orchidée
+  '#3F8F63', // sauge
+  '#4F8FCB', // océan
+  '#B0632F', // caramel
+  '#8A5FA8', // violet
+  '#5D8A2E', // prairie
+  '#C05A75', // framboise
 ] as const;
 
 /** Familles chargées au démarrage (voir app/_layout.tsx). */

@@ -7,7 +7,13 @@ import { Button } from '@/src/components/ui/Button';
 import { FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
-import { createCategory, deleteCategory, updateCategory } from '@/src/features/categories/repository';
+import { useLiveQuery } from '@/src/db/useLiveQuery';
+import {
+  createCategory,
+  deleteCategory,
+  listCategories,
+  updateCategory,
+} from '@/src/features/categories/repository';
 import { categoryPalette, fonts, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 
@@ -44,7 +50,12 @@ export default function NewCategoryScreen() {
   const [icon, setIcon] = useState<keyof typeof Ionicons.glyphMap>(
     (params.icon as keyof typeof Ionicons.glyphMap) ?? 'pricetag-outline',
   );
-  const [color, setColor] = useState(params.color ?? CATEGORY_COLORS[0]);
+  // Couleur par défaut : la teinte suivante de la palette (ordre fixe).
+  const { data: existingCategories } = useLiveQuery((db) => listCategories(db));
+  const [pickedColor, setPickedColor] = useState<string | null>(params.color ?? null);
+  const color =
+    pickedColor ?? CATEGORY_COLORS[(existingCategories?.length ?? 0) % CATEGORY_COLORS.length];
+  const setColor = setPickedColor;
   const [saving, setSaving] = useState(false);
 
   const save = async () => {

@@ -45,15 +45,23 @@ export function BarChart({ groups, height = 140 }: BarChartProps) {
         ))}
       </View>
       <View style={styles.labelsRow}>
-        {groups.map((group, index) => (
-          <Text
-            key={`${group.label}-${index}`}
-            style={[styles.label, { color: theme.colors.textMuted }]}
-            numberOfLines={1}
-          >
-            {group.label}
-          </Text>
-        ))}
+        {groups.map((group, index) => {
+          // Point final mis en avant : le mois courant se repère d'un coup d'œil.
+          const isLast = index === groups.length - 1;
+          return (
+            <Text
+              key={`${group.label}-${index}`}
+              style={[
+                styles.label,
+                isLast && styles.labelCurrent,
+                { color: isLast ? theme.colors.text : theme.colors.textMuted },
+              ]}
+              numberOfLines={1}
+            >
+              {group.label}
+            </Text>
+          );
+        })}
       </View>
     </View>
   );
@@ -92,5 +100,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     textTransform: 'capitalize',
+  },
+  labelCurrent: {
+    fontFamily: fonts.bodySemibold,
   },
 });

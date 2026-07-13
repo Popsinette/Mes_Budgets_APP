@@ -27,14 +27,17 @@ export function DonutChart({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const total = slices.reduce((sum, s) => sum + s.value, 0);
+  const visible = slices.filter((s) => s.value > 0);
+  // Écart de 2 px (couleur du fond) entre segments adjacents, pour que chaque
+  // part se lise sans dépendre uniquement de la couleur. Un seul segment : pas d'écart.
+  const gap = visible.length > 1 ? 2 : 0;
 
   let offset = 0;
-  const segments = total > 0
-    ? slices
-        .filter((s) => s.value > 0)
-        .map((slice, index) => {
+  const segments =
+    total > 0
+      ? visible.map((slice, index) => {
           const fraction = slice.value / total;
-          const length = fraction * circumference;
+          const length = Math.max(fraction * circumference - gap, 1);
           const segment = (
             <Circle
               key={index}
@@ -46,13 +49,13 @@ export function DonutChart({
               strokeLinecap="butt"
               fill="none"
               strokeDasharray={`${length} ${circumference - length}`}
-              strokeDashoffset={-offset}
+              strokeDashoffset={-(offset + gap / 2)}
             />
           );
-          offset += length;
+          offset += fraction * circumference;
           return segment;
         })
-    : [];
+      : [];
 
   return (
     <View style={{ width: size, height: size }}>
