@@ -14,6 +14,8 @@ import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
+import { getBillsSummary } from '@/src/features/bills/repository';
+import { getPlannedSavingsForMonth, getRealSavingsForMonth } from '@/src/features/savings/repository';
 import {
   deleteTransaction,
   getMonthTotals,
@@ -36,6 +38,9 @@ export default function OperationsScreen() {
 
   const { data: transactions } = useLiveQuery((db) => listTransactionsForMonth(db, month), [month]);
   const { data: totals } = useLiveQuery((db) => getMonthTotals(db, month), [month]);
+  const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
+  const { data: plannedSavings } = useLiveQuery((db) => getPlannedSavingsForMonth(db, month), [month]);
+  const { data: realSavings } = useLiveQuery((db) => getRealSavingsForMonth(db, month), [month]);
 
   const filtered = useMemo(
     () => (transactions ?? []).filter((t) => filter === 'all' || t.type === filter),
@@ -45,9 +50,17 @@ export default function OperationsScreen() {
   const pending = useMemo(() => filtered.filter((t) => t.cleared === 0), [filtered]);
   const clearedTx = useMemo(() => filtered.filter((t) => t.cleared === 1), [filtered]);
 
-  // Solde réel = opérations pointées ; prévisionnel = tout (pointé + à venir).
-  const realBalance = (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0);
-  const plannedBalance = (totals?.income_cents ?? 0) - (totals?.expense_cents ?? 0);
+  // Mêmes formules que l'accueil, pour que les deux écrans racontent la même histoire :
+  // réel = opérations pointées − épargne virée ; prévisionnel = tout, moins les
+  // factures restant à payer et toute l'épargne du mois.
+  const unpaidBillsTotal = (billsSummary?.total_cents ?? 0) - (billsSummary?.paid_cents ?? 0);
+  const realBalance =
+    (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - (realSavings ?? 0);
+  const plannedBalance =
+    (totals?.income_cents ?? 0) -
+    (totals?.expense_cents ?? 0) -
+    unpaidBillsTotal -
+    (plannedSavings ?? 0);
 
   const togglePointed = (t: TransactionWithCategory) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

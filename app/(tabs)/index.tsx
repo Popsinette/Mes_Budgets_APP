@@ -53,23 +53,30 @@ export default function DashboardScreen() {
 
   const income = totals?.income_cents ?? 0;
   const expense = totals?.expense_cents ?? 0;
-  const balance = income - expense;
-  // Solde réel = opérations pointées uniquement (ce qui est passé sur le compte).
-  const realBalance = (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0);
   const pendingCount = totals?.pending_count ?? 0;
   const monthLabel = monthKeyLabel(month);
   const upcomingBills = (bills ?? []).filter((b) => !b.paid_at).slice(0, 3);
   const topBudgets = (budgets ?? []).slice(0, 3);
   const recentTransactions = (transactions ?? []).slice(0, 4);
 
-  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue du mois
   const billsTotal = billsSummary?.total_cents ?? 0;
+  const unpaidBillsTotal = billsTotal - (billsSummary?.paid_cents ?? 0);
   const budgetsTotal = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
-  const savingsPlanned = plannedSavings ?? 0;
+  const savingsPlanned = plannedSavings ?? 0; // tous les virements du mois (dépôts +, retraits −)
+  const savingsReal = realSavings ?? 0; // virements cochés « effectués » uniquement
+
+  // Solde réel « pointé » = ce qui est réellement passé sur le compte courant :
+  // opérations pointées, moins l'épargne réellement virée (un retrait, négatif, s'y rajoute).
+  const realBalance =
+    (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - savingsReal;
+  // Solde prévisionnel = projection fin de mois : toutes les opérations saisies,
+  // moins les factures restant à payer et toute l'épargne du mois (faite + prévue).
+  const balance = income - expense - unpaidBillsTotal - savingsPlanned;
+
+  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue du mois
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
-  // Reste à vivre réel : solde pointé du mois − épargne réellement virée ce mois
-  const savingsReal = realSavings ?? 0;
-  const remainingReal = realBalance - savingsReal;
+  // Reste à vivre réel : le solde réel pointé, déjà net de l'épargne virée
+  const remainingReal = realBalance;
 
   return (
     <View style={{ flex: 1 }}>
@@ -100,7 +107,7 @@ export default function DashboardScreen() {
           />
           <View style={styles.heroMeta}>
             <View style={styles.heroStat}>
-              <Caption>Prévisionnel</Caption>
+              <Caption>Prévisionnel fin de mois</Caption>
               <Money cents={balance} size={16} weight="semibold" tone="muted" />
             </View>
             <View style={[styles.heroDivider, { backgroundColor: theme.colors.border }]} />
