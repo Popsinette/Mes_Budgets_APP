@@ -16,14 +16,20 @@ export function Chip({ label, selected, onPress, color }: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          backgroundColor: selected ? accent : 'transparent',
-          borderColor: selected ? accent : theme.colors.border,
-          opacity: pressed ? 0.7 : 1,
-        },
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: Boolean(selected) }}
+      style={(state) => {
+        const hovered = (state as { hovered?: boolean }).hovered ?? false;
+        return [
+          styles.chip,
+          {
+            backgroundColor: selected ? accent : 'transparent',
+            borderColor: selected ? accent : hovered ? theme.colors.textMuted : theme.colors.border,
+            opacity: state.pressed ? 0.7 : 1,
+          },
+        ];
+      }}
     >
       <Text style={[styles.label, { color: textColor }]}>{label}</Text>
     </Pressable>

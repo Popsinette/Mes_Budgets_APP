@@ -88,6 +88,8 @@ export default function DashboardScreen() {
           <Pressable
             hitSlop={8}
             onPress={() => router.push('/reglages')}
+            accessibilityRole="button"
+            accessibilityLabel="Réglages"
             style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
           >
             <Ionicons name="settings-outline" size={19} color={theme.colors.text} />

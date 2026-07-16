@@ -114,7 +114,13 @@ export default function BillsScreen() {
           </View>
           <Money cents={bill.amount_cents} size={15.5} weight="bold" tone={isPaid ? 'muted' : 'text'} />
         </Pressable>
-        <Pressable hitSlop={8} onPress={() => openEdit(bill)} style={styles.billEdit}>
+        <Pressable
+          hitSlop={8}
+          onPress={() => openEdit(bill)}
+          accessibilityRole="button"
+          accessibilityLabel={`Modifier la facture ${bill.name}`}
+          style={styles.billEdit}
+        >
           <Ionicons name="create-outline" size={19} color={theme.colors.textMuted} />
         </Pressable>
       </Card>

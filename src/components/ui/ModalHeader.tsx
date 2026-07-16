@@ -11,6 +11,8 @@ export function ModalHeader({ title }: { title: string }) {
       <Pressable
         hitSlop={8}
         onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Fermer"
         style={[styles.close, { backgroundColor: theme.colors.cardMuted }]}
       >
         <Ionicons name="close" size={20} color={theme.colors.text} />

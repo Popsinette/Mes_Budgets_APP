@@ -10,6 +10,11 @@ type ScreenProps = PropsWithChildren<{
   bottomInset?: number;
 }>;
 
+/**
+ * Conteneur d'écran. Mobile first : pleine largeur sur téléphone ; sur
+ * tablette/desktop le contenu se recentre dans une colonne de lecture
+ * (max 560 px) pour que la PWA reste élégante à toutes les tailles.
+ */
 export function Screen({ children, scroll = true, style, bottomInset = 0 }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -22,15 +27,19 @@ export function Screen({ children, scroll = true, style, bottomInset = 0 }: Scre
   ];
 
   if (!scroll) {
-    return <View style={[containerStyle, contentStyle]}>{children}</View>;
+    return (
+      <View style={containerStyle}>
+        <View style={[styles.column, contentStyle]}>{children}</View>
+      </View>
+    );
   }
   return (
     <ScrollView
       style={containerStyle}
-      contentContainerStyle={contentStyle}
+      contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      {children}
+      <View style={[styles.column, contentStyle]}>{children}</View>
     </ScrollView>
   );
 }
@@ -38,6 +47,15 @@ export function Screen({ children, scroll = true, style, bottomInset = 0 }: Scre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    alignItems: 'center',
+  },
+  column: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   content: {
     paddingHorizontal: spacing.lg,

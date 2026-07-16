@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { useTheme } from '@/src/theme';
 import { clampRatio } from '@/src/utils/money';
 
@@ -15,9 +16,10 @@ type ProgressBarProps = {
 };
 
 /**
- * Compteur horizontal. Piste arrondie, remplissage net. En cas de dépassement,
- * le remplissage passe en rouge (plein). Un repère de rythme optionnel permet
- * de voir d'un coup d'œil si l'on dépense trop vite dans le mois.
+ * Compteur horizontal. Piste arrondie, remplissage net qui glisse vers sa
+ * valeur (250 ms, ease-out) au montage et à chaque changement. En cas de
+ * dépassement, le remplissage passe en rouge. Un repère de rythme optionnel
+ * montre où l'on « devrait » en être dans le mois.
  */
 export function ProgressBar({ ratio, color, height = 9, markerRatio }: ProgressBarProps) {
   const theme = useTheme();
@@ -27,15 +29,31 @@ export function ProgressBar({ ratio, color, height = 9, markerRatio }: ProgressB
     color ?? (over ? theme.colors.danger : ratio > 0.9 ? theme.colors.warning : theme.colors.primary);
   const markerColor = theme.dark ? 'rgba(255,255,255,0.5)' : 'rgba(20,20,26,0.34)';
   // Un minimum visible dès qu'il y a la moindre dépense.
-  const fillWidth = clamped > 0 ? `${Math.max(clamped * 100, height / 2)}%` : 0;
+  const targetPct = clamped > 0 ? Math.max(clamped * 100, height / 2) : 0;
+
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: targetPct,
+      duration: 250,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // la largeur en % n'est pas animable nativement
+    }).start();
+  }, [progress, targetPct]);
+
+  const animatedWidth = progress.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
-    <View style={[styles.track, { backgroundColor: theme.colors.cardMuted, height, borderRadius: height / 2 }]}>
-      <View
-        style={[
-          styles.fill,
-          { backgroundColor: barColor, width: fillWidth as `${number}%` | 0, borderRadius: height / 2 },
-        ]}
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped * 100) }}
+      style={[styles.track, { backgroundColor: theme.colors.cardMuted, height, borderRadius: height / 2 }]}
+    >
+      <Animated.View
+        style={[styles.fill, { backgroundColor: barColor, width: animatedWidth, borderRadius: height / 2 }]}
       />
       {markerRatio != null && markerRatio > 0 && markerRatio < 1 ? (
         <View

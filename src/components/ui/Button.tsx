@@ -28,10 +28,18 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.button,
-        { backgroundColor: background, opacity: disabled ? 0.4 : pressed ? 0.88 : 1 },
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={(state) => {
+        const hovered = (state as { hovered?: boolean }).hovered ?? false;
+        return [
+          styles.button,
+          {
+            backgroundColor: background,
+            opacity: disabled ? 0.4 : state.pressed ? 0.85 : hovered ? 0.92 : 1,
+          },
+        ];
+      }}
     >
       {loading ? (
         <ActivityIndicator color={color} />

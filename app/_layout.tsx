@@ -15,18 +15,35 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SQLiteProvider } from 'expo-sqlite';
 import { Suspense } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BiometricGate } from '@/src/components/BiometricGate';
+import { Skeleton } from '@/src/components/ui/Skeleton';
 import { DATABASE_NAME, onDatabaseInit } from '@/src/db';
 import { spacing, useTheme } from '@/src/theme';
 
+/**
+ * Pendant le déverrouillage de la base chiffrée : un squelette de l'accueil
+ * plutôt qu'un spinner — l'interface annonce sa structure avant ses données.
+ */
 function DatabaseLoading() {
   const theme = useTheme();
   return (
     <View style={[styles.loading, { backgroundColor: theme.colors.background }]}>
-      <ActivityIndicator size="large" color={theme.colors.primary} />
-      <Text style={{ color: theme.colors.textMuted }}>Déverrouillage des données…</Text>
+      <View style={styles.loadingColumn}>
+        <Skeleton width={96} height={12} />
+        <Skeleton width={190} height={40} radius={10} style={{ marginTop: 6 }} />
+        <View style={styles.loadingRow}>
+          <Skeleton height={78} radius={18} style={{ flex: 1 }} />
+          <Skeleton height={78} radius={18} style={{ flex: 1 }} />
+          <Skeleton height={78} radius={18} style={{ flex: 1 }} />
+        </View>
+        <Skeleton height={168} radius={18} style={{ marginTop: spacing.md }} />
+        <Skeleton height={120} radius={18} style={{ marginTop: spacing.md }} />
+        <Text style={[styles.loadingHint, { color: theme.colors.textMuted }]}>
+          Déverrouillage de vos données chiffrées…
+        </Text>
+      </View>
     </View>
   );
 }
@@ -45,11 +62,8 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return (
-      <View style={[styles.loading, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
+    // Même squelette que le déverrouillage : une seule expérience de chargement.
+    return <DatabaseLoading />;
   }
 
   return (
@@ -87,6 +101,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loadingColumn: {
+    width: '100%',
+    maxWidth: 560,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  loadingRow: {
+    flexDirection: 'row',
     gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  loadingHint: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: spacing.xl,
   },
 });
