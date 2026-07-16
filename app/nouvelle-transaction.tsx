@@ -9,8 +9,9 @@ import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { addTransaction, type TransactionType } from '@/src/features/transactions/repository';
+import { useSelectedMonth } from '@/src/store/month';
 import { fonts, radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, todayIso } from '@/src/utils/dates';
+import { currentMonthKey, isoDayInMonth, monthKeyLabel, todayIso } from '@/src/utils/dates';
 import { parseAmountToCents } from '@/src/utils/money';
 import { Pressable } from 'react-native';
 
@@ -18,6 +19,11 @@ export default function NewTransactionScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
   const params = useLocalSearchParams<{ type?: string }>();
+  // L'opération se range dans le mois affiché (sélecteur global) : on peut
+  // saisir un revenu prévisionnel d'août en préparant ses budgets depuis juillet.
+  const month = useSelectedMonth((s) => s.month);
+  const isCurrentMonth = month === currentMonthKey();
+
   const [type, setType] = useState<TransactionType>(params.type === 'income' ? 'income' : 'expense');
   const [amount, setAmount] = useState('');
   const [label, setLabel] = useState('');
@@ -44,8 +50,10 @@ export default function NewTransactionScreen() {
       label: label.trim(),
       amountCents,
       type,
-      date: todayIso(),
-      month: currentMonthKey(),
+      // Mois courant : datée d'aujourd'hui. Autre mois : datée du même jour
+      // du mois affiché (borné à sa fin), pour rester dans ce mois.
+      date: isCurrentMonth ? todayIso() : isoDayInMonth(month, new Date().getDate()),
+      month,
       note: note.trim() || undefined,
       cleared,
     });
@@ -55,6 +63,13 @@ export default function NewTransactionScreen() {
   return (
     <Screen>
       <ModalHeader title="Nouvelle opération" />
+      {!isCurrentMonth ? (
+        <View style={[styles.monthBanner, { backgroundColor: theme.colors.warningSoft }]}>
+          <Text style={[styles.monthBannerText, { color: theme.colors.warning }]}>
+            Sera enregistrée en {monthKeyLabel(month)} (mois affiché)
+          </Text>
+        </View>
+      ) : null}
 
       <View style={[styles.typeToggle, { backgroundColor: theme.colors.cardMuted }]}>
         {(
@@ -162,5 +177,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  monthBanner: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+  },
+  monthBannerText: {
+    fontFamily: fonts.bodySemibold,
+    fontSize: 13,
+    textAlign: 'center',
   },
 });
