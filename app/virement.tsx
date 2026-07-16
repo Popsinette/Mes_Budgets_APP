@@ -12,6 +12,7 @@ import { Body, Caption, Eyebrow } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { addTransfer, listAccountsWithBalance } from '@/src/features/savings/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
+import { useSelectedMonth } from '@/src/store/month';
 import { currentMonthKey, monthKeyLabel, todayIso } from '@/src/utils/dates';
 import { notify } from '@/src/utils/dialogs';
 import { formatCents, parseAmountToCents } from '@/src/utils/money';
@@ -21,8 +22,9 @@ type Direction = 'deposit' | 'withdraw';
 export default function NewTransferScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
+  const globalMonth = useSelectedMonth((s) => s.month);
   const params = useLocalSearchParams<{ accountId?: string; month?: string }>();
-  const month = params.month || currentMonthKey();
+  const month = params.month || globalMonth;
 
   const { data: accounts } = useLiveQuery((db) => listAccountsWithBalance(db));
   const [accountId, setAccountId] = useState<number | null>(params.accountId ? Number(params.accountId) : null);

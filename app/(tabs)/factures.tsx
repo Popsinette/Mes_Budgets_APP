@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { confirmAction } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -21,6 +20,7 @@ import {
   setBillPaid,
   type BillWithStatus,
 } from '@/src/features/bills/repository';
+import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
@@ -28,7 +28,8 @@ import { formatCents } from '@/src/utils/money';
 export default function BillsScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const [month, setMonth] = useState(currentMonthKey());
+  const month = useSelectedMonth((s) => s.month);
+  const setMonth = useSelectedMonth((s) => s.setMonth);
   const { data: bills } = useLiveQuery((db) => listBillsForMonth(db, month), [month]);
   const { data: summary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
 

@@ -7,6 +7,7 @@ import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { DonutChart } from '@/src/components/charts/DonutChart';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { FAB } from '@/src/components/ui/FAB';
+import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
@@ -25,6 +26,7 @@ import {
   getSpendingByCategory,
   listTransactionsForMonth,
 } from '@/src/features/transactions/repository';
+import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
 import {
   currentMonthKey,
@@ -38,7 +40,9 @@ import { formatCents } from '@/src/utils/money';
 
 export default function DashboardScreen() {
   const theme = useTheme();
-  const month = currentMonthKey();
+  // Mois global : le sélecteur ci-dessous pilote tous les écrans de l'app.
+  const month = useSelectedMonth((s) => s.month);
+  const setMonth = useSelectedMonth((s) => s.setMonth);
 
   const { data: totals } = useLiveQuery((db) => getMonthTotals(db, month), [month]);
   const { data: spending } = useLiveQuery((db) => getSpendingByCategory(db, month), [month]);
@@ -95,6 +99,8 @@ export default function DashboardScreen() {
             <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
           </Pressable>
         </View>
+
+        <MonthSwitcher month={month} onChange={setMonth} />
 
         {/* Héros typographique : le montant porte la page, pas une carte en dégradé. */}
         <View style={styles.hero}>

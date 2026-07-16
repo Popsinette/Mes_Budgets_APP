@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -13,11 +12,15 @@ import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
+import { getBillsSummary } from '@/src/features/bills/repository';
 import {
   copyBudgetsFromMonth,
   deleteBudget,
   listBudgetsWithSpending,
 } from '@/src/features/budgets/repository';
+import { getPlannedSavingsForMonth } from '@/src/features/savings/repository';
+import { getMonthTotals } from '@/src/features/transactions/repository';
+import { useSelectedMonth } from '@/src/store/month';
 import { spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, monthPaceRatio, shiftMonthKey } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
@@ -25,13 +28,25 @@ import { formatCents } from '@/src/utils/money';
 export default function BudgetsScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const [month, setMonth] = useState(currentMonthKey());
+  const month = useSelectedMonth((s) => s.month);
+  const setMonth = useSelectedMonth((s) => s.setMonth);
   const { data: budgets } = useLiveQuery((db) => listBudgetsWithSpending(db, month), [month]);
+  const { data: totals } = useLiveQuery((db) => getMonthTotals(db, month), [month]);
+  const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
+  const { data: plannedSavings } = useLiveQuery((db) => getPlannedSavingsForMonth(db, month), [month]);
 
   const totalBudget = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
   const totalSpent = (budgets ?? []).reduce((sum, b) => sum + b.spent_cents, 0);
   const globalRatio = totalBudget > 0 ? totalSpent / totalBudget : 0;
   const pace = monthPaceRatio(month);
+
+  // Reste à allouer (prévisionnel) : ce que les revenus du mois — y compris
+  // ceux « à venir » — laissent une fois factures, épargne prévue et budgets posés.
+  const income = totals?.income_cents ?? 0;
+  const pendingIncome = income - (totals?.cleared_income_cents ?? 0);
+  const billsTotal = billsSummary?.total_cents ?? 0;
+  const savingsPlanned = plannedSavings ?? 0;
+  const leftToAllocate = income - billsTotal - savingsPlanned - totalBudget;
 
   const confirmDelete = (id: number, name: string) => {
     confirmAction({
@@ -55,6 +70,50 @@ export default function BudgetsScreen() {
       <Screen bottomInset={80}>
         <Title>Budgets</Title>
         <MonthSwitcher month={month} onChange={setMonth} />
+
+        <SectionHeader title="Reste à allouer" />
+        <Card style={{ gap: spacing.md }}>
+          <View style={{ gap: 2 }}>
+            <Money
+              cents={leftToAllocate}
+              size={28}
+              weight="bold"
+              tone={leftToAllocate < 0 ? 'danger' : 'text'}
+            />
+            <Caption>
+              {leftToAllocate < 0
+                ? 'Vos budgets dépassent ce que les revenus du mois permettent.'
+                : 'disponible pour de nouveaux budgets ce mois-ci'}
+            </Caption>
+          </View>
+          <View style={{ gap: spacing.sm }}>
+            <View style={styles.allocRow}>
+              <Body tone="muted" size={13.5}>
+                Revenus du mois{pendingIncome > 0 ? ` (dont ${formatCents(pendingIncome)} à venir)` : ''}
+              </Body>
+              <Money cents={income} size={13.5} weight="semibold" signed tone="success" />
+            </View>
+            {(
+              [
+                ['Factures récurrentes', -billsTotal],
+                ['Épargne prévue', -savingsPlanned],
+                ['Budgets alloués', -totalBudget],
+              ] as Array<[string, number]>
+            ).map(([label, value]) => (
+              <View key={label} style={styles.allocRow}>
+                <Body tone="muted" size={13.5}>
+                  {label}
+                </Body>
+                <Money cents={value} size={13.5} weight="semibold" signed />
+              </View>
+            ))}
+          </View>
+          {income === 0 ? (
+            <Caption>
+              Ajoutez vos revenus — même « à venir » — depuis l'accueil pour un calcul complet.
+            </Caption>
+          ) : null}
+        </Card>
 
         {(budgets ?? []).length > 0 ? (
           <Card style={{ gap: spacing.md }}>
@@ -173,6 +232,11 @@ export default function BudgetsScreen() {
 }
 
 const styles = StyleSheet.create({
+  allocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   totalRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -22,6 +22,7 @@ import {
   setTransferDone,
   type SavingsTransfer,
 } from '@/src/features/savings/repository';
+import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, monthKeyLabel, shortDayLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
@@ -30,7 +31,8 @@ import { formatCents } from '@/src/utils/money';
 export default function SavingsScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const [month, setMonth] = useState(currentMonthKey());
+  const month = useSelectedMonth((s) => s.month);
+  const setMonth = useSelectedMonth((s) => s.setMonth);
 
   const { data: accounts } = useLiveQuery((db) => listAccountsWithBalance(db));
   const { data: overview } = useLiveQuery((db) => getSavingsOverview(db));

@@ -23,6 +23,7 @@ import {
   setTransactionCleared,
   type TransactionWithCategory,
 } from '@/src/features/transactions/repository';
+import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, shortDayLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
@@ -33,7 +34,8 @@ type Filter = 'all' | 'expense' | 'income';
 export default function OperationsScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const [month, setMonth] = useState(currentMonthKey());
+  const month = useSelectedMonth((s) => s.month);
+  const setMonth = useSelectedMonth((s) => s.setMonth);
   const [filter, setFilter] = useState<Filter>('all');
 
   const { data: transactions } = useLiveQuery((db) => listTransactionsForMonth(db, month), [month]);
