@@ -109,14 +109,20 @@ export default function BudgetDetailScreen() {
             size={44}
           />
           <View style={{ flex: 1, gap: 2 }}>
+            {/* Le « reste » d'abord : le dépensé/alloué passe en légende. */}
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-              <Money cents={spent} size={22} weight="bold" />
-              <Caption>sur {formatCents(allocated)}</Caption>
+              <Money
+                cents={remaining >= 0 ? remaining : -remaining}
+                size={22}
+                weight="bold"
+                tone={remaining >= 0 ? 'text' : 'danger'}
+              />
+              <Caption tone={remaining >= 0 ? 'muted' : 'danger'}>
+                {remaining >= 0 ? 'restants' : 'de dépassement'}
+              </Caption>
             </View>
-            <Caption tone={remaining >= 0 ? 'muted' : 'danger'}>
-              {remaining >= 0
-                ? `Reste ${formatCents(remaining)}`
-                : `Dépassé de ${formatCents(-remaining)}`}
+            <Caption>
+              Dépensé {formatCents(spent)} sur {formatCents(allocated)}
             </Caption>
           </View>
         </View>

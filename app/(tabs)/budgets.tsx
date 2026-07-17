@@ -137,10 +137,17 @@ export default function BudgetsScreen() {
 
         {(budgets ?? []).length > 0 ? (
           <Card style={{ gap: spacing.md }}>
+            {/* Le « reste » d'abord : le grand chiffre dit ce qu'il reste à dépenser,
+                le dépensé et l'enveloppe passent en second plan. */}
             <View style={styles.totalRow}>
               <View style={{ gap: 3 }}>
-                <Eyebrow>Dépensé ce mois</Eyebrow>
-                <Money cents={totalSpent} size={24} weight="bold" />
+                <Eyebrow>Reste sur l'enveloppe</Eyebrow>
+                <Money
+                  cents={totalBudget - totalSpent}
+                  size={24}
+                  weight="bold"
+                  tone={totalSpent > totalBudget ? 'danger' : 'text'}
+                />
               </View>
               <View style={{ alignItems: 'flex-end', gap: 3 }}>
                 <Eyebrow>Enveloppe</Eyebrow>
@@ -163,7 +170,7 @@ export default function BudgetsScreen() {
               <Caption tone={globalRatio > 1 ? 'danger' : 'muted'}>
                 {globalRatio > 1
                   ? `Dépassement de ${formatCents(totalSpent - totalBudget)}`
-                  : `Reste ${formatCents(totalBudget - totalSpent)} disponible`}
+                  : `Dépensé ${formatCents(totalSpent)} sur ${formatCents(totalBudget)}`}
               </Caption>
               {pace != null ? (
                 <Caption>
@@ -214,10 +221,8 @@ export default function BudgetsScreen() {
                   <CategoryIcon icon={budget.category_icon} color={budget.category_color} />
                   <View style={{ flex: 1, gap: 1 }}>
                     <Body weight="semibold">{budget.category_name}</Body>
-                    <Caption tone={remaining >= 0 ? 'muted' : 'danger'}>
-                      {remaining >= 0
-                        ? `Reste ${formatCents(remaining)}`
-                        : `Dépassé de ${formatCents(-remaining)}`}
+                    <Caption>
+                      Dépensé {formatCents(budget.spent_cents)} sur {formatCents(budget.amount_cents)}
                     </Caption>
                   </View>
                   <View style={styles.pct}>
@@ -233,7 +238,8 @@ export default function BudgetsScreen() {
                         {Math.round(ratio * 100)}%
                       </Body>
                     </View>
-                    <Money cents={budget.spent_cents} size={15} weight="bold" />
+                    {/* Le grand chiffre = ce qu'il reste (négatif et rouge si dépassé). */}
+                    <Money cents={remaining} size={15} weight="bold" tone={over ? 'danger' : 'text'} />
                   </View>
                 </View>
                 <ProgressBar ratio={ratio} color={barColor} markerRatio={pace} />

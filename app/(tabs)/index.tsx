@@ -316,8 +316,10 @@ export default function DashboardScreen() {
                   <CategoryIcon icon={budget.category_icon} color={budget.category_color} size={36} />
                   <View style={styles.budgetInfo}>
                     <Body weight="semibold">{budget.category_name}</Body>
-                    <Caption>
-                      {formatCents(budget.spent_cents)} sur {formatCents(budget.amount_cents)}
+                    <Caption tone={over ? 'danger' : 'muted'}>
+                      {over
+                        ? `Dépassé de ${formatCents(budget.spent_cents - budget.amount_cents)}`
+                        : `Reste ${formatCents(budget.amount_cents - budget.spent_cents)} sur ${formatCents(budget.amount_cents)}`}
                     </Caption>
                   </View>
                   <Body weight="semibold" size={13} tone={over ? 'danger' : 'muted'}>
