@@ -17,7 +17,7 @@ export default function Root({ children }: PropsWithChildren) {
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
         />
         <meta name="description" content="Suivi de budgets mensuels, plan d'épargne et factures — 100 % local." />
-        <meta name="theme-color" content="#F6F6F3" />
+        <meta name="theme-color" content="#F6F0E6" />
 
         {/* PWA installable */}
         <link rel="manifest" href="manifest.json" />

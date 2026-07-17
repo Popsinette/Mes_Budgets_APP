@@ -1,19 +1,20 @@
 import { useColorScheme } from 'react-native';
 
 /**
- * Direction « Précision tranquille » : palette neutre encre, un seul registre
- * d'accent fonctionnel (vert = positif, brique = dépense), l'encre comme couleur
- * d'action. Typographie appariée Schibsted Grotesk (titres + montants) /
+ * Direction « Précision tranquille », déclinaison chaleureuse : fond crème,
+ * texte et actions en brun profond, accents fonctionnels sauge (positif) et
+ * terracotta (dépense). Le thème sombre est un brun chaud — jamais de noir.
+ * Typographie appariée Schibsted Grotesk (titres + montants) /
  * Instrument Sans (corps).
  */
 
 export const palette = {
-  ink: '#191A1E',
-  green: '#1C8A5B',
-  greenDark: '#0F1E1A',
+  ink: '#3A2E21', // brun profond — la couleur d'action
+  green: '#5F8B6D', // sauge
+  greenDark: '#26352B',
   amber: '#B7791F',
-  brick: '#BE4A3A',
-  slate: '#797A80',
+  brick: '#B4674E', // terracotta douce
+  slate: '#84776A',
 };
 
 /**
@@ -82,52 +83,53 @@ export type Theme = {
 export const lightTheme: Theme = {
   dark: false,
   colors: {
-    background: '#F6F6F3',
-    card: '#FFFFFF',
-    cardMuted: '#F1F1EC',
-    text: '#191A1E',
-    textMuted: '#797A80',
-    border: '#E7E7E1',
-    hairline: '#ECECE6',
-    primary: '#191A1E',
-    onPrimary: '#FFFFFF',
-    primarySoft: '#ECECE6',
-    success: palette.green,
-    successSoft: '#E4F2EA',
+    background: '#F6F0E6', // crème
+    card: '#FDFAF4', // ivoire
+    cardMuted: '#EFE7D9',
+    text: '#33291E', // brun foncé
+    textMuted: '#84776A',
+    border: '#E6DCCB',
+    hairline: '#ECE3D4',
+    primary: '#4A3B2C', // brun — couleur d'action
+    onPrimary: '#FBF6EC',
+    primarySoft: '#ECE3D4',
+    success: palette.green, // sauge
+    successSoft: '#E4EEE6',
     warning: palette.amber,
-    warningSoft: '#F6EEDD',
-    danger: palette.brick,
-    dangerSoft: '#F6E7E3',
+    warningSoft: '#F3EAD7',
+    danger: palette.brick, // terracotta douce
+    dangerSoft: '#F3E3DC',
     income: palette.green,
     expense: palette.brick,
-    onAccent: '#FFFFFF',
-    onAccentMuted: 'rgba(255,255,255,0.78)',
+    onAccent: '#FBF6EC',
+    onAccentMuted: 'rgba(251,246,236,0.78)',
   },
 };
 
+// Thème sombre : brun chaud profond (cacao), jamais de noir.
 export const darkTheme: Theme = {
   dark: true,
   colors: {
-    background: '#0F0F11',
-    card: '#17181B',
-    cardMuted: '#212227',
-    text: '#F3F3F0',
-    textMuted: '#9B9CA1',
-    border: '#26272B',
-    hairline: '#222327',
-    primary: '#F3F3F0',
-    onPrimary: '#17181B',
-    primarySoft: '#26272B',
-    success: '#34B87E',
-    successSoft: '#123227',
-    warning: '#D8A544',
-    warningSoft: '#33280F',
-    danger: '#E0685A',
-    dangerSoft: '#3A211D',
-    income: '#34B87E',
-    expense: '#E0685A',
-    onAccent: '#17181B',
-    onAccentMuted: 'rgba(23,24,27,0.72)',
+    background: '#221B14',
+    card: '#2B2219',
+    cardMuted: '#362B20',
+    text: '#F2EADD', // crème
+    textMuted: '#A99C8B',
+    border: '#3D3225',
+    hairline: '#352B1F',
+    primary: '#EFE5D2', // crème — couleur d'action sur fond cacao
+    onPrimary: '#2B2219',
+    primarySoft: '#3D3225',
+    success: '#7FAE8D', // sauge claire
+    successSoft: '#26352B',
+    warning: '#D3A24C',
+    warningSoft: '#3B2F17',
+    danger: '#D08A72', // terracotta claire
+    dangerSoft: '#41291F',
+    income: '#7FAE8D',
+    expense: '#D08A72',
+    onAccent: '#2B2219',
+    onAccentMuted: 'rgba(43,34,25,0.72)',
   },
 };
 
