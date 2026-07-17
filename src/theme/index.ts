@@ -1,4 +1,5 @@
 import { useColorScheme } from 'react-native';
+import { useThemePref } from '@/src/store/themePref';
 
 /**
  * Direction « Précision tranquille », déclinaison chaleureuse : fond crème,
@@ -135,7 +136,9 @@ export const darkTheme: Theme = {
 
 export function useTheme(): Theme {
   const scheme = useColorScheme();
-  return scheme === 'dark' ? darkTheme : lightTheme;
+  const pref = useThemePref((s) => s.pref);
+  const effective = pref === 'auto' ? scheme : pref;
+  return effective === 'dark' ? darkTheme : lightTheme;
 }
 
 export const spacing = {

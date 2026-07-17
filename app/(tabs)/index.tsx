@@ -81,6 +81,13 @@ export default function DashboardScreen() {
   // (Le « reste à vivre réel » est le solde réel pointé, affiché en héros — pas de doublon.)
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
 
+  // Les deux prévisionnels ne mesurent pas la même chose : le « fin de mois »
+  // suit les dépenses libres réellement saisies, le « reste à vivre » suppose
+  // les budgets dépensés à l'euro près. Leur écart = budgets alloués − dépenses
+  // libres déjà saisies (les dépenses de factures sont hors budgets).
+  const freeExpense = expense - (billsSummary?.paid_cents ?? 0);
+  const planGap = budgetsTotal - freeExpense;
+
   return (
     <View style={{ flex: 1 }}>
       <Screen bottomInset={80}>
@@ -170,7 +177,7 @@ export default function DashboardScreen() {
                 tone={remainingToLive < 0 ? 'danger' : 'text'}
               />
               <Caption>
-                une fois factures, budgets et épargne du mois mis de côté
+                si vous tenez vos budgets — factures, budgets alloués et épargne mis de côté
               </Caption>
             </View>
           </View>
@@ -197,6 +204,24 @@ export default function DashboardScreen() {
                 <Money cents={value} size={13.5} weight="semibold" signed tone={value < 0 ? 'text' : 'success'} />
               </View>
             ))}
+          </View>
+
+          {/* Pont vers l'autre prévisionnel : le même chiffre que le héros,
+              avec la raison de l'écart — les deux ne mesurent pas la même chose. */}
+          <View style={[styles.compareBox, { borderTopColor: theme.colors.hairline }]}>
+            <View style={styles.breakdownRow}>
+              <Body tone="muted" size={13.5}>
+                Prévisionnel fin de mois
+              </Body>
+              <Money cents={balance} size={13.5} weight="semibold" />
+            </View>
+            <Caption>
+              {planGap === 0
+                ? 'Identique au reste à vivre : vos dépenses libres égalent exactement vos budgets.'
+                : planGap > 0
+                  ? `Suit vos opérations saisies, pas les budgets : il reste ${formatCents(planGap)} à dépenser sur vos budgets, d'où l'écart.`
+                  : `Suit vos opérations saisies, pas les budgets : vos dépenses libres dépassent les budgets alloués de ${formatCents(-planGap)}, d'où l'écart.`}
+            </Caption>
           </View>
         </Card>
 
@@ -454,6 +479,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  compareBox: {
+    borderTopWidth: 1,
+    paddingTop: spacing.md,
+    gap: spacing.xs,
   },
   donutCard: {
     paddingVertical: spacing.xl,

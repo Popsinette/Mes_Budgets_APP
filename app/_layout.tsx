@@ -14,12 +14,13 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SQLiteProvider } from 'expo-sqlite';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BiometricGate } from '@/src/components/BiometricGate';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { DATABASE_NAME, onDatabaseInit } from '@/src/db';
+import { useThemePref } from '@/src/store/themePref';
 import { spacing, useTheme } from '@/src/theme';
 
 /**
@@ -50,6 +51,12 @@ function DatabaseLoading() {
 
 export default function RootLayout() {
   const theme = useTheme();
+
+  // Relit la préférence d'apparence (Auto / Clair / Sombre) dès le lancement.
+  useEffect(() => {
+    void useThemePref.getState().hydrate();
+  }, []);
+
   const [fontsLoaded] = useFonts({
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,

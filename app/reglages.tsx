@@ -7,18 +7,28 @@ import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
+import { Chip } from '@/src/components/ui/Chip';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Heading } from '@/src/components/ui/Text';
 import { exportAllDataAsJson, exportTransactionsAsCsv } from '@/src/features/export/exporter';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { isBiometricAvailable, useSecurity } from '@/src/store/security';
+import { useThemePref, type ThemePref } from '@/src/store/themePref';
 import { spacing, useTheme } from '@/src/theme';
+
+const THEME_CHOICES: Array<[ThemePref, string]> = [
+  ['auto', 'Automatique'],
+  ['light', 'Clair'],
+  ['dark', 'Sombre'],
+];
 
 export default function SettingsScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
   const { biometricEnabled, setBiometricEnabled, tryUnlock } = useSecurity();
+  const themePref = useThemePref((s) => s.pref);
+  const setThemePref = useThemePref((s) => s.setPref);
   const [exportingJson, setExportingJson] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
 
@@ -64,8 +74,8 @@ export default function SettingsScreen() {
           await db.execAsync(`
             DELETE FROM bill_payments;
             DELETE FROM bills;
-            DELETE FROM savings_entries;
-            DELETE FROM savings_goals;
+            DELETE FROM savings_transfers;
+            DELETE FROM savings_accounts;
             DELETE FROM budgets;
             DELETE FROM transactions;
           `);
@@ -91,6 +101,23 @@ export default function SettingsScreen() {
               ? 'Tout est stocké uniquement sur cet appareil, dans le stockage privé du navigateur (isolé par site et protégé par le verrouillage de votre appareil). Aucune donnée ne part sur un serveur : pas de compte, pas de suivi. Pensez à exporter régulièrement une sauvegarde JSON.'
               : 'Tout est stocké uniquement sur cet appareil, dans une base chiffrée (SQLCipher, AES-256). La clé de chiffrement est gardée dans l’enclave sécurisée du téléphone (Keychain iOS / Keystore Android). Aucune donnée ne quitte votre téléphone : pas de compte, pas de serveur, pas de suivi.'}
           </Caption>
+        </View>
+      </Card>
+
+      <Card style={{ gap: spacing.md }}>
+        <Heading>Apparence</Heading>
+        <Body tone="muted" size={13.5}>
+          « Automatique » suit le réglage clair/sombre de votre appareil.
+        </Body>
+        <View style={styles.themeRow}>
+          {THEME_CHOICES.map(([value, label]) => (
+            <Chip
+              key={value}
+              label={label}
+              selected={themePref === value}
+              onPress={() => setThemePref(value)}
+            />
+          ))}
         </View>
       </Card>
 
@@ -177,5 +204,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+  },
+  themeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
 });

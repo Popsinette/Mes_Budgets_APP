@@ -131,15 +131,17 @@ export default function OperationsScreen() {
           <Card style={styles.totalCard}>
             <Eyebrow>Réel · pointé</Eyebrow>
             <Money cents={realBalance} size={22} weight="bold" tone={realBalance < 0 ? 'danger' : 'text'} />
+            <Caption style={styles.totalHint}>passé sur le compte</Caption>
           </Card>
           <Card style={styles.totalCard}>
-            <Eyebrow>Prévisionnel</Eyebrow>
+            <Eyebrow>Prévisionnel fin de mois</Eyebrow>
             <Money
               cents={plannedBalance}
               size={22}
               weight="bold"
               tone={plannedBalance < 0 ? 'danger' : 'muted'}
             />
+            <Caption style={styles.totalHint}>selon les opérations saisies</Caption>
           </Card>
         </View>
 
@@ -205,6 +207,9 @@ const styles = StyleSheet.create({
   totalCard: {
     flex: 1,
     gap: spacing.xs,
+  },
+  totalHint: {
+    fontSize: 11,
   },
   filters: {
     flexDirection: 'row',
