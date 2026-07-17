@@ -48,6 +48,12 @@ export default function BudgetsScreen() {
   const savingsPlanned = plannedSavings ?? 0;
   const leftToAllocate = income - billsTotal - savingsPlanned - totalBudget;
 
+  // Garde-fou réel : le reste à allouer suppose les budgets tenus. Si les
+  // dépenses libres saisies (hors factures) dépassent les budgets alloués,
+  // on l'affiche — même formule que le « planGap » de l'accueil.
+  const freeExpense = (totals?.expense_cents ?? 0) - (billsSummary?.paid_cents ?? 0);
+  const overrun = freeExpense - totalBudget;
+
   const confirmDelete = (id: number, name: string) => {
     confirmAction({
       title: 'Supprimer le budget',
@@ -108,6 +114,20 @@ export default function BudgetsScreen() {
               </View>
             ))}
           </View>
+          {overrun > 0 ? (
+            <View style={[styles.overrunBox, { borderTopColor: theme.colors.hairline }]}>
+              <View style={styles.allocRow}>
+                <Body tone="muted" size={13.5}>
+                  Dépenses libres déjà saisies
+                </Body>
+                <Money cents={-freeExpense} size={13.5} weight="semibold" signed tone="danger" />
+              </View>
+              <Caption tone="danger">
+                Vos dépenses réelles dépassent vos budgets alloués de {formatCents(overrun)} : ce
+                montant est déjà parti, le reste à allouer est optimiste d'autant.
+              </Caption>
+            </View>
+          ) : null}
           {income === 0 ? (
             <Caption>
               Ajoutez vos revenus — même « à venir » — depuis l'accueil pour un calcul complet.
@@ -236,6 +256,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  overrunBox: {
+    borderTopWidth: 1,
+    paddingTop: spacing.md,
+    gap: spacing.xs,
   },
   totalRow: {
     flexDirection: 'row',
