@@ -96,33 +96,40 @@ export async function listBudgetExpenses(
 }
 
 export type BudgetAlignment = {
-  /** Budgets dépassés relevés au niveau réellement dépensé. */
-  raised: number;
+  /** Budgets recalés (relevés ou abaissés) au niveau réellement dépensé. */
+  adjusted: number;
   /** Budgets créés pour les catégories dépensées sans budget. */
   created: number;
+  /** Budgets non entamés supprimés (aucune dépense ce mois-ci). */
+  removed: number;
   /** Dépenses libres sans catégorie : impossibles à couvrir par un budget. */
   uncategorizedCents: number;
 };
 
 /**
- * Aligne les budgets du mois sur les dépenses réelles : relève chaque budget
- * dépassé à son niveau dépensé et crée un budget pour les catégories qui ont
- * des dépenses libres mais pas de budget. Les dépenses sans catégorie ne
- * peuvent pas être couvertes — leur total est renvoyé pour l'annoncer.
+ * Recale les budgets du mois sur les dépenses réelles, dans les deux sens,
+ * pour que le reste à allouer devienne exactement le reste réel : chaque
+ * budget prend le montant déjà dépensé (relevé s'il est dépassé, abaissé s'il
+ * est entamé), les budgets sans aucune dépense sont supprimés, et un budget
+ * est créé pour chaque catégorie dépensée sans budget. Les dépenses sans
+ * catégorie ne peuvent pas être couvertes — leur total est renvoyé pour
+ * l'annoncer (elles maintiennent un écart résiduel).
  */
 export async function alignBudgetsWithSpending(
   db: SQLiteDatabase,
   month: MonthKey,
 ): Promise<BudgetAlignment> {
-  const raised = await db.runAsync(
-    `UPDATE budgets SET amount_cents = (
-       SELECT COALESCE(SUM(t.amount_cents), 0) FROM transactions t
-       WHERE t.category_id = budgets.category_id AND t.month = budgets.month
-         AND t.type = 'expense' AND t.bill_id IS NULL)
-     WHERE month = ? AND amount_cents < (
-       SELECT COALESCE(SUM(t.amount_cents), 0) FROM transactions t
-       WHERE t.category_id = budgets.category_id AND t.month = budgets.month
-         AND t.type = 'expense' AND t.bill_id IS NULL)`,
+  const spentSql = `(
+    SELECT COALESCE(SUM(t.amount_cents), 0) FROM transactions t
+    WHERE t.category_id = budgets.category_id AND t.month = budgets.month
+      AND t.type = 'expense' AND t.bill_id IS NULL)`;
+  const removed = await db.runAsync(
+    `DELETE FROM budgets WHERE month = ? AND ${spentSql} = 0`,
+    [month],
+  );
+  const adjusted = await db.runAsync(
+    `UPDATE budgets SET amount_cents = ${spentSql}
+     WHERE month = ? AND amount_cents <> ${spentSql}`,
     [month],
   );
   const created = await db.runAsync(
@@ -143,8 +150,9 @@ export async function alignBudgetsWithSpending(
   );
   invalidateQueries();
   return {
-    raised: raised.changes,
+    adjusted: adjusted.changes,
     created: created.changes,
+    removed: removed.changes,
     uncategorizedCents: uncategorized?.total ?? 0,
   };
 }

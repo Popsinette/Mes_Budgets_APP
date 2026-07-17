@@ -73,27 +73,30 @@ export default function BudgetsScreen() {
     }
   };
 
-  // Le bouton « corrige tout » : relève les budgets dépassés au niveau réel et
-  // crée un budget pour les catégories dépensées sans budget.
+  // Le bouton « corrige tout » : recale chaque budget sur le dépensé réel
+  // (dans les deux sens), pour que reste à allouer = reste réel.
   const alignBudgets = () => {
     confirmAction({
       title: 'Ajuster mes budgets au réel',
       message:
-        'Chaque budget dépassé sera relevé à son niveau réel de dépenses, et un budget sera créé pour les catégories dépensées sans budget. Le reste à allouer reflétera alors exactement votre mois.',
+        'Tous les budgets du mois seront recalés sur vos dépenses réelles : les budgets dépassés sont relevés, les budgets entamés sont abaissés au montant déjà dépensé, les budgets non entamés sont supprimés, et un budget est créé pour chaque catégorie dépensée sans budget. Le reste à allouer deviendra exactement le reste réel.',
       confirmLabel: 'Ajuster',
       onConfirm: () => {
         void (async () => {
           const result = await alignBudgetsWithSpending(db, month);
           const parts: string[] = [];
-          if (result.raised > 0) {
-            parts.push(`${result.raised} budget${result.raised > 1 ? 's' : ''} relevé${result.raised > 1 ? 's' : ''} au niveau dépensé`);
+          if (result.adjusted > 0) {
+            parts.push(`${result.adjusted} budget${result.adjusted > 1 ? 's' : ''} recalé${result.adjusted > 1 ? 's' : ''} au niveau dépensé`);
           }
           if (result.created > 0) {
-            parts.push(`${result.created} budget${result.created > 1 ? 's' : ''} créé${result.created > 1 ? 's' : ''}`);
+            parts.push(`${result.created} créé${result.created > 1 ? 's' : ''}`);
+          }
+          if (result.removed > 0) {
+            parts.push(`${result.removed} supprimé${result.removed > 1 ? 's' : ''} (non entamé${result.removed > 1 ? 's' : ''})`);
           }
           const uncovered =
             result.uncategorizedCents > 0
-              ? ` Il reste ${formatCents(result.uncategorizedCents)} de dépenses sans catégorie, qu'aucun budget ne peut couvrir.`
+              ? ` Il reste ${formatCents(result.uncategorizedCents)} de dépenses sans catégorie, qu'aucun budget ne peut couvrir : donnez-leur une catégorie pour un calcul exact.`
               : '';
           notify(
             'Budgets ajustés',
