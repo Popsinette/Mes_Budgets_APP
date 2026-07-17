@@ -95,6 +95,60 @@ export async function listBudgetExpenses(
   );
 }
 
+export type BudgetAlignment = {
+  /** Budgets dépassés relevés au niveau réellement dépensé. */
+  raised: number;
+  /** Budgets créés pour les catégories dépensées sans budget. */
+  created: number;
+  /** Dépenses libres sans catégorie : impossibles à couvrir par un budget. */
+  uncategorizedCents: number;
+};
+
+/**
+ * Aligne les budgets du mois sur les dépenses réelles : relève chaque budget
+ * dépassé à son niveau dépensé et crée un budget pour les catégories qui ont
+ * des dépenses libres mais pas de budget. Les dépenses sans catégorie ne
+ * peuvent pas être couvertes — leur total est renvoyé pour l'annoncer.
+ */
+export async function alignBudgetsWithSpending(
+  db: SQLiteDatabase,
+  month: MonthKey,
+): Promise<BudgetAlignment> {
+  const raised = await db.runAsync(
+    `UPDATE budgets SET amount_cents = (
+       SELECT COALESCE(SUM(t.amount_cents), 0) FROM transactions t
+       WHERE t.category_id = budgets.category_id AND t.month = budgets.month
+         AND t.type = 'expense' AND t.bill_id IS NULL)
+     WHERE month = ? AND amount_cents < (
+       SELECT COALESCE(SUM(t.amount_cents), 0) FROM transactions t
+       WHERE t.category_id = budgets.category_id AND t.month = budgets.month
+         AND t.type = 'expense' AND t.bill_id IS NULL)`,
+    [month],
+  );
+  const created = await db.runAsync(
+    `INSERT INTO budgets (category_id, month, amount_cents)
+     SELECT t.category_id, t.month, SUM(t.amount_cents)
+     FROM transactions t
+     WHERE t.month = ? AND t.type = 'expense' AND t.bill_id IS NULL AND t.category_id IS NOT NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM budgets b WHERE b.category_id = t.category_id AND b.month = t.month
+       )
+     GROUP BY t.category_id`,
+    [month],
+  );
+  const uncategorized = await db.getFirstAsync<{ total: number }>(
+    `SELECT COALESCE(SUM(amount_cents), 0) AS total FROM transactions
+     WHERE month = ? AND type = 'expense' AND bill_id IS NULL AND category_id IS NULL`,
+    [month],
+  );
+  invalidateQueries();
+  return {
+    raised: raised.changes,
+    created: created.changes,
+    uncategorizedCents: uncategorized?.total ?? 0,
+  };
+}
+
 /** Recopie les budgets du mois précédent s'ils n'existent pas encore pour ce mois. */
 export async function copyBudgetsFromMonth(
   db: SQLiteDatabase,

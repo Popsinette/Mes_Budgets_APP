@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { useSQLiteContext } from 'expo-sqlite';
+import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { EmptyState } from '@/src/components/ui/EmptyState';
@@ -14,6 +15,7 @@ import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getBillsSummary } from '@/src/features/bills/repository';
 import {
+  alignBudgetsWithSpending,
   copyBudgetsFromMonth,
   deleteBudget,
   listBudgetsWithSpending,
@@ -71,6 +73,37 @@ export default function BudgetsScreen() {
     }
   };
 
+  // Le bouton « corrige tout » : relève les budgets dépassés au niveau réel et
+  // crée un budget pour les catégories dépensées sans budget.
+  const alignBudgets = () => {
+    confirmAction({
+      title: 'Ajuster mes budgets au réel',
+      message:
+        'Chaque budget dépassé sera relevé à son niveau réel de dépenses, et un budget sera créé pour les catégories dépensées sans budget. Le reste à allouer reflétera alors exactement votre mois.',
+      confirmLabel: 'Ajuster',
+      onConfirm: () => {
+        void (async () => {
+          const result = await alignBudgetsWithSpending(db, month);
+          const parts: string[] = [];
+          if (result.raised > 0) {
+            parts.push(`${result.raised} budget${result.raised > 1 ? 's' : ''} relevé${result.raised > 1 ? 's' : ''} au niveau dépensé`);
+          }
+          if (result.created > 0) {
+            parts.push(`${result.created} budget${result.created > 1 ? 's' : ''} créé${result.created > 1 ? 's' : ''}`);
+          }
+          const uncovered =
+            result.uncategorizedCents > 0
+              ? ` Il reste ${formatCents(result.uncategorizedCents)} de dépenses sans catégorie, qu'aucun budget ne peut couvrir.`
+              : '';
+          notify(
+            'Budgets ajustés',
+            parts.length > 0 ? `${parts.join(' · ')}.${uncovered}` : `Rien à ajuster.${uncovered}`,
+          );
+        })();
+      },
+    });
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <Screen bottomInset={80}>
@@ -126,6 +159,19 @@ export default function BudgetsScreen() {
                 Vos dépenses réelles dépassent vos budgets alloués de {formatCents(overrun)} : ce
                 montant est déjà parti, le reste à allouer est optimiste d'autant.
               </Caption>
+              {/* Le vrai reste, recalculé en direct à chaque dépense saisie. */}
+              <View style={styles.allocRow}>
+                <Body weight="semibold" size={13.5}>
+                  Reste à allouer réel
+                </Body>
+                <Money
+                  cents={leftToAllocate - overrun}
+                  size={13.5}
+                  weight="semibold"
+                  tone={leftToAllocate - overrun < 0 ? 'danger' : 'text'}
+                />
+              </View>
+              <Button label="Ajuster mes budgets au réel" variant="secondary" onPress={alignBudgets} />
             </View>
           ) : null}
           {income === 0 ? (
