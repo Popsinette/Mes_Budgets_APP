@@ -73,16 +73,16 @@ CREATE TABLE IF NOT EXISTS bill_payments (
 // Couleurs issues de `categoryPalette` (src/theme) — palette validée
 // contraste/daltonisme sur fond clair et sombre.
 const DEFAULT_CATEGORIES: Array<[string, string, string]> = [
-  ['Alimentation', 'cart-outline', '#3F8F63'],
-  ['Logement', 'home-outline', '#6B65B5'],
-  ['Transport', 'car-outline', '#4F8FCB'],
-  ['Restaurants', 'restaurant-outline', '#C25E3F'],
-  ['Loisirs', 'game-controller-outline', '#B85497'],
-  ['Santé', 'heart-outline', '#C05A75'],
-  ['Abonnements', 'tv-outline', '#8A5FA8'],
-  ['Vêtements', 'shirt-outline', '#0E9BAA'],
-  ['Épargne', 'trending-up-outline', '#B8841F'],
-  ['Autre', 'ellipsis-horizontal-outline', '#B0632F'],
+  ['Alimentation', 'cart-outline', '#4FA173'],
+  ['Logement', 'home-outline', '#837DC1'],
+  ['Transport', 'car-outline', '#5E97D1'],
+  ['Restaurants', 'restaurant-outline', '#C97558'],
+  ['Loisirs', 'game-controller-outline', '#C372A8'],
+  ['Santé', 'heart-outline', '#CB778D'],
+  ['Abonnements', 'tv-outline', '#9E72BE'],
+  ['Vêtements', 'shirt-outline', '#2AA0B0'],
+  ['Épargne', 'trending-up-outline', '#B8892F'],
+  ['Autre', 'ellipsis-horizontal-outline', '#BD7745'],
 ];
 
 // V2 : le pointage d'une facture crée la dépense correspondante ; on garde
@@ -167,6 +167,38 @@ const COLOR_REMAP: Array<[string, string]> = [
   ['#64748B', '#857F76'],
 ];
 
+// V7 : palette adoucie (validée contraste/daltonisme). Reteinte les couleurs
+// par défaut des générations précédentes (sourde V6 et validée vive) vers
+// leurs équivalents doux — les couleurs choisies à la main sont conservées.
+const COLOR_REMAP_V7: Array<[string, string]> = [
+  // génération « sourde » (V6)
+  ['#5F9070', '#4FA173'],
+  ['#6E6FA6', '#837DC1'],
+  ['#5580A6', '#5E97D1'],
+  ['#C56A4E', '#C97558'],
+  ['#9A6494', '#C372A8'],
+  ['#C57487', '#CB778D'],
+  ['#7A6E9C', '#9E72BE'],
+  ['#3F9195', '#2AA0B0'],
+  ['#C79A3E', '#B8892F'],
+  ['#857F76', '#BD7745'],
+  ['#8B9150', '#89A048'],
+  ['#B5695A', '#BD7745'],
+  // génération « validée vive »
+  ['#C25E3F', '#C97558'],
+  ['#0E9BAA', '#2AA0B0'],
+  ['#B8841F', '#B8892F'],
+  ['#6B65B5', '#837DC1'],
+  ['#7E9A3F', '#89A048'],
+  ['#B85497', '#C372A8'],
+  ['#3F8F63', '#4FA173'],
+  ['#4F8FCB', '#5E97D1'],
+  ['#B0632F', '#BD7745'],
+  ['#8A5FA8', '#9E72BE'],
+  ['#5D8A2E', '#789F4C'],
+  ['#C05A75', '#CB778D'],
+];
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -198,6 +230,13 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.runAsync('UPDATE savings_accounts SET color = ? WHERE color = ?', [to, from]);
     }
     await db.execAsync('PRAGMA user_version = 6');
+  }
+  if (current < 7) {
+    for (const [from, to] of COLOR_REMAP_V7) {
+      await db.runAsync('UPDATE categories SET color = ? WHERE color = ?', [to, from]);
+      await db.runAsync('UPDATE savings_accounts SET color = ? WHERE color = ?', [to, from]);
+    }
+    await db.execAsync('PRAGMA user_version = 7');
   }
 }
 

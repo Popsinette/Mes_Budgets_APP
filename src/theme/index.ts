@@ -25,18 +25,18 @@ export const palette = {
  * de séquence par défaut — ne pas le réordonner.
  */
 export const categoryPalette = [
-  '#C25E3F', // terracotta
-  '#0E9BAA', // sarcelle
-  '#B8841F', // ocre
-  '#6B65B5', // indigo
-  '#7E9A3F', // olive
-  '#B85497', // orchidée
-  '#3F8F63', // sauge
-  '#4F8FCB', // océan
-  '#B0632F', // caramel
-  '#8A5FA8', // violet
-  '#5D8A2E', // prairie
-  '#C05A75', // framboise
+  '#C97558', // terracotta doux
+  '#2AA0B0', // sarcelle douce
+  '#B8892F', // ocre doux
+  '#837DC1', // indigo doux
+  '#89A048', // olive douce
+  '#C372A8', // orchidée douce
+  '#4FA173', // sauge douce
+  '#5E97D1', // océan doux
+  '#BD7745', // caramel doux
+  '#9E72BE', // violet doux
+  '#789F4C', // prairie douce
+  '#CB778D', // framboise douce
 ] as const;
 
 /** Familles chargées au démarrage (voir app/_layout.tsx). */
