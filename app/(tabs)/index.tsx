@@ -77,15 +77,17 @@ export default function DashboardScreen() {
   // moins les factures restant à payer et toute l'épargne du mois (faite + prévue).
   const balance = income - expense - unpaidBillsTotal - savingsPlanned;
 
-  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne prévue du mois.
-  // (Le « reste à vivre réel » est le solde réel pointé, affiché en héros — pas de doublon.)
-  const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned;
+  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne
+  // prévue − dépenses sans catégorie (déjà parties, aucun budget ne peut les
+  // couvrir). (Le « reste à vivre réel » est le solde réel pointé, en héros.)
+  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
+  const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned - uncategorized;
 
   // Les deux prévisionnels ne mesurent pas la même chose : le « fin de mois »
   // suit les dépenses libres réellement saisies, le « reste à vivre » suppose
   // les budgets dépensés à l'euro près. Leur écart = budgets alloués − dépenses
-  // libres déjà saisies (les dépenses de factures sont hors budgets).
-  const freeExpense = expense - (billsSummary?.paid_cents ?? 0);
+  // libres catégorisées déjà saisies (factures et sans-catégorie déjà déduits).
+  const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
   const planGap = budgetsTotal - freeExpense;
 
   return (
@@ -195,6 +197,9 @@ export default function DashboardScreen() {
                 ['Factures récurrentes', -billsTotal],
                 ['Budgets alloués', -budgetsTotal],
                 ['Épargne prévue', -savingsPlanned],
+                ...(uncategorized > 0
+                  ? ([['Dépenses sans catégorie', -uncategorized]] as Array<[string, number]>)
+                  : []),
               ] as Array<[string, number]>
             ).map(([label, value]) => (
               <View key={label} style={styles.breakdownRow}>

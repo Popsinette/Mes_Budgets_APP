@@ -43,8 +43,14 @@ export default function NewBudgetScreen() {
   const otherBudgetsTotal = (budgets ?? [])
     .filter((b) => b.category_id !== categoryId)
     .reduce((sum, b) => sum + b.amount_cents, 0);
+  // Même formule que la carte « Reste à allouer » : les dépenses sans
+  // catégorie (non couvrables par un budget) sont déduites directement.
   const availableBefore =
-    income - (billsSummary?.total_cents ?? 0) - (plannedSavings ?? 0) - otherBudgetsTotal;
+    income -
+    (billsSummary?.total_cents ?? 0) -
+    (plannedSavings ?? 0) -
+    otherBudgetsTotal -
+    (totals?.uncategorized_expense_cents ?? 0);
   const typedCents = parseAmountToCents(amount) ?? 0;
   const availableAfter = availableBefore - typedCents;
 

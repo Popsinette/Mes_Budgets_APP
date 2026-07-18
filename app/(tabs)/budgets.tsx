@@ -43,17 +43,21 @@ export default function BudgetsScreen() {
   const pace = monthPaceRatio(month);
 
   // Reste à allouer (prévisionnel) : ce que les revenus du mois — y compris
-  // ceux « à venir » — laissent une fois factures, épargne prévue et budgets posés.
+  // ceux « à venir » — laissent une fois factures, épargne prévue et budgets
+  // posés. Les dépenses sans catégorie, qu'aucun budget ne peut couvrir, sont
+  // déduites directement : cet argent est déjà parti.
   const income = totals?.income_cents ?? 0;
   const pendingIncome = income - (totals?.cleared_income_cents ?? 0);
   const billsTotal = billsSummary?.total_cents ?? 0;
   const savingsPlanned = plannedSavings ?? 0;
-  const leftToAllocate = income - billsTotal - savingsPlanned - totalBudget;
+  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
+  const leftToAllocate = income - billsTotal - savingsPlanned - totalBudget - uncategorized;
 
   // Garde-fou réel : le reste à allouer suppose les budgets tenus. Si les
-  // dépenses libres saisies (hors factures) dépassent les budgets alloués,
-  // on l'affiche — même formule que le « planGap » de l'accueil.
-  const freeExpense = (totals?.expense_cents ?? 0) - (billsSummary?.paid_cents ?? 0);
+  // dépenses libres catégorisées dépassent les budgets alloués, on l'affiche —
+  // même formule que le « planGap » de l'accueil.
+  const freeExpense =
+    (totals?.expense_cents ?? 0) - (billsSummary?.paid_cents ?? 0) - uncategorized;
   const overrun = freeExpense - totalBudget;
 
   const confirmDelete = (id: number, name: string) => {
@@ -96,7 +100,7 @@ export default function BudgetsScreen() {
           }
           const uncovered =
             result.uncategorizedCents > 0
-              ? ` Il reste ${formatCents(result.uncategorizedCents)} de dépenses sans catégorie, qu'aucun budget ne peut couvrir : donnez-leur une catégorie pour un calcul exact.`
+              ? ` ${formatCents(result.uncategorizedCents)} de dépenses sans catégorie restent hors budgets : elles sont déduites directement du reste à allouer.`
               : '';
           notify(
             'Budgets ajustés',
@@ -140,6 +144,9 @@ export default function BudgetsScreen() {
                 ['Factures récurrentes', -billsTotal],
                 ['Épargne prévue', -savingsPlanned],
                 ['Budgets alloués', -totalBudget],
+                ...(uncategorized > 0
+                  ? ([['Dépenses sans catégorie', -uncategorized]] as Array<[string, number]>)
+                  : []),
               ] as Array<[string, number]>
             ).map(([label, value]) => (
               <View key={label} style={styles.allocRow}>
@@ -150,6 +157,12 @@ export default function BudgetsScreen() {
               </View>
             ))}
           </View>
+          {uncategorized > 0 ? (
+            <Caption>
+              Les dépenses sans catégorie sont déjà parties et ne peuvent être couvertes par
+              aucun budget — donnez-leur une catégorie pour les suivre dans vos budgets.
+            </Caption>
+          ) : null}
           {overrun > 0 ? (
             <View style={[styles.overrunBox, { borderTopColor: theme.colors.hairline }]}>
               <View style={styles.allocRow}>

@@ -34,6 +34,12 @@ export type MonthTotals = {
   cleared_expense_cents: number;
   /** Nombre d'opérations encore en attente de pointage. */
   pending_count: number;
+  /**
+   * Dépenses libres sans catégorie (hors factures) : de l'argent déjà parti
+   * qu'aucun budget ne pourra jamais couvrir — les calculs de plan (reste à
+   * vivre / reste à allouer) doivent les déduire directement.
+   */
+  uncategorized_expense_cents: number;
 };
 
 export async function addTransaction(
@@ -103,7 +109,8 @@ export async function getMonthTotals(db: SQLiteDatabase, month: MonthKey): Promi
        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expense_cents,
        COALESCE(SUM(CASE WHEN type = 'income' AND cleared = 1 THEN amount_cents ELSE 0 END), 0) AS cleared_income_cents,
        COALESCE(SUM(CASE WHEN type = 'expense' AND cleared = 1 THEN amount_cents ELSE 0 END), 0) AS cleared_expense_cents,
-       COALESCE(SUM(CASE WHEN cleared = 0 THEN 1 ELSE 0 END), 0) AS pending_count
+       COALESCE(SUM(CASE WHEN cleared = 0 THEN 1 ELSE 0 END), 0) AS pending_count,
+       COALESCE(SUM(CASE WHEN type = 'expense' AND bill_id IS NULL AND category_id IS NULL THEN amount_cents ELSE 0 END), 0) AS uncategorized_expense_cents
      FROM transactions WHERE month = ?`,
     [month],
   );
@@ -114,6 +121,7 @@ export async function getMonthTotals(db: SQLiteDatabase, month: MonthKey): Promi
       cleared_income_cents: 0,
       cleared_expense_cents: 0,
       pending_count: 0,
+      uncategorized_expense_cents: 0,
     }
   );
 }
