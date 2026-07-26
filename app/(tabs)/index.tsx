@@ -74,19 +74,32 @@ export default function DashboardScreen() {
   const realBalance =
     (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - savingsReal;
 
-  // Solde prévisionnel = projection fin de mois : TOUTES les dépenses saisies
-  // comptent, qu'elles soient dans un budget ou non — chaque dépense fait
-  // bouger ce chiffre. On déduit aussi les factures restant à payer et toute
-  // l'épargne du mois (faite + prévue).
-  const balance = income - expense - unpaidBillsTotal - savingsPlanned;
+  // Trois soldes, trois questions :
+  // 1. Solde réel (héros) : ce qui est passé sur le compte.
+  // 2. Solde à venir : le réel ± tout ce qui est déjà connu mais pas encore
+  //    passé — opérations saisies à venir, factures restantes, épargne du mois.
+  //    Chaque dépense saisie le fait bouger, budget ou non.
+  const upcomingBalance = income - expense - unpaidBillsTotal - savingsPlanned;
+  // 3. Prévisionnel avec budgets : le solde à venir moins ce qu'il reste à
+  //    dépenser dans les budgets (un budget posé est une dépense prévue).
+  const remainingBudgets = (budgets ?? []).reduce(
+    (sum, b) => sum + Math.max(0, b.amount_cents - b.spent_cents),
+    0,
+  );
+  const plannedBalance = upcomingBalance - remainingBudgets;
 
   // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne
   // prévue − dépenses sans catégorie (déjà parties, aucun budget ne peut les
-  // couvrir). C'est la lecture « plan » ; le fin de mois est la lecture
-  // « opérations ». Leur écart = budgets alloués − dépenses catégorisées.
+  // couvrir). Plan tenu ⇒ égal au prévisionnel avec budgets ; sinon l'écart
+  // = les dépassements réels (overrunReal).
   const uncategorized = totals?.uncategorized_expense_cents ?? 0;
   const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
-  const planGap = budgetsTotal - freeExpense;
+  const budgetedSpent = (budgets ?? []).reduce((sum, b) => sum + b.spent_cents, 0);
+  const overBudgets = (budgets ?? []).reduce(
+    (sum, b) => sum + Math.max(0, b.spent_cents - b.amount_cents),
+    0,
+  );
+  const overrunReal = overBudgets + Math.max(0, freeExpense - budgetedSpent);
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned - uncategorized;
 
   return (
@@ -110,7 +123,8 @@ export default function DashboardScreen() {
 
         <MonthSwitcher month={month} onChange={setMonth} />
 
-        {/* Héros typographique : le montant porte la page, pas une carte en dégradé. */}
+        {/* Héros typographique : le montant porte la page, pas une carte en dégradé.
+            Trois soldes : réel (grand) → à venir → prévisionnel avec budgets. */}
         <View style={styles.hero}>
           <Eyebrow>Solde réel · pointé</Eyebrow>
           <Money
@@ -120,21 +134,45 @@ export default function DashboardScreen() {
             tone={realBalance < 0 ? 'danger' : 'text'}
             style={{ marginTop: 2 }}
           />
-          <View style={styles.heroMeta}>
-            <View style={styles.heroStat}>
-              <Caption>Prévisionnel fin de mois</Caption>
-              <Money cents={balance} size={16} weight="semibold" tone="muted" />
-            </View>
-            <View style={[styles.heroDivider, { backgroundColor: theme.colors.border }]} />
+          <View style={styles.heroRows}>
             <Pressable
-              style={styles.heroStat}
-              onPress={() => (pendingCount > 0 ? router.push('/operations') : undefined)}
+              style={styles.heroRow}
+              onPress={() => router.push('/operations')}
+              accessibilityRole="button"
+              accessibilityLabel="Solde à venir — voir les opérations"
             >
-              <Caption>À venir</Caption>
-              <Body weight="semibold" size={16} tone={pendingCount > 0 ? 'warning' : 'muted'}>
-                {pendingCount > 0 ? `${pendingCount} opération${pendingCount > 1 ? 's' : ''}` : 'À jour'}
-              </Body>
+              <View style={{ flex: 1, gap: 1 }}>
+                <Body weight="semibold" size={14}>
+                  Solde à venir
+                </Body>
+                <Caption>
+                  {pendingCount > 0
+                    ? `${pendingCount} opération${pendingCount > 1 ? 's' : ''} à venir, factures et épargne restantes comprises`
+                    : 'factures et épargne restantes comprises'}
+                </Caption>
+              </View>
+              <Money
+                cents={upcomingBalance}
+                size={17}
+                weight="semibold"
+                tone={upcomingBalance < 0 ? 'danger' : 'text'}
+              />
             </Pressable>
+            <View style={[styles.heroRowDivider, { backgroundColor: theme.colors.hairline }]} />
+            <View style={styles.heroRow}>
+              <View style={{ flex: 1, gap: 1 }}>
+                <Body weight="semibold" size={14}>
+                  Prévisionnel avec budgets
+                </Body>
+                <Caption>si vos budgets sont dépensés en entier</Caption>
+              </View>
+              <Money
+                cents={plannedBalance}
+                size={17}
+                weight="semibold"
+                tone={plannedBalance < 0 ? 'danger' : 'muted'}
+              />
+            </View>
           </View>
         </View>
 
@@ -210,21 +248,19 @@ export default function DashboardScreen() {
             ))}
           </View>
 
-          {/* Pont vers l'autre prévisionnel : le même chiffre que le héros,
-              avec la raison de l'écart — les deux ne mesurent pas la même chose. */}
+          {/* Pont vers le héros : le prévisionnel avec budgets, avec la raison
+              de l'écart éventuel (les dépassements réels). */}
           <View style={[styles.compareBox, { borderTopColor: theme.colors.hairline }]}>
             <View style={styles.breakdownRow}>
               <Body tone="muted" size={13.5}>
-                Prévisionnel fin de mois
+                Prévisionnel avec budgets
               </Body>
-              <Money cents={balance} size={13.5} weight="semibold" />
+              <Money cents={plannedBalance} size={13.5} weight="semibold" />
             </View>
             <Caption>
-              {planGap === 0
-                ? 'Identique au reste à vivre : vos dépenses égalent exactement vos budgets.'
-                : planGap > 0
-                  ? `Compte toutes vos dépenses saisies : il reste ${formatCents(planGap)} à dépenser sur vos budgets, d'où l'écart.`
-                  : `Compte toutes vos dépenses saisies : vos dépenses dépassent les budgets alloués de ${formatCents(-planGap)}, d'où l'écart.`}
+              {overrunReal === 0
+                ? 'Identique : votre plan est tenu, aucune dépense ne déborde des budgets.'
+                : `Vos dépassements réels (${formatCents(overrunReal)} au-delà des budgets) l'abaissent d'autant.`}
             </Caption>
           </View>
         </Card>
@@ -441,18 +477,17 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.xs,
   },
-  heroMeta: {
+  heroRows: {
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
+    gap: spacing.md,
   },
-  heroStat: {
-    gap: 2,
-  },
-  heroDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: spacing.lg,
+  heroRowDivider: {
+    height: 1,
   },
   quickActions: {
     flexDirection: 'row',
