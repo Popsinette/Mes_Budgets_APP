@@ -15,6 +15,7 @@ import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getBillsSummary } from '@/src/features/bills/repository';
+import { listBudgetsWithSpending } from '@/src/features/budgets/repository';
 import { getPlannedSavingsForMonth, getRealSavingsForMonth } from '@/src/features/savings/repository';
 import {
   deleteTransaction,
@@ -43,6 +44,7 @@ export default function OperationsScreen() {
   const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
   const { data: plannedSavings } = useLiveQuery((db) => getPlannedSavingsForMonth(db, month), [month]);
   const { data: realSavings } = useLiveQuery((db) => getRealSavingsForMonth(db, month), [month]);
+  const { data: budgets } = useLiveQuery((db) => listBudgetsWithSpending(db, month), [month]);
 
   const filtered = useMemo(
     () => (transactions ?? []).filter((t) => filter === 'all' || t.type === filter),
@@ -54,15 +56,20 @@ export default function OperationsScreen() {
 
   // Mêmes formules que l'accueil, pour que les deux écrans racontent la même histoire :
   // réel = opérations pointées − épargne virée ; prévisionnel = tout, moins les
-  // factures restant à payer et toute l'épargne du mois.
+  // factures restant à payer, toute l'épargne du mois et le reste à dépenser des budgets.
   const unpaidBillsTotal = (billsSummary?.total_cents ?? 0) - (billsSummary?.paid_cents ?? 0);
+  const remainingBudgets = (budgets ?? []).reduce(
+    (sum, b) => sum + Math.max(0, b.amount_cents - b.spent_cents),
+    0,
+  );
   const realBalance =
     (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - (realSavings ?? 0);
   const plannedBalance =
     (totals?.income_cents ?? 0) -
     (totals?.expense_cents ?? 0) -
     unpaidBillsTotal -
-    (plannedSavings ?? 0);
+    (plannedSavings ?? 0) -
+    remainingBudgets;
 
   const togglePointed = (t: TransactionWithCategory) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

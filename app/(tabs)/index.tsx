@@ -73,22 +73,34 @@ export default function DashboardScreen() {
   // opérations pointées, moins l'épargne réellement virée (un retrait, négatif, s'y rajoute).
   const realBalance =
     (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - savingsReal;
+
+  // Reste à dépenser sur les budgets : compté comme dépense à venir dans la
+  // projection de fin de mois (un budget posé est de l'argent qu'on prévoit
+  // de dépenser).
+  const remainingBudgets = (budgets ?? []).reduce(
+    (sum, b) => sum + Math.max(0, b.amount_cents - b.spent_cents),
+    0,
+  );
+  // Dépassements du plan : budgets crevés + dépenses catégorisées hors budget.
+  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
+  const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
+  const budgetedSpent = (budgets ?? []).reduce((sum, b) => sum + b.spent_cents, 0);
+  const overBudgets = (budgets ?? []).reduce(
+    (sum, b) => sum + Math.max(0, b.spent_cents - b.amount_cents),
+    0,
+  );
+  const overrunReal = overBudgets + Math.max(0, freeExpense - budgetedSpent);
+
   // Solde prévisionnel = projection fin de mois : toutes les opérations saisies,
-  // moins les factures restant à payer et toute l'épargne du mois (faite + prévue).
-  const balance = income - expense - unpaidBillsTotal - savingsPlanned;
+  // moins les factures restant à payer, toute l'épargne du mois (faite + prévue)
+  // et le reste à dépenser des budgets.
+  const balance = income - expense - unpaidBillsTotal - savingsPlanned - remainingBudgets;
 
   // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne
   // prévue − dépenses sans catégorie (déjà parties, aucun budget ne peut les
-  // couvrir). (Le « reste à vivre réel » est le solde réel pointé, en héros.)
-  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
+  // couvrir). Quand le plan est tenu (overrunReal = 0), il est ÉGAL au
+  // prévisionnel fin de mois ; sinon l'écart = les dépassements.
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned - uncategorized;
-
-  // Les deux prévisionnels ne mesurent pas la même chose : le « fin de mois »
-  // suit les dépenses libres réellement saisies, le « reste à vivre » suppose
-  // les budgets dépensés à l'euro près. Leur écart = budgets alloués − dépenses
-  // libres catégorisées déjà saisies (factures et sans-catégorie déjà déduits).
-  const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
-  const planGap = budgetsTotal - freeExpense;
 
   return (
     <View style={{ flex: 1 }}>
@@ -221,11 +233,9 @@ export default function DashboardScreen() {
               <Money cents={balance} size={13.5} weight="semibold" />
             </View>
             <Caption>
-              {planGap === 0
-                ? 'Identique au reste à vivre : vos dépenses libres égalent exactement vos budgets.'
-                : planGap > 0
-                  ? `Suit vos opérations saisies, pas les budgets : il reste ${formatCents(planGap)} à dépenser sur vos budgets, d'où l'écart.`
-                  : `Suit vos opérations saisies, pas les budgets : vos dépenses libres dépassent les budgets alloués de ${formatCents(-planGap)}, d'où l'écart.`}
+              {overrunReal === 0
+                ? 'Identique au reste à vivre : le reste de vos budgets est compté comme à dépenser.'
+                : `Vos dépenses dépassent votre plan de ${formatCents(overrunReal)} (budgets dépassés ou dépenses hors budget), d'où l'écart.`}
             </Caption>
           </View>
         </Card>

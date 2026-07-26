@@ -53,12 +53,17 @@ export default function BudgetsScreen() {
   const uncategorized = totals?.uncategorized_expense_cents ?? 0;
   const leftToAllocate = income - billsTotal - savingsPlanned - totalBudget - uncategorized;
 
-  // Garde-fou réel : le reste à allouer suppose les budgets tenus. Si les
-  // dépenses libres catégorisées dépassent les budgets alloués, on l'affiche —
-  // même formule que le « planGap » de l'accueil.
+  // Garde-fou réel : le reste à allouer suppose les budgets tenus. Les
+  // dépassements se mesurent budget par budget (budgets crevés + dépenses
+  // catégorisées hors budget) — même formule que « overrunReal » de l'accueil,
+  // sans compensation par les budgets pas encore finis.
   const freeExpense =
     (totals?.expense_cents ?? 0) - (billsSummary?.paid_cents ?? 0) - uncategorized;
-  const overrun = freeExpense - totalBudget;
+  const overBudgets = (budgets ?? []).reduce(
+    (sum, b) => sum + Math.max(0, b.spent_cents - b.amount_cents),
+    0,
+  );
+  const overrun = overBudgets + Math.max(0, freeExpense - totalSpent);
 
   const confirmDelete = (id: number, name: string) => {
     confirmAction({
