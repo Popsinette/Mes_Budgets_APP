@@ -33,6 +33,7 @@ export default function CategoriesScreen() {
                 name: category.name,
                 icon: category.icon,
                 color: category.color,
+                bucket: category.bucket,
               },
             })
           }

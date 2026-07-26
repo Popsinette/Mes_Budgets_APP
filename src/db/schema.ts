@@ -199,6 +199,29 @@ const COLOR_REMAP_V7: Array<[string, string]> = [
   ['#C05A75', '#CB778D'],
 ];
 
+// V8 : « budget type » (inspiré du glow-up budget). Chaque catégorie
+// appartient à un poste — « besoins », « envies » ou « epargne » — et la
+// table budget_templates porte le mois idéal (le modèle que l'on recopie
+// dans les mois réels). Les montants sont en centimes, comme partout.
+const MIGRATION_V8 = `
+ALTER TABLE categories ADD COLUMN bucket TEXT NOT NULL DEFAULT 'envies';
+CREATE TABLE IF NOT EXISTS budget_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL UNIQUE REFERENCES categories(id) ON DELETE CASCADE,
+  amount_cents INTEGER NOT NULL
+);
+`;
+
+// Postes par défaut des catégories connues (les autres restent « envies »).
+const BUCKET_DEFAULTS: Array<[string, string]> = [
+  ['besoins', 'Alimentation'],
+  ['besoins', 'Logement'],
+  ['besoins', 'Transport'],
+  ['besoins', 'Santé'],
+  ['besoins', 'Abonnements'],
+  ['epargne', 'Épargne'],
+];
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -237,6 +260,13 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.runAsync('UPDATE savings_accounts SET color = ? WHERE color = ?', [to, from]);
     }
     await db.execAsync('PRAGMA user_version = 7');
+  }
+  if (current < 8) {
+    await db.execAsync(MIGRATION_V8);
+    for (const [bucket, name] of BUCKET_DEFAULTS) {
+      await db.runAsync('UPDATE categories SET bucket = ? WHERE name = ?', [bucket, name]);
+    }
+    await db.execAsync('PRAGMA user_version = 8');
   }
 }
 

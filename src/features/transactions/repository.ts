@@ -132,6 +132,46 @@ export type MonthlyPoint = {
   expense_cents: number;
 };
 
+export type YearMonthPoint = {
+  month: MonthKey;
+  income_cents: number;
+  expense_cents: number;
+  /** Épargne réellement virée (virements cochés « effectués »). */
+  saved_cents: number;
+};
+
+/**
+ * Vue annuelle : revenus, dépenses et épargne virée pour chacun des 12 mois
+ * de l'année (0 pour les mois vides). Sert au tableau de bord annuel.
+ */
+export async function getYearOverview(db: SQLiteDatabase, year: number): Promise<YearMonthPoint[]> {
+  const like = `${year}-%`;
+  const tx = await db.getAllAsync<{ month: string; income_cents: number; expense_cents: number }>(
+    `SELECT month,
+       COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS income_cents,
+       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expense_cents
+     FROM transactions WHERE month LIKE ? GROUP BY month`,
+    [like],
+  );
+  const savings = await db.getAllAsync<{ month: string; saved_cents: number }>(
+    `SELECT month, COALESCE(SUM(CASE WHEN done = 1 THEN amount_cents ELSE 0 END), 0) AS saved_cents
+     FROM savings_transfers WHERE month LIKE ? GROUP BY month`,
+    [like],
+  );
+  const txByMonth = new Map(tx.map((r) => [r.month, r]));
+  const savedByMonth = new Map(savings.map((r) => [r.month, r.saved_cents]));
+  return Array.from({ length: 12 }, (_, i) => {
+    const month = `${year}-${String(i + 1).padStart(2, '0')}` as MonthKey;
+    const row = txByMonth.get(month);
+    return {
+      month,
+      income_cents: row?.income_cents ?? 0,
+      expense_cents: row?.expense_cents ?? 0,
+      saved_cents: savedByMonth.get(month) ?? 0,
+    };
+  });
+}
+
 /** Revenus/dépenses agrégés pour chaque mois demandé (0 pour les mois sans opération). */
 export async function getMonthlySeries(
   db: SQLiteDatabase,

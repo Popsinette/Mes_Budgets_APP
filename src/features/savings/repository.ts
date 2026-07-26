@@ -160,6 +160,14 @@ export async function getSavingsOverview(db: SQLiteDatabase): Promise<SavingsOve
   return row ?? { total_real_cents: 0, total_planned_cents: 0 };
 }
 
+/** Objectif d'épargne mensuel type : Σ des virements mensuels prévus des comptes. */
+export async function getMonthlySavingsTarget(db: SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ s: number }>(
+    'SELECT COALESCE(SUM(monthly_cents), 0) AS s FROM savings_accounts',
+  );
+  return row?.s ?? 0;
+}
+
 /** Épargne prévue pour le mois (tous les virements du mois, cochés ou non) — pour le reste à vivre prévisionnel. */
 export async function getPlannedSavingsForMonth(db: SQLiteDatabase, month: MonthKey): Promise<number> {
   const row = await db.getFirstAsync<{ s: number }>(

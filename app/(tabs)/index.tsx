@@ -110,15 +110,26 @@ export default function DashboardScreen() {
             <Eyebrow>Bonjour</Eyebrow>
             <Title>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</Title>
           </View>
-          <Pressable
-            hitSlop={8}
-            onPress={() => router.push('/reglages')}
-            accessibilityRole="button"
-            accessibilityLabel="Réglages"
-            style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-          >
-            <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push('/annee')}
+              accessibilityRole="button"
+              accessibilityLabel="Vue annuelle"
+              style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+            >
+              <Ionicons name="calendar-outline" size={19} color={theme.colors.text} />
+            </Pressable>
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push('/reglages')}
+              accessibilityRole="button"
+              accessibilityLabel="Réglages"
+              style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+            >
+              <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
+            </Pressable>
+          </View>
         </View>
 
         <MonthSwitcher month={month} onChange={setMonth} />
@@ -464,6 +475,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   gearButton: {
     width: 40,

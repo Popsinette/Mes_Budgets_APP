@@ -118,7 +118,11 @@ export default function BudgetsScreen() {
         <Title>Budgets</Title>
         <MonthSwitcher month={month} onChange={setMonth} />
 
-        <SectionHeader title="Reste à allouer" />
+        <SectionHeader
+          title="Reste à allouer"
+          actionLabel="Budget type"
+          onAction={() => router.push('/budget-type')}
+        />
         <Card style={{ gap: spacing.md }}>
           <View style={{ gap: 2 }}>
             <Money

@@ -157,6 +157,66 @@ export async function alignBudgetsWithSpending(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Budget type (« le mois idéal ») — inspiré du glow-up budget : un modèle de
+// budget par catégorie, organisé en postes (besoins / envies / épargne), que
+// l'on recopie ensuite dans les mois réels.
+// ---------------------------------------------------------------------------
+
+export type TemplateLine = {
+  category_id: number;
+  category_name: string;
+  category_icon: string;
+  category_color: string;
+  bucket: 'besoins' | 'envies' | 'epargne';
+  amount_cents: number;
+};
+
+/** Toutes les catégories avec leur montant de budget type (0 si aucun). */
+export async function listBudgetTemplate(db: SQLiteDatabase): Promise<TemplateLine[]> {
+  return db.getAllAsync<TemplateLine>(
+    `SELECT c.id AS category_id, c.name AS category_name, c.icon AS category_icon,
+            c.color AS category_color, c.bucket, COALESCE(t.amount_cents, 0) AS amount_cents
+     FROM categories c
+     LEFT JOIN budget_templates t ON t.category_id = c.id
+     ORDER BY c.sort_order, c.name`,
+  );
+}
+
+/** Fixe (ou retire, si 0) le montant de budget type d'une catégorie. */
+export async function setTemplateAmount(
+  db: SQLiteDatabase,
+  categoryId: number,
+  amountCents: number,
+): Promise<void> {
+  if (amountCents <= 0) {
+    await db.runAsync('DELETE FROM budget_templates WHERE category_id = ?', [categoryId]);
+  } else {
+    await db.runAsync(
+      `INSERT INTO budget_templates (category_id, amount_cents) VALUES (?, ?)
+       ON CONFLICT (category_id) DO UPDATE SET amount_cents = excluded.amount_cents`,
+      [categoryId, amountCents],
+    );
+  }
+  invalidateQueries();
+}
+
+/**
+ * Recopie le budget type dans un mois : chaque catégorie du modèle reçoit
+ * son montant (créé ou mis à jour) ; les budgets du mois sans équivalent
+ * dans le modèle sont conservés. Renvoie le nombre de budgets écrits.
+ */
+export async function applyTemplateToMonth(db: SQLiteDatabase, month: MonthKey): Promise<number> {
+  const result = await db.runAsync(
+    `INSERT INTO budgets (category_id, month, amount_cents)
+     SELECT category_id, ?, amount_cents FROM budget_templates WHERE amount_cents > 0
+     ON CONFLICT (category_id, month) DO UPDATE SET amount_cents = excluded.amount_cents`,
+    [month],
+  );
+  invalidateQueries();
+  return result.changes;
+}
+
 /** Recopie les budgets du mois précédent s'ils n'existent pas encore pour ce mois. */
 export async function copyBudgetsFromMonth(
   db: SQLiteDatabase,

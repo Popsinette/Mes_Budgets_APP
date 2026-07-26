@@ -8,11 +8,13 @@ import { FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
+import { Chip } from '@/src/components/ui/Chip';
 import {
   createCategory,
   deleteCategory,
   listCategories,
   updateCategory,
+  type CategoryBucket,
 } from '@/src/features/categories/repository';
 import { categoryPalette, fonts, spacing, useTheme } from '@/src/theme';
 import { confirmAction, notify } from '@/src/utils/dialogs';
@@ -43,10 +45,19 @@ const CATEGORY_COLORS = categoryPalette;
 export default function NewCategoryScreen() {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const params = useLocalSearchParams<{ id?: string; name?: string; icon?: string; color?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    name?: string;
+    icon?: string;
+    color?: string;
+    bucket?: string;
+  }>();
   const editingId = params.id ? Number(params.id) : null;
 
   const [name, setName] = useState(params.name ?? '');
+  const [bucket, setBucket] = useState<CategoryBucket>(
+    params.bucket === 'besoins' || params.bucket === 'epargne' ? params.bucket : 'envies',
+  );
   const [icon, setIcon] = useState<keyof typeof Ionicons.glyphMap>(
     (params.icon as keyof typeof Ionicons.glyphMap) ?? 'pricetag-outline',
   );
@@ -65,9 +76,9 @@ export default function NewCategoryScreen() {
     }
     setSaving(true);
     if (editingId) {
-      await updateCategory(db, { id: editingId, name: name.trim(), icon, color });
+      await updateCategory(db, { id: editingId, name: name.trim(), icon, color, bucket });
     } else {
-      await createCategory(db, { name: name.trim(), icon, color });
+      await createCategory(db, { name: name.trim(), icon, color, bucket });
     }
     router.back();
   };
@@ -93,6 +104,24 @@ export default function NewCategoryScreen() {
       <ModalHeader title={editingId ? 'Modifier la catégorie' : 'Nouvelle catégorie'} />
 
       <FormField label="Nom" value={name} onChangeText={setName} placeholder="Animaux, Sport, Enfants…" autoFocus />
+
+      <View style={{ gap: spacing.sm }}>
+        <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Poste</Text>
+        <View style={styles.optionsRow}>
+          {(
+            [
+              ['besoins', 'Besoin'],
+              ['envies', 'Envie'],
+              ['epargne', 'Épargne'],
+            ] as Array<[CategoryBucket, string]>
+          ).map(([value, label]) => (
+            <Chip key={value} label={label} selected={bucket === value} onPress={() => setBucket(value)} />
+          ))}
+        </View>
+        <Text style={{ color: theme.colors.textMuted, fontSize: 12, lineHeight: 16 }}>
+          Le poste classe la catégorie dans le budget type (méthode 50/30/20 : besoins, envies, épargne).
+        </Text>
+      </View>
 
       <View style={{ gap: spacing.sm }}>
         <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Icône</Text>
