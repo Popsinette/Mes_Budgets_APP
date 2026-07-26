@@ -74,32 +74,19 @@ export default function DashboardScreen() {
   const realBalance =
     (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - savingsReal;
 
-  // Reste à dépenser sur les budgets : compté comme dépense à venir dans la
-  // projection de fin de mois (un budget posé est de l'argent qu'on prévoit
-  // de dépenser).
-  const remainingBudgets = (budgets ?? []).reduce(
-    (sum, b) => sum + Math.max(0, b.amount_cents - b.spent_cents),
-    0,
-  );
-  // Dépassements du plan : budgets crevés + dépenses catégorisées hors budget.
-  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
-  const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
-  const budgetedSpent = (budgets ?? []).reduce((sum, b) => sum + b.spent_cents, 0);
-  const overBudgets = (budgets ?? []).reduce(
-    (sum, b) => sum + Math.max(0, b.spent_cents - b.amount_cents),
-    0,
-  );
-  const overrunReal = overBudgets + Math.max(0, freeExpense - budgetedSpent);
-
-  // Solde prévisionnel = projection fin de mois : toutes les opérations saisies,
-  // moins les factures restant à payer, toute l'épargne du mois (faite + prévue)
-  // et le reste à dépenser des budgets.
-  const balance = income - expense - unpaidBillsTotal - savingsPlanned - remainingBudgets;
+  // Solde prévisionnel = projection fin de mois : TOUTES les dépenses saisies
+  // comptent, qu'elles soient dans un budget ou non — chaque dépense fait
+  // bouger ce chiffre. On déduit aussi les factures restant à payer et toute
+  // l'épargne du mois (faite + prévue).
+  const balance = income - expense - unpaidBillsTotal - savingsPlanned;
 
   // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne
   // prévue − dépenses sans catégorie (déjà parties, aucun budget ne peut les
-  // couvrir). Quand le plan est tenu (overrunReal = 0), il est ÉGAL au
-  // prévisionnel fin de mois ; sinon l'écart = les dépassements.
+  // couvrir). C'est la lecture « plan » ; le fin de mois est la lecture
+  // « opérations ». Leur écart = budgets alloués − dépenses catégorisées.
+  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
+  const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
+  const planGap = budgetsTotal - freeExpense;
   const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned - uncategorized;
 
   return (
@@ -233,9 +220,11 @@ export default function DashboardScreen() {
               <Money cents={balance} size={13.5} weight="semibold" />
             </View>
             <Caption>
-              {overrunReal === 0
-                ? 'Identique au reste à vivre : le reste de vos budgets est compté comme à dépenser.'
-                : `Vos dépenses dépassent votre plan de ${formatCents(overrunReal)} (budgets dépassés ou dépenses hors budget), d'où l'écart.`}
+              {planGap === 0
+                ? 'Identique au reste à vivre : vos dépenses égalent exactement vos budgets.'
+                : planGap > 0
+                  ? `Compte toutes vos dépenses saisies : il reste ${formatCents(planGap)} à dépenser sur vos budgets, d'où l'écart.`
+                  : `Compte toutes vos dépenses saisies : vos dépenses dépassent les budgets alloués de ${formatCents(-planGap)}, d'où l'écart.`}
             </Caption>
           </View>
         </Card>
