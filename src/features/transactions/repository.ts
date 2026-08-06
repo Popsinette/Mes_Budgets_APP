@@ -134,7 +134,14 @@ export async function getTransaction(
   return row ?? null;
 }
 
+/**
+ * Supprime une opération. Si c'est la dépense née du pointage d'une facture,
+ * la facture est **dé-pointée** du même geste : sans cela elle resterait
+ * « réglée » sans dépense en face, et les soldes divergeraient (le total des
+ * factures réglées compterait de l'argent qu'aucune opération ne porte).
+ */
 export async function deleteTransaction(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM bill_payments WHERE transaction_id = ?', [id]);
   await db.runAsync('DELETE FROM transactions WHERE id = ?', [id]);
   invalidateQueries();
 }

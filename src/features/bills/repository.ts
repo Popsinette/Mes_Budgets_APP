@@ -31,7 +31,13 @@ export async function createBill(
   invalidateQueries();
 }
 
-/** Modifie une facture. N'affecte pas les dépenses déjà créées par les pointages passés. */
+/**
+ * Modifie une facture. Les dépenses déjà créées par les pointages suivent
+ * (libellé, montant, catégorie) : le total « réglées » d'un mois se calcule à
+ * partir du montant courant de la facture, donc laisser les anciennes dépenses
+ * en arrière ferait diverger les soldes. La date de chaque dépense, elle, ne
+ * bouge pas — c'est le jour où le prélèvement a été constaté.
+ */
 export async function updateBill(
   db: SQLiteDatabase,
   input: { id: number; name: string; amountCents: number; dueDay: number; categoryId?: number | null },
@@ -43,6 +49,11 @@ export async function updateBill(
     input.categoryId ?? null,
     input.id,
   ]);
+  await db.runAsync(
+    `UPDATE transactions SET label = ?, amount_cents = ?, category_id = ?
+     WHERE id IN (SELECT transaction_id FROM bill_payments WHERE bill_id = ? AND transaction_id IS NOT NULL)`,
+    [input.name, input.amountCents, input.categoryId ?? null, input.id],
+  );
   invalidateQueries();
 }
 
@@ -112,6 +123,46 @@ export async function setBillPaid(
     await db.runAsync('DELETE FROM bill_payments WHERE bill_id = ? AND month = ?', [billId, month]);
   }
   invalidateQueries();
+}
+
+export type BillsRepairReport = {
+  /** Factures pointées dont la dépense avait disparu : remises « à payer ». */
+  unpointed: number;
+  /** Dépenses de factures dont le montant ne correspondait plus : réalignées. */
+  realigned: number;
+};
+
+/**
+ * Répare les pointages incohérents, ceux qui font diverger le « reste à vivre
+ * prévisionnel » du « prévisionnel avec budgets » (le premier doit toujours
+ * être le plus haut, l'écart valant les dépassements de budgets).
+ *
+ * Deux cas hérités des versions précédentes :
+ * - une facture pointée dont la dépense a été supprimée depuis l'activité →
+ *   on la remet « à payer » (un tap la re-pointe et recrée la dépense) ;
+ * - une dépense dont le montant ne suit plus celui de la facture → réalignée.
+ */
+export async function repairBillPayments(db: SQLiteDatabase): Promise<BillsRepairReport> {
+  const orphans = await db.runAsync(
+    `DELETE FROM bill_payments
+     WHERE transaction_id IS NULL
+        OR transaction_id NOT IN (SELECT id FROM transactions)`,
+  );
+  const mismatched = await db.runAsync(
+    `UPDATE transactions SET amount_cents = (
+       SELECT b.amount_cents FROM bills b
+       JOIN bill_payments p ON p.bill_id = b.id
+       WHERE p.transaction_id = transactions.id
+     )
+     WHERE id IN (
+       SELECT p.transaction_id FROM bill_payments p
+       JOIN bills b ON b.id = p.bill_id
+       JOIN transactions t ON t.id = p.transaction_id
+       WHERE t.amount_cents <> b.amount_cents
+     )`,
+  );
+  invalidateQueries();
+  return { unpointed: orphans.changes, realigned: mismatched.changes };
 }
 
 export type BillsSummary = {

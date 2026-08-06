@@ -11,6 +11,7 @@ import { Chip } from '@/src/components/ui/Chip';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Heading } from '@/src/components/ui/Text';
+import { repairBillPayments } from '@/src/features/bills/repository';
 import { exportAllDataAsJson, exportTransactionsAsCsv } from '@/src/features/export/exporter';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { isBiometricAvailable, useSecurity } from '@/src/store/security';
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
   const setThemePref = useThemePref((s) => s.setPref);
   const [exportingJson, setExportingJson] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [repairing, setRepairing] = useState(false);
 
   const toggleBiometric = async (next: boolean) => {
     if (next) {
@@ -59,6 +61,32 @@ export default function SettingsScreen() {
       notify('Export impossible', error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const runRepair = async () => {
+    setRepairing(true);
+    try {
+      const { unpointed, realigned } = await repairBillPayments(db);
+      notify(
+        unpointed + realigned === 0 ? 'Tout est cohérent' : 'Données corrigées',
+        unpointed + realigned === 0
+          ? 'Aucune facture pointée sans dépense : vos soldes sont cohérents.'
+          : [
+              unpointed > 0
+                ? `${unpointed} facture${unpointed > 1 ? 's' : ''} pointée${unpointed > 1 ? 's' : ''} sans dépense : remise${unpointed > 1 ? 's' : ''} « à payer ».`
+                : null,
+              realigned > 0
+                ? `${realigned} dépense${realigned > 1 ? 's' : ''} de facture réalignée${realigned > 1 ? 's' : ''} sur le montant de la facture.`
+                : null,
+            ]
+              .filter(Boolean)
+              .join('\n'),
+      );
+    } catch (error) {
+      notify('Vérification impossible', error instanceof Error ? error.message : String(error));
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -169,6 +197,16 @@ export default function SettingsScreen() {
 
       <Card style={{ gap: spacing.md }}>
         <Heading>Données</Heading>
+        <Body tone="muted" size={13.5}>
+          La vérification cherche les factures cochées « réglées » dont la dépense n’existe plus (ou
+          n’a plus le bon montant) — la cause des écarts entre le reste à vivre et le prévisionnel.
+        </Body>
+        <Button
+          label="Vérifier mes données"
+          variant="secondary"
+          onPress={() => void runRepair()}
+          loading={repairing}
+        />
         <Body tone="muted" size={13.5}>
           Supprime définitivement toutes les données de l’application sur cet appareil.
         </Body>
