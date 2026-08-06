@@ -3,7 +3,9 @@
  *   arrivent dès qu'on est en ligne, et l'app s'ouvre quand même hors ligne.
  * - Ressources (JS, images, polices, wasm) : cache d'abord → démarrage rapide. */
 
-const CACHE_NAME = 'mes-budgets-v1';
+// Incrémenter à chaque changement d'icônes ou de ressources statiques : les
+// anciens caches sont purgés à l'activation.
+const CACHE_NAME = 'mes-budgets-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
