@@ -67,12 +67,16 @@ export default function SettingsScreen() {
   const runRepair = async () => {
     setRepairing(true);
     try {
-      const { unpointed, realigned } = await repairBillPayments(db);
+      const { relinked, unpointed, realigned } = await repairBillPayments(db);
+      const fixed = relinked + unpointed + realigned;
       notify(
-        unpointed + realigned === 0 ? 'Tout est cohérent' : 'Données corrigées',
-        unpointed + realigned === 0
+        fixed === 0 ? 'Tout est cohérent' : 'Données corrigées',
+        fixed === 0
           ? 'Aucune facture pointée sans dépense : vos soldes sont cohérents.'
           : [
+              relinked > 0
+                ? `${relinked} dépense${relinked > 1 ? 's' : ''} re-rattachée${relinked > 1 ? 's' : ''} à sa facture.`
+                : null,
               unpointed > 0
                 ? `${unpointed} facture${unpointed > 1 ? 's' : ''} pointée${unpointed > 1 ? 's' : ''} sans dépense : remise${unpointed > 1 ? 's' : ''} « à payer ».`
                 : null,

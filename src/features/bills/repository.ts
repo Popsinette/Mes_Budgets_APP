@@ -126,6 +126,8 @@ export async function setBillPaid(
 }
 
 export type BillsRepairReport = {
+  /** Dépenses de pointage qui avaient perdu leur `bill_id` : re-rattachées. */
+  relinked: number;
   /** Factures pointées dont la dépense avait disparu : remises « à payer ». */
   unpointed: number;
   /** Dépenses de factures dont le montant ne correspondait plus : réalignées. */
@@ -137,12 +139,24 @@ export type BillsRepairReport = {
  * prévisionnel » du « prévisionnel avec budgets » (le premier doit toujours
  * être le plus haut, l'écart valant les dépassements de budgets).
  *
- * Deux cas hérités des versions précédentes :
+ * Trois cas hérités des versions précédentes :
+ * - une dépense de pointage sans `bill_id` → re-rattachée à sa facture : sans
+ *   ce lien elle compte comme une dépense libre (et pèse sur les budgets ou sur
+ *   les « dépenses sans catégorie ») alors que sa facture est déjà comptée ;
  * - une facture pointée dont la dépense a été supprimée depuis l'activité →
  *   on la remet « à payer » (un tap la re-pointe et recrée la dépense) ;
  * - une dépense dont le montant ne suit plus celui de la facture → réalignée.
  */
 export async function repairBillPayments(db: SQLiteDatabase): Promise<BillsRepairReport> {
+  // Même rattrapage que la migration V3, rejouable : le lien peut se perdre
+  // (ancienne base, contrainte FK qui a remis bill_id à NULL…).
+  const relinked = await db.runAsync(
+    `UPDATE transactions SET bill_id = (
+       SELECT p.bill_id FROM bill_payments p WHERE p.transaction_id = transactions.id
+     )
+     WHERE bill_id IS NULL
+       AND id IN (SELECT transaction_id FROM bill_payments WHERE transaction_id IS NOT NULL)`,
+  );
   const orphans = await db.runAsync(
     `DELETE FROM bill_payments
      WHERE transaction_id IS NULL
@@ -162,7 +176,11 @@ export async function repairBillPayments(db: SQLiteDatabase): Promise<BillsRepai
      )`,
   );
   invalidateQueries();
-  return { unpointed: orphans.changes, realigned: mismatched.changes };
+  return {
+    relinked: relinked.changes,
+    unpointed: orphans.changes,
+    realigned: mismatched.changes,
+  };
 }
 
 export type BillsSummary = {
