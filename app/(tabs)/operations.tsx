@@ -77,6 +77,10 @@ export default function OperationsScreen() {
     void setTransactionCleared(db, t.id, t.cleared === 0);
   };
 
+  const editDate = (t: TransactionWithCategory) => {
+    router.push({ pathname: '/date-operation', params: { id: String(t.id) } });
+  };
+
   const confirmDelete = (t: TransactionWithCategory) => {
     confirmAction({
       title: 'Supprimer l’opération',
@@ -103,7 +107,13 @@ export default function OperationsScreen() {
           color={t.type === 'income' ? theme.colors.success : (t.category_color ?? theme.colors.textMuted)}
           size={38}
         />
-        <View style={{ flex: 1 }}>
+        {/* Toucher l'opération corrige sa date (jour de débit réel, faute de frappe…). */}
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => editDate(t)}
+          accessibilityRole="button"
+          accessibilityLabel={`Modifier la date de ${t.label}`}
+        >
           <Body weight="medium" numberOfLines={1}>
             {t.label}
           </Body>
@@ -113,7 +123,7 @@ export default function OperationsScreen() {
             {t.type === 'income' ? 'Revenu' : (t.category_name ?? 'Sans catégorie')}
             {t.note ? ` · ${t.note}` : ''}
           </Caption>
-        </View>
+        </Pressable>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
           <Money
             cents={t.type === 'income' ? t.amount_cents : -t.amount_cents}
@@ -198,6 +208,7 @@ export default function OperationsScreen() {
                 <Caption style={{ textAlign: 'center' }}>
                   Touchez le cercle pour pointer une opération dès qu’elle passe sur votre compte.
                 </Caption>
+
               </>
             ) : null}
 
@@ -209,6 +220,10 @@ export default function OperationsScreen() {
                 </Card>
               </>
             ) : null}
+
+            <Caption style={{ textAlign: 'center' }}>
+              Touchez le libellé d’une opération pour corriger sa date.
+            </Caption>
           </>
         )}
       </Screen>

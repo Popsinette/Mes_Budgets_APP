@@ -1,4 +1,4 @@
-import { addMonths, format, getDaysInMonth, parse, setDate } from 'date-fns';
+import { addMonths, format, getDay, getDaysInMonth, parse, setDate } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 /** Clé de mois au format 'YYYY-MM', utilisée partout en base. */
@@ -49,6 +49,33 @@ export function isoDayInMonth(month: MonthKey, day: number): string {
   const start = parse(month, 'yyyy-MM', new Date());
   const lastDay = getDaysInMonth(start);
   return format(setDate(start, Math.min(Math.max(1, day), lastDay)), 'yyyy-MM-dd');
+}
+
+/** Le mois ('yyyy-MM') et le quantième d'une date ISO 'yyyy-MM-dd'. */
+export function monthOfIsoDay(isoDay: string): MonthKey {
+  return isoDay.slice(0, 7);
+}
+
+export function dayOfIsoDay(isoDay: string): number {
+  return Number(isoDay.slice(8, 10));
+}
+
+/** Nombre de jours du mois. */
+export function daysInMonth(month: MonthKey): number {
+  return getDaysInMonth(parse(month, 'yyyy-MM', new Date()));
+}
+
+/**
+ * Grille de calendrier du mois, semaine commençant le lundi : des cases vides
+ * (`null`) jusqu'au 1er, puis les quantièmes. Sert au choix d'un jour.
+ */
+export function monthDayGrid(month: MonthKey): Array<number | null> {
+  const start = parse(month, 'yyyy-MM', new Date());
+  const leading = (getDay(start) + 6) % 7; // getDay : 0 = dimanche
+  return [
+    ...Array.from({ length: leading }, () => null),
+    ...Array.from({ length: getDaysInMonth(start) }, (_, i) => i + 1),
+  ];
 }
 
 /**

@@ -89,6 +89,7 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="nouvelle-transaction" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="date-operation" options={{ presentation: 'modal' }} />
               <Stack.Screen name="nouveau-budget" options={{ presentation: 'modal' }} />
               <Stack.Screen name="budget-type" options={{ presentation: 'modal' }} />
               <Stack.Screen name="annee" options={{ presentation: 'modal' }} />

@@ -83,6 +83,57 @@ export async function setTransactionCleared(
   invalidateQueries();
 }
 
+/**
+ * Corrige la date d'une opération déjà enregistrée (prélèvement ou revenu) —
+ * on s'est trompé de jour, ou la banque a débité un autre jour que prévu.
+ * Le mois dénormalisé suit la date : choisir un jour d'un autre mois déplace
+ * l'opération, et donc ses agrégats (soldes, budgets), dans ce mois-là.
+ *
+ * Exception : une dépense née du pointage d'une facture reste dans son mois —
+ * c'est `bill_payments` qui dit quel mois de la facture est réglé, et le lien
+ * se romprait. `dateChangeLocksMonth` permet à l'interface de le savoir avant
+ * de proposer le changement.
+ */
+export async function updateTransactionDate(
+  db: SQLiteDatabase,
+  id: number,
+  date: string,
+): Promise<void> {
+  const tx = await db.getFirstAsync<{ bill_id: number | null; month: MonthKey }>(
+    'SELECT bill_id, month FROM transactions WHERE id = ?',
+    [id],
+  );
+  if (!tx) return;
+  const month = date.slice(0, 7);
+  if (tx.bill_id != null && month !== tx.month) {
+    throw new Error(
+      'Une dépense de facture reste dans le mois où elle a été pointée : dé-pointez la facture pour la déplacer.',
+    );
+  }
+  await db.runAsync('UPDATE transactions SET date = ?, month = ? WHERE id = ?', [date, month, id]);
+  invalidateQueries();
+}
+
+/** Vrai si l'opération ne peut changer que de jour, pas de mois (dépense de facture). */
+export function dateChangeLocksMonth(tx: Pick<Transaction, 'bill_id'>): boolean {
+  return tx.bill_id != null;
+}
+
+/** Une opération et sa catégorie, par id. */
+export async function getTransaction(
+  db: SQLiteDatabase,
+  id: number,
+): Promise<TransactionWithCategory | null> {
+  const row = await db.getFirstAsync<TransactionWithCategory>(
+    `SELECT t.*, c.name AS category_name, c.icon AS category_icon, c.color AS category_color
+     FROM transactions t
+     LEFT JOIN categories c ON c.id = t.category_id
+     WHERE t.id = ?`,
+    [id],
+  );
+  return row ?? null;
+}
+
 export async function deleteTransaction(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM transactions WHERE id = ?', [id]);
   invalidateQueries();

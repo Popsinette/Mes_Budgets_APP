@@ -60,6 +60,10 @@ export default function BudgetDetailScreen() {
     void setTransactionCleared(db, t.id, t.cleared === 0);
   };
 
+  const editDate = (t: TransactionWithCategory) => {
+    router.push({ pathname: '/date-operation', params: { id: String(t.id) } });
+  };
+
   const confirmDeleteTx = (t: TransactionWithCategory) => {
     confirmAction({
       title: 'Supprimer l’opération',
@@ -172,7 +176,13 @@ export default function BudgetDetailScreen() {
                     color={isPending ? theme.colors.textMuted : theme.colors.success}
                   />
                 </Pressable>
-                <View style={{ flex: 1 }}>
+                {/* Toucher la dépense corrige sa date (même modale que l'écran Activité). */}
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => editDate(t)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Modifier la date de ${t.label}`}
+                >
                   <Body weight="medium" numberOfLines={1}>
                     {t.label}
                   </Body>
@@ -181,7 +191,7 @@ export default function BudgetDetailScreen() {
                     {isPending ? ' · à venir' : ''}
                     {t.note ? ` · ${t.note}` : ''}
                   </Caption>
-                </View>
+                </Pressable>
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
                   <Money cents={-t.amount_cents} size={15} signed />
                   <Caption onPress={() => confirmDeleteTx(t)} style={{ fontSize: 11 }}>
@@ -195,7 +205,8 @@ export default function BudgetDetailScreen() {
       )}
 
       <Caption style={{ textAlign: 'center' }}>
-        Touchez le cercle pour pointer une dépense passée sur votre compte.
+        Touchez le cercle pour pointer une dépense passée sur votre compte, son libellé pour
+        corriger sa date.
       </Caption>
     </Screen>
   );
