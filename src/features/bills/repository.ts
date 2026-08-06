@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { invalidateQueries } from '@/src/store/invalidation';
-import { isoDayInMonth, type MonthKey } from '@/src/utils/dates';
+import { todayInMonth, type MonthKey } from '@/src/utils/dates';
 
 export type Bill = {
   id: number;
@@ -71,8 +71,11 @@ export async function listBillsForMonth(
 
 /**
  * Pointe/dé-pointe une facture pour un mois donné.
- * Pointer crée automatiquement la dépense correspondante dans les opérations
- * (datée du jour d'échéance) ; dé-pointer la supprime.
+ * Pointer crée automatiquement la dépense correspondante dans les opérations,
+ * **datée du jour du pointage** (c'est la date à laquelle on constate le
+ * prélèvement, pas la date d'échéance présumée) ; dé-pointer la supprime.
+ * Pour un mois autre que le mois courant, la date reste bornée à ce mois
+ * (`todayInMonth`) pour ne pas désaccorder `date` et `month`.
  */
 export async function setBillPaid(
   db: SQLiteDatabase,
@@ -92,7 +95,7 @@ export async function setBillPaid(
     const result = await db.runAsync(
       `INSERT INTO transactions (category_id, label, amount_cents, type, date, month, note, bill_id)
        VALUES (?, ?, ?, 'expense', ?, ?, 'Facture récurrente', ?)`,
-      [bill.category_id, bill.name, bill.amount_cents, isoDayInMonth(month, bill.due_day), month, billId],
+      [bill.category_id, bill.name, bill.amount_cents, todayInMonth(month), month, billId],
     );
     await db.runAsync(
       `INSERT INTO bill_payments (bill_id, month, paid_at, transaction_id) VALUES (?, ?, datetime('now'), ?)`,

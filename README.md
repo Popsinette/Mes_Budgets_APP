@@ -8,7 +8,7 @@ Une seule base de code (React Native + Expo), une interface soignée, et aucune 
 - **Tableau de bord** — solde du mois (revenus − dépenses), répartition des dépenses par catégorie (graphique en anneau), **évolution revenus/dépenses sur 6 mois** (histogramme), aperçu des budgets, factures à venir et épargne.
 - **Budgets mensuels** — un budget par catégorie et par mois, barres de progression avec alertes visuelles (orange à 85 %, rouge en dépassement), navigation de mois en mois, recopie des budgets du mois précédent en un geste.
 - **Plan d'épargne** — objectifs d'épargne (vacances, voiture, fonds d'urgence…) avec montant cible, versement mensuel prévu, progression et historique des versements.
-- **Factures** — factures récurrentes avec jour d'échéance, pointage payé/à payer mois par mois, total réglé sur le mois.
+- **Factures** — factures récurrentes avec jour d'échéance, pointage payé/à payer mois par mois, total réglé sur le mois. La dépense créée au pointage est datée du jour où l'on pointe.
 - **Transactions** — dépenses et revenus, catégorisés, avec notes.
 - **Export des données** — sauvegarde complète en JSON ou transactions en CSV (compatible Excel/Numbers), via la feuille de partage du système (AirDrop, Fichiers, mail…).
 - **Verrouillage biométrique** — Face ID / Touch ID / empreinte exigé à chaque ouverture (option activable dans les réglages) ; l'app se reverrouille dès qu'elle passe en arrière-plan.

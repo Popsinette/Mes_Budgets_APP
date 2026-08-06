@@ -51,6 +51,17 @@ export function isoDayInMonth(month: MonthKey, day: number): string {
   return format(setDate(start, Math.min(Math.max(1, day), lastDay)), 'yyyy-MM-dd');
 }
 
+/**
+ * Date du jour ramenée dans le mois donné : aujourd'hui si c'est le mois
+ * courant, sinon le même quantième dans ce mois (borné à sa fin). Sert à dater
+ * une saisie/un pointage du jour sans jamais sortir du mois affiché (la colonne
+ * `month` des transactions porte les agrégats).
+ */
+export function todayInMonth(month: MonthKey): string {
+  if (month === currentMonthKey()) return todayIso();
+  return isoDayInMonth(month, new Date().getDate());
+}
+
 /** "mars 2027" — le mois situé à `offset` mois d'aujourd'hui. */
 export function monthLabelFromNow(offset: number): string {
   return format(addMonths(new Date(), offset), 'MMMM yyyy', { locale: fr });

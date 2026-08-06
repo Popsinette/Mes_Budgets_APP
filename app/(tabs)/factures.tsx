@@ -174,7 +174,8 @@ export default function BillsScreen() {
             ) : null}
             <Caption style={{ textAlign: 'center' }}>
               Touchez une facture pour la pointer payée — la dépense est ajoutée automatiquement à votre
-              activité (hors budgets). Icône ✎ pour la modifier, appui long pour la supprimer.
+              activité, à la date du pointage (hors budgets). Icône ✎ pour la modifier, appui long pour la
+              supprimer.
             </Caption>
           </>
         )}

@@ -11,7 +11,7 @@ import { Screen } from '@/src/components/ui/Screen';
 import { addTransaction, type TransactionType } from '@/src/features/transactions/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { fonts, radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, isoDayInMonth, monthKeyLabel, todayIso } from '@/src/utils/dates';
+import { currentMonthKey, monthKeyLabel, todayInMonth } from '@/src/utils/dates';
 import { parseAmountToCents } from '@/src/utils/money';
 import { Pressable } from 'react-native';
 
@@ -52,7 +52,7 @@ export default function NewTransactionScreen() {
       type,
       // Mois courant : datée d'aujourd'hui. Autre mois : datée du même jour
       // du mois affiché (borné à sa fin), pour rester dans ce mois.
-      date: isCurrentMonth ? todayIso() : isoDayInMonth(month, new Date().getDate()),
+      date: todayInMonth(month),
       month,
       note: note.trim() || undefined,
       cleared,

@@ -222,6 +222,21 @@ const BUCKET_DEFAULTS: Array<[string, string]> = [
   ['epargne', 'Épargne'],
 ];
 
+// V9 : une facture pointée est datée du jour du pointage (date à laquelle on
+// constate le prélèvement) et non plus du jour d'échéance présumé. On réaligne
+// les dépenses déjà créées sur la date de leur pointage, sauf si celui-ci a eu
+// lieu hors du mois de la facture (on garderait alors une date incohérente avec
+// la colonne `month`, qui porte tous les agrégats).
+const MIGRATION_V9 = `
+UPDATE transactions
+SET date = (SELECT date(bp.paid_at) FROM bill_payments bp WHERE bp.transaction_id = transactions.id)
+WHERE EXISTS (
+  SELECT 1 FROM bill_payments bp
+  WHERE bp.transaction_id = transactions.id
+    AND substr(bp.paid_at, 1, 7) = transactions.month
+);
+`;
+
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
@@ -267,6 +282,10 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.runAsync('UPDATE categories SET bucket = ? WHERE name = ?', [bucket, name]);
     }
     await db.execAsync('PRAGMA user_version = 8');
+  }
+  if (current < 9) {
+    await db.execAsync(MIGRATION_V9);
+    await db.execAsync('PRAGMA user_version = 9');
   }
 }
 
