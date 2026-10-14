@@ -197,6 +197,45 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
         </Caption>
       </Card>
 
+      <Card style={{ gap: spacing.sm }}>
+        <Body weight="semibold">Comment ces chiffres se tiennent</Body>
+        <Caption>
+          La pastille « Prévisionnel » est le résultat du mois (revenus − dépenses). La fin de mois dépend aussi de ce
+          que tu avais sur ton compte au début du mois :
+        </Caption>
+        <View style={styles.between}>
+          <Body size={14} style={{ flex: 1 }}>
+            Solde de début de mois (déduit)
+          </Body>
+          <Money cents={status.implied_start_cents} size={14.5} tone={status.implied_start_cents < 0 ? 'danger' : 'text'} />
+        </View>
+        <View style={styles.between}>
+          <Body size={14} style={{ flex: 1 }}>
+            Résultat du mois (pastille)
+          </Body>
+          <Money cents={status.month_forecast_cents} signed size={14.5} />
+        </View>
+        {status.extra_savings_cents !== 0 ? (
+          <View style={styles.between}>
+            <Body size={14} style={{ flex: 1 }}>
+              Virements d’épargne hors plan
+            </Body>
+            <Money cents={-status.extra_savings_cents} signed size={14.5} />
+          </View>
+        ) : null}
+        <View style={[styles.between, { borderTopWidth: 1, borderTopColor: theme.colors.hairline, paddingTop: spacing.sm }]}>
+          <Body size={14} weight="semibold" style={{ flex: 1 }}>
+            Fin de mois prévue
+          </Body>
+          <Money cents={end} size={14.5} weight="bold" tone={end < 0 ? 'danger' : 'text'} />
+        </View>
+        <Caption>
+          Si ce solde de début de mois ne te paraît pas juste, vérifie les charges et revenus cochés « déjà passés » à la
+          saisie, et les dépenses notées alors qu’elles n’étaient pas encore débitées. « Saisir un nouveau solde »
+          permet de tout reprendre.
+        </Caption>
+      </Card>
+
       <SectionHeader title="Comparer avec ma banque" />
       <AmountField label="Solde affiché par ma banque" value={bank} onChangeText={setBank} placeholder="1 250,00" />
       {gap !== null ? (
