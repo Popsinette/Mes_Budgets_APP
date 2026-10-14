@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, Switch, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
@@ -11,8 +10,8 @@ import { Chip } from '@/src/components/ui/Chip';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Heading } from '@/src/components/ui/Text';
-import { repairBillPayments } from '@/src/features/bills/repository';
-import { exportAllDataAsJson, exportTransactionsAsCsv } from '@/src/features/export/exporter';
+import { seedDefaults } from '@/src/db/schema';
+import { exportAllDataAsJson, exportExpensesAsCsv } from '@/src/features/export/exporter';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { isBiometricAvailable, useSecurity } from '@/src/store/security';
 import { useThemePref, type ThemePref } from '@/src/store/themePref';
@@ -32,7 +31,6 @@ export default function SettingsScreen() {
   const setThemePref = useThemePref((s) => s.setPref);
   const [exportingJson, setExportingJson] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
-  const [repairing, setRepairing] = useState(false);
 
   const toggleBiometric = async (next: boolean) => {
     if (next) {
@@ -64,53 +62,27 @@ export default function SettingsScreen() {
     }
   };
 
-  const runRepair = async () => {
-    setRepairing(true);
-    try {
-      const { relinked, unpointed, realigned } = await repairBillPayments(db);
-      const fixed = relinked + unpointed + realigned;
-      notify(
-        fixed === 0 ? 'Tout est cohérent' : 'Données corrigées',
-        fixed === 0
-          ? 'Aucune facture pointée sans dépense : vos soldes sont cohérents.'
-          : [
-              relinked > 0
-                ? `${relinked} dépense${relinked > 1 ? 's' : ''} re-rattachée${relinked > 1 ? 's' : ''} à sa facture.`
-                : null,
-              unpointed > 0
-                ? `${unpointed} facture${unpointed > 1 ? 's' : ''} pointée${unpointed > 1 ? 's' : ''} sans dépense : remise${unpointed > 1 ? 's' : ''} « à payer ».`
-                : null,
-              realigned > 0
-                ? `${realigned} dépense${realigned > 1 ? 's' : ''} de facture réalignée${realigned > 1 ? 's' : ''} sur le montant de la facture.`
-                : null,
-            ]
-              .filter(Boolean)
-              .join('\n'),
-      );
-    } catch (error) {
-      notify('Vérification impossible', error instanceof Error ? error.message : String(error));
-    } finally {
-      setRepairing(false);
-    }
-  };
-
   const eraseAllData = () => {
     confirmAction({
       title: 'Tout effacer',
       message:
-        'Toutes vos données (transactions, budgets, épargne, factures) seront définitivement supprimées de cet appareil. Cette action est irréversible.',
+        'Toutes vos données (dépenses, enveloppes, revenus et charges fixes, épargne) seront définitivement supprimées de cet appareil. Cette action est irréversible.',
       confirmLabel: 'Tout effacer',
       destructive: true,
       onConfirm: () => {
         void (async () => {
-          await db.execAsync(`
-            DELETE FROM bill_payments;
-            DELETE FROM bills;
-            DELETE FROM savings_transfers;
-            DELETE FROM savings_accounts;
-            DELETE FROM budgets;
-            DELETE FROM transactions;
-          `);
+          await db.withTransactionAsync(async () => {
+            await db.execAsync(`
+              DELETE FROM week_closures;
+              DELETE FROM savings_moves;
+              DELETE FROM savings_pots;
+              DELETE FROM fixed_checks;
+              DELETE FROM fixed_items;
+              DELETE FROM expenses;
+              DELETE FROM envelopes;
+            `);
+            await seedDefaults(db);
+          });
           invalidateQueries();
           notify('Données effacées', 'Toutes vos données ont été supprimées.');
         })();
@@ -173,17 +145,9 @@ export default function SettingsScreen() {
       ) : null}
 
       <Card style={{ gap: spacing.md }}>
-        <Heading>Catégories</Heading>
-        <Body tone="muted" size={13.5}>
-          Créez vos propres catégories et personnalisez leur nom, icône et couleur.
-        </Body>
-        <Button label="Gérer les catégories" variant="secondary" onPress={() => router.push('/categories')} />
-      </Card>
-
-      <Card style={{ gap: spacing.md }}>
         <Heading>Exporter mes données</Heading>
         <Body tone="muted" size={13.5}>
-          Sauvegarde complète (JSON) ou transactions seules (CSV, pour Excel/Numbers), via la feuille de
+          Sauvegarde complète (JSON) ou dépenses seules (CSV, pour Excel/Numbers), via la feuille de
           partage : AirDrop, Fichiers, mail…
         </Body>
         <Button
@@ -192,25 +156,15 @@ export default function SettingsScreen() {
           loading={exportingJson}
         />
         <Button
-          label="Exporter les transactions (CSV)"
+          label="Exporter les dépenses (CSV)"
           variant="secondary"
-          onPress={() => void runExport(() => exportTransactionsAsCsv(db), setExportingCsv)}
+          onPress={() => void runExport(() => exportExpensesAsCsv(db), setExportingCsv)}
           loading={exportingCsv}
         />
       </Card>
 
       <Card style={{ gap: spacing.md }}>
         <Heading>Données</Heading>
-        <Body tone="muted" size={13.5}>
-          La vérification cherche les factures cochées « réglées » dont la dépense n’existe plus (ou
-          n’a plus le bon montant) — la cause des écarts entre le reste à vivre et le prévisionnel.
-        </Body>
-        <Button
-          label="Vérifier mes données"
-          variant="secondary"
-          onPress={() => void runRepair()}
-          loading={repairing}
-        />
         <Body tone="muted" size={13.5}>
           Supprime définitivement toutes les données de l’application sur cet appareil.
         </Body>
@@ -223,7 +177,7 @@ export default function SettingsScreen() {
           Mes Budgets · version {Constants.expoConfig?.version ?? '0.1.0'}
         </Body>
         <Body tone="muted" size={13.5}>
-          Suivi de budgets mensuels, plan d’épargne et factures — 100 % local.
+          Charges fixes, enveloppes de la semaine et épargne — 100 % local.
         </Body>
       </Card>
     </Screen>

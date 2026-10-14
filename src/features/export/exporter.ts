@@ -43,32 +43,24 @@ async function shareFile(fileName: string, content: string, mimeType: string): P
   await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: 'Exporter mes données' });
 }
 
+const TABLES = [
+  'envelopes',
+  'expenses',
+  'fixed_items',
+  'fixed_checks',
+  'savings_pots',
+  'savings_moves',
+  'week_closures',
+] as const;
+
 /** Sauvegarde complète : toutes les tables, au format JSON. */
 export async function exportAllDataAsJson(db: SQLiteDatabase): Promise<void> {
-  const [categories, transactions, budgets, savingsGoals, savingsEntries, bills, billPayments] =
-    await Promise.all([
-      db.getAllAsync('SELECT * FROM categories ORDER BY id'),
-      db.getAllAsync('SELECT * FROM transactions ORDER BY id'),
-      db.getAllAsync('SELECT * FROM budgets ORDER BY id'),
-      db.getAllAsync('SELECT * FROM savings_goals ORDER BY id'),
-      db.getAllAsync('SELECT * FROM savings_entries ORDER BY id'),
-      db.getAllAsync('SELECT * FROM bills ORDER BY id'),
-      db.getAllAsync('SELECT * FROM bill_payments ORDER BY id'),
-    ]);
-
+  const rows = await Promise.all(TABLES.map((table) => db.getAllAsync(`SELECT * FROM ${table}`)));
   const payload = {
     app: 'Mes Budgets',
-    format: 1,
+    format: 2,
     exported_at: new Date().toISOString(),
-    data: {
-      categories,
-      transactions,
-      budgets,
-      savings_goals: savingsGoals,
-      savings_entries: savingsEntries,
-      bills,
-      bill_payments: billPayments,
-    },
+    data: Object.fromEntries(TABLES.map((table, i) => [table, rows[i]])),
   };
 
   await shareFile(
@@ -86,37 +78,27 @@ function csvEscape(value: unknown): string {
   return text;
 }
 
-/** Transactions au format CSV (séparateur « ; », montants en euros, virgule décimale) — s'ouvre directement dans Excel/Numbers. */
-export async function exportTransactionsAsCsv(db: SQLiteDatabase): Promise<void> {
-  const rows = await db.getAllAsync<{
-    date: string;
-    type: string;
-    category: string | null;
-    label: string;
-    amount_cents: number;
-    note: string | null;
-  }>(
-    `SELECT t.date, t.type, c.name AS category, t.label, t.amount_cents, t.note
-     FROM transactions t
-     LEFT JOIN categories c ON c.id = t.category_id
-     ORDER BY t.date, t.id`,
+/** Dépenses au format CSV (séparateur « ; », montants en euros, virgule décimale) — s'ouvre directement dans Excel/Numbers. */
+export async function exportExpensesAsCsv(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<{ date: string; envelope: string; label: string; amount_cents: number }>(
+    `SELECT x.date, e.name AS envelope, x.label, x.amount_cents
+     FROM expenses x JOIN envelopes e ON e.id = x.envelope_id
+     ORDER BY x.date, x.id`,
   );
 
-  const header = 'date;type;categorie;libelle;montant_eur;note';
+  const header = 'date;enveloppe;libelle;montant_eur';
   const lines = rows.map((row) =>
     [
       row.date,
-      row.type === 'income' ? 'revenu' : 'depense',
-      csvEscape(row.category ?? ''),
+      csvEscape(row.envelope),
       csvEscape(row.label),
       (row.amount_cents / 100).toFixed(2).replace('.', ','),
-      csvEscape(row.note ?? ''),
     ].join(';'),
   );
 
   // BOM UTF-8 pour qu'Excel reconnaisse les accents
   await shareFile(
-    `mes-budgets-transactions-${todayIso()}.csv`,
+    `mes-budgets-depenses-${todayIso()}.csv`,
     '\uFEFF' + [header, ...lines].join('\n'),
     'text/csv',
   );

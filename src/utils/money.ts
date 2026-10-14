@@ -32,3 +32,9 @@ export function clampRatio(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
 }
+
+/** Centimes → saisie éditable ("12,5" ; vide pour 0). */
+export function centsToInput(cents: number | null | undefined): string {
+  if (!cents) return '';
+  return String(cents / 100).replace('.', ',');
+}
