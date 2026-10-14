@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ProgressRing } from '@/src/components/charts/ProgressRing';
@@ -19,6 +19,7 @@ import {
   deleteExpense,
   listEnvelopesForMonth,
   listExpensesForMonth,
+  resolveEnvelopeId,
   type EnvelopeForMonth,
   type Expense,
 } from '@/src/features/envelopes/repository';
@@ -108,8 +109,20 @@ function VariablesTab({ month }: { month: string }) {
   );
 }
 
+/**
+ * Ouvre une enveloppe (détail ou modification). Si le mois suit encore la
+ * base, il est d'abord créé : ses enveloppes deviennent les siennes.
+ */
+async function openEnvelope(db: SQLiteDatabase, envelope: EnvelopeForMonth, mode: 'edit' | 'detail') {
+  const id = await resolveEnvelopeId(db, envelope);
+  if (!id) return;
+  if (mode === 'edit') router.push({ pathname: '/enveloppe', params: { id: String(id), month: envelope.month } });
+  else router.push({ pathname: '/enveloppe-detail', params: { id: String(id), month: envelope.month } });
+}
+
 function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: string }) {
   const theme = useTheme();
+  const db = useSQLiteContext();
   const left = envelope.budget_cents - envelope.spent_cents;
   const ratio = envelope.budget_cents > 0 ? envelope.spent_cents / envelope.budget_cents : 0;
   const isCurrent = month === currentMonthKey();
@@ -119,11 +132,7 @@ function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: 
   return (
     <Card
       style={styles.envelopeCard}
-      onPress={() =>
-        unset
-          ? router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })
-          : router.push({ pathname: '/enveloppe-detail', params: { id: String(envelope.id), month } })
-      }
+      onPress={() => void openEnvelope(db, envelope, unset ? 'edit' : 'detail')}
     >
       <Body weight="semibold" size={16} numberOfLines={1}>
         {envelope.name}
@@ -243,7 +252,7 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
           {postes.map((poste) => (
             <Pressable
               key={poste.id}
-              onPress={() => router.push({ pathname: '/enveloppe-detail', params: { id: String(poste.id), month } })}
+              onPress={() => void openEnvelope(db, poste, 'detail')}
               accessibilityRole="button"
               accessibilityLabel={`${poste.name} : ${formatCents(poste.spent_cents)} sur ${formatCents(poste.budget_cents)}`}
               style={[styles.chip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
@@ -272,7 +281,7 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
             </Pressable>
           ))}
           <Pressable
-            onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month' } })}
+            onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month', month } })}
             accessibilityRole="button"
             accessibilityLabel="Nouveau poste du mois"
             style={[styles.chip, styles.chipAdd, { borderColor: theme.colors.border }]}

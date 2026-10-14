@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { currentMonthKey, monthOfWeek } from '@/src/utils/dates';
 import { migrateLegacyToV9 } from './legacy';
 
 /**
@@ -292,10 +293,121 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     });
     await db.execAsync('PRAGMA user_version = 13');
   }
+
+  if (current < 14) {
+    await db.withTransactionAsync(async () => {
+      await migrateToMonthlyEnvelopes(db);
+    });
+    await db.execAsync('PRAGMA user_version = 14');
+  }
 }
 
-/** Enveloppes Courses / Autres et les deux poches d'épargne de la méthode. */
+/**
+ * V14 — chaque mois a SES enveloppes, sans lien avec les autres mois.
+ * - `envelope_templates` = « Ma base » : le modèle copié dans un mois quand on
+ *   commence à le remplir (`ensureMonth`).
+ * - `envelopes.month` : le mois de l'enveloppe ; `template_id` : la ligne de
+ *   base dont elle est issue (simple trace, aucun lien de calcul).
+ * - `envelope_months_ready` : mois déjà « ouverts » (leurs enveloppes existent
+ *   et sont indépendantes). Un mois non ouvert suit la base, en lecture seule.
+ * Conversion : la base reprend les enveloppes récurrentes encore actives ; chaque
+ * mois portant des dépenses, un montant propre ou une enveloppe ponctuelle (et le
+ * mois courant) reçoit sa copie des enveloppes
+ * actives ce mois-là avec son montant (propre au mois sinon habituel), et ses
+ * dépenses y sont rattachées. Les anciennes lignes et `envelope_months` disparaissent.
+ */
+async function migrateToMonthlyEnvelopes(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
+    ALTER TABLE envelopes ADD COLUMN month TEXT;
+    ALTER TABLE envelopes ADD COLUMN template_id INTEGER;
+    CREATE INDEX idx_envelopes_month ON envelopes(month);
+    CREATE TABLE envelope_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL,
+      color TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      period TEXT NOT NULL DEFAULT 'week',
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE envelope_months_ready (month TEXT PRIMARY KEY);
+  `);
+
+  type Old = {
+    id: number;
+    name: string;
+    icon: string;
+    color: string;
+    weekly_cents: number;
+    period: string;
+    sort_order: number;
+    start_month: string | null;
+    end_month: string | null;
+  };
+  const olds = await db.getAllAsync<Old>('SELECT * FROM envelopes ORDER BY sort_order, id');
+  const now = currentMonthKey();
+  const active = (o: Old, m: string) => (!o.start_month || o.start_month <= m) && (!o.end_month || o.end_month >= m);
+  const oneOff = (o: Old) => Boolean(o.start_month && o.start_month === o.end_month);
+
+  const templateOf = new Map<number, number>();
+  for (const o of olds) {
+    if (oneOff(o) || (o.end_month && o.end_month < now)) continue;
+    const res = await db.runAsync(
+      'INSERT INTO envelope_templates (name, icon, color, amount_cents, period, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+      [o.name, o.icon, o.color, o.weekly_cents, o.period, o.sort_order],
+    );
+    templateOf.set(o.id, Number(res.lastInsertRowId));
+  }
+
+  const expenses = await db.getAllAsync<{ id: number; envelope_id: number; date: string; week: string; period: string }>(
+    'SELECT x.id, x.envelope_id, x.date, x.week, e.period FROM expenses x JOIN envelopes e ON e.id = x.envelope_id',
+  );
+  const monthOfExpense = (x: { date: string; week: string; period: string }) =>
+    x.period === 'week' ? monthOfWeek(x.week) : x.date.slice(0, 7);
+  const byKey = new Map<string, number[]>(); // `${envelope}|${mois}` → dépenses
+  const months = new Set<string>([now]);
+  for (const x of expenses) {
+    const m = monthOfExpense(x);
+    months.add(m);
+    const key = `${x.envelope_id}|${m}`;
+    byKey.set(key, [...(byKey.get(key) ?? []), x.id]);
+  }
+  const overrides = await db.getAllAsync<{ envelope_id: number; month: string; amount_cents: number }>(
+    'SELECT * FROM envelope_months',
+  );
+  // Un mois préparé à l'avance (montant propre, enveloppe ponctuelle) garde ses réglages.
+  for (const r of overrides) months.add(r.month);
+  for (const o of olds) if (oneOff(o) && o.start_month) months.add(o.start_month);
+
+  for (const m of [...months].sort()) {
+    for (const o of olds) {
+      const ids = byKey.get(`${o.id}|${m}`) ?? [];
+      if (!active(o, m) && ids.length === 0) continue;
+      const amount = overrides.find((r) => r.envelope_id === o.id && r.month === m)?.amount_cents ?? o.weekly_cents;
+      const res = await db.runAsync(
+        `INSERT INTO envelopes (name, icon, color, weekly_cents, period, sort_order, created_at, month, template_id)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)`,
+        [o.name, o.icon, o.color, amount, o.period, o.sort_order, m, templateOf.get(o.id) ?? null],
+      );
+      const newId = Number(res.lastInsertRowId);
+      for (const id of ids) await db.runAsync('UPDATE expenses SET envelope_id = ? WHERE id = ?', [newId, id]);
+    }
+    await db.runAsync('INSERT OR IGNORE INTO envelope_months_ready (month) VALUES (?)', [m]);
+  }
+
+  await db.execAsync(`
+    DELETE FROM envelopes WHERE month IS NULL;
+    DROP TABLE envelope_months;
+  `);
+}
+
+/** Enveloppes Courses / Autres (deviennent « Ma base » en V14) et les deux poches d'épargne. */
 export async function seedDefaults(db: SQLiteDatabase): Promise<void> {
   await db.execAsync(DEFAULT_ENVELOPES);
+  await db.execAsync(DEFAULT_POTS);
+}
+
+/** Les deux poches d'épargne de la méthode (utilisé par « Tout effacer »). */
+export async function seedPots(db: SQLiteDatabase): Promise<void> {
   await db.execAsync(DEFAULT_POTS);
 }

@@ -44,6 +44,8 @@ async function shareFile(fileName: string, content: string, mimeType: string): P
 }
 
 const TABLES = [
+  'envelope_templates',
+  'envelope_months_ready',
   'envelopes',
   'expenses',
   'fixed_items',

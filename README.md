@@ -16,7 +16,7 @@ Calquée sur **Budgetiz** (méthode Deux Sœurs Un Agenda) : simple, sans connex
 - **Analyse** — constats clés du mois (enveloppe dépassée, rythme trop rapide, cagnotte en retard, dépenses vs ta moyenne…), rythme du mois, semaine bouclée à mettre de côté, courbe d'épargne cumulée avec projection à 6 mois, moyennes, répartition par cagnotte.
 - **Mon plan du mois** (Synthèse) — revenus − charges − postes − enveloppes − épargne programmée = reste à répartir, puis le reste prévisionnel avec les dépassements. Une **pastille** sur l'écran Budget passe au rouge dès que le mois l'est, et le formulaire de dépense prévient avant d'enregistrer.
 - **Mon compte** — tu saisis le solde de ton compte courant une fois ; l'app le tient à jour avec ce que tu notes et coches, prévoit le solde de fin de mois et te montre l'écart avec ta banque.
-- **Mes enveloppes** — mois par mois : une enveloppe peut être prévue tous les mois, seulement un mois (« Anniversaire » en novembre), ou avoir un montant propre à un mois (Courses plus haut en décembre).
+- **Mes enveloppes** — chaque mois a ses propres enveloppes, sans lien avec les autres mois. **Ma base** (Courses, Essence, Plaisir…) est copiée dans chaque nouveau mois, puis tu ajustes librement (« Anniversaire » en novembre seulement, Courses plus haut en décembre…).
 - **Les prochains mois** (Synthèse) — le plan de chaque mois à venir (revenus − charges − enveloppes − épargne), sans tenir compte du solde actuel.
 - **Synthèse** — revenus, dépenses, solde, poste le plus dépensé, taux d'épargne, total des avoirs, répartition des dépenses.
 - **Bouton +** — dépense, charge fixe, revenu, frais de santé ou virement d'épargne en un geste.
@@ -62,8 +62,9 @@ src/
 ## 🗄 Modèle de données
 
 ```
-envelopes        (id, name, icon, color, weekly_cents, period week|month, start_month, end_month)
-envelope_months  (envelope_id, month, amount_cents)        montant propre à un mois
+envelope_templates (id, name, icon, color, amount_cents, period)   « Ma base »
+envelopes        (id, month, name, icon, color, weekly_cents, period, template_id)   propres au mois
+envelope_months_ready (month)                              mois commencés (copie de la base faite)
 expenses         (id, envelope_id, label, amount_cents, date, week = lundi)
 fixed_items      (id, kind income|charge, name, amount_cents, day, frequency, start_month, end_month, icon)
 fixed_checks     (item_id, month)                          coche « réglé / crédité »
