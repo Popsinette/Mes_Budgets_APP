@@ -174,7 +174,7 @@ export async function saveExpense(
     );
   } else {
     await db.runAsync(
-      'INSERT INTO expenses (envelope_id, label, amount_cents, date, week) VALUES (?, ?, ?, ?, ?)',
+      "INSERT INTO expenses (envelope_id, label, amount_cents, date, week, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
       [input.envelopeId, input.label, input.amountCents, input.date, week],
     );
   }
@@ -204,7 +204,7 @@ export async function closeWeek(
   await db.withTransactionAsync(async () => {
     if (input.potId && input.amountCents && input.amountCents > 0) {
       await db.runAsync(
-        'INSERT INTO savings_moves (pot_id, amount_cents, date, note, week) VALUES (?, ?, ?, ?, ?)',
+        "INSERT INTO savings_moves (pot_id, amount_cents, date, note, week, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
         [input.potId, input.amountCents, input.date, 'Reste de la semaine', input.week],
       );
     }

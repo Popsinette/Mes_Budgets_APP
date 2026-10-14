@@ -124,7 +124,7 @@ export async function addMove(
   db: SQLiteDatabase,
   input: { potId: number; amountCents: number; date: string; note: string | null },
 ): Promise<void> {
-  await db.runAsync('INSERT INTO savings_moves (pot_id, amount_cents, date, note) VALUES (?, ?, ?, ?)', [
+  await db.runAsync("INSERT INTO savings_moves (pot_id, amount_cents, date, note, created_at) VALUES (?, ?, ?, ?, datetime('now'))", [
     input.potId,
     input.amountCents,
     input.date,
@@ -153,7 +153,7 @@ export async function setPlanDone(
   if (done) {
     if (!pot.monthly_cents) return;
     await db.runAsync(
-      'INSERT OR IGNORE INTO savings_moves (pot_id, amount_cents, date, note, plan_month) VALUES (?, ?, ?, ?, ?)',
+      "INSERT OR IGNORE INTO savings_moves (pot_id, amount_cents, date, note, plan_month, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
       [pot.id, pot.monthly_cents, date, 'Versement programmé', month],
     );
   } else {

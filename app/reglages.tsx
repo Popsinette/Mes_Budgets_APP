@@ -74,6 +74,7 @@ export default function SettingsScreen() {
         void (async () => {
           await db.withTransactionAsync(async () => {
             await db.execAsync(`
+              DELETE FROM account;
               DELETE FROM health_expenses;
               DELETE FROM week_closures;
               DELETE FROM savings_moves;
