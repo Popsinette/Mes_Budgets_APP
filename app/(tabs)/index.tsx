@@ -54,7 +54,14 @@ export default function BudgetScreen() {
       <AppHeader title="Mon budget" />
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
       <ForecastPill month={month} />
-      <AccountCard />
+      {month === currentMonthKey() ? (
+        <AccountCard />
+      ) : month > currentMonthKey() ? (
+        <Caption style={{ textAlign: 'center' }}>
+          Mois à venir : le prévisionnel est ton plan (revenus − charges − enveloppes − épargne), sans tenir compte de
+          ton solde actuel.
+        </Caption>
+      ) : null}
       <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />
       {tab === 'variables' ? <VariablesTab month={month} /> : null}
       {tab === 'fixes' ? <FixedTab month={month} kind="charge" /> : null}
