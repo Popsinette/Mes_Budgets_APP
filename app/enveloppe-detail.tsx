@@ -33,7 +33,7 @@ export default function EnvelopeDetail() {
   const id = Number(params.id);
   const thisWeek = currentWeekKey();
   const { data: envelopes } = useLiveQuery((db) => listEnvelopesForMonth(db, month, thisWeek), [month, thisWeek]);
-  const { data: expenses } = useLiveQuery((db) => listExpensesForEnvelope(db, id, month), [id, month]);
+  const { data: expenses } = useLiveQuery((db) => listExpensesForEnvelope(db, id), [id]);
   const envelope = envelopes?.find((e) => e.id === id);
   if (!envelope) return <Screen />;
 
