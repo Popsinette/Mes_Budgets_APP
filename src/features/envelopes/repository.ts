@@ -3,10 +3,16 @@ import { invalidateQueries } from '@/src/store/invalidation';
 import { weekKeyOf, weeksOfMonth, type MonthKey, type WeekKey } from '@/src/utils/dates';
 
 /**
- * Enveloppes hebdomadaires (méthode Budgetiz) : un montant par semaine,
- * du lundi au dimanche. Le reste d'une semaine terminée peut être mis de
- * côté dans une poche d'épargne (voir `closeWeek`).
+ * Enveloppes (méthode Budgetiz) :
+ * - période « week » : budget variable (Courses, Autres…), montant par semaine,
+ *   du lundi au dimanche ; une semaine appartient au mois de son lundi. Le
+ *   reste d'une semaine terminée peut être mis de côté (voir `closeWeek`).
+ * - période « month » : poste suivi avec les Fixes (Essence, Garderie…),
+ *   montant par mois civil.
+ * `weekly_cents` porte le montant de la période, quelle qu'elle soit.
  */
+
+export type EnvelopePeriod = 'week' | 'month';
 
 export type Envelope = {
   id: number;
@@ -14,10 +20,19 @@ export type Envelope = {
   icon: string;
   color: string;
   weekly_cents: number;
+  period: EnvelopePeriod;
   sort_order: number;
 };
 
 export type EnvelopeWithSpending = Envelope & { spent_cents: number };
+
+export type EnvelopeForMonth = Envelope & {
+  /** Budget du mois : montant × nb de semaines (week) ou montant (month). */
+  budget_cents: number;
+  spent_cents: number;
+  /** Semaine en cours (si elle appartient au mois) : dépensé. */
+  week_spent_cents: number;
+};
 
 export type Expense = {
   id: number;
@@ -29,6 +44,7 @@ export type Expense = {
   envelope_name: string;
   envelope_icon: string;
   envelope_color: string;
+  envelope_period: EnvelopePeriod;
 };
 
 // ---------- Enveloppes ----------
@@ -41,11 +57,38 @@ export async function getEnvelope(db: SQLiteDatabase, id: number): Promise<Envel
   return db.getFirstAsync<Envelope>('SELECT * FROM envelopes WHERE id = ?', [id]);
 }
 
+/**
+ * Enveloppes avec leur budget et leurs dépenses du mois. Une enveloppe
+ * hebdomadaire compte les semaines du mois (lundis), une mensuelle le mois civil.
+ */
+export async function listEnvelopesForMonth(
+  db: SQLiteDatabase,
+  month: MonthKey,
+  currentWeek: WeekKey,
+): Promise<EnvelopeForMonth[]> {
+  const weeks = weeksOfMonth(month);
+  const rows = await db.getAllAsync<Envelope & { spent_week_based: number; spent_month_based: number; week_spent_cents: number }>(
+    `SELECT e.*,
+       COALESCE((SELECT SUM(amount_cents) FROM expenses x WHERE x.envelope_id = e.id AND x.week >= ? AND x.week <= ?), 0) AS spent_week_based,
+       COALESCE((SELECT SUM(amount_cents) FROM expenses x WHERE x.envelope_id = e.id AND substr(x.date, 1, 7) = ?), 0) AS spent_month_based,
+       COALESCE((SELECT SUM(amount_cents) FROM expenses x WHERE x.envelope_id = e.id AND x.week = ?), 0) AS week_spent_cents
+     FROM envelopes e
+     ORDER BY e.sort_order, e.id`,
+    [weeks[0], weeks[weeks.length - 1], month, currentWeek],
+  );
+  return rows.map(({ spent_week_based, spent_month_based, ...e }) => ({
+    ...e,
+    budget_cents: e.period === 'week' ? e.weekly_cents * weeks.length : e.weekly_cents,
+    spent_cents: e.period === 'week' ? spent_week_based : spent_month_based,
+  }));
+}
+
 export async function listEnvelopesForWeek(db: SQLiteDatabase, week: WeekKey): Promise<EnvelopeWithSpending[]> {
   return db.getAllAsync<EnvelopeWithSpending>(
     `SELECT e.*, COALESCE(SUM(x.amount_cents), 0) AS spent_cents
      FROM envelopes e
      LEFT JOIN expenses x ON x.envelope_id = e.id AND x.week = ?
+     WHERE e.period = 'week'
      GROUP BY e.id
      ORDER BY e.sort_order, e.id`,
     [week],
@@ -54,21 +97,18 @@ export async function listEnvelopesForWeek(db: SQLiteDatabase, week: WeekKey): P
 
 export async function saveEnvelope(
   db: SQLiteDatabase,
-  input: { id?: number; name: string; icon: string; color: string; weeklyCents: number },
+  input: { id?: number; name: string; icon: string; color: string; weeklyCents: number; period: EnvelopePeriod },
 ): Promise<void> {
   if (input.id) {
-    await db.runAsync('UPDATE envelopes SET name = ?, icon = ?, color = ?, weekly_cents = ? WHERE id = ?', [
-      input.name,
-      input.icon,
-      input.color,
-      input.weeklyCents,
-      input.id,
-    ]);
+    await db.runAsync(
+      'UPDATE envelopes SET name = ?, icon = ?, color = ?, weekly_cents = ?, period = ? WHERE id = ?',
+      [input.name, input.icon, input.color, input.weeklyCents, input.period, input.id],
+    );
   } else {
     await db.runAsync(
-      `INSERT INTO envelopes (name, icon, color, weekly_cents, sort_order, created_at)
-       VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM envelopes), datetime('now'))`,
-      [input.name, input.icon, input.color, input.weeklyCents],
+      `INSERT INTO envelopes (name, icon, color, weekly_cents, period, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM envelopes), datetime('now'))`,
+      [input.name, input.icon, input.color, input.weeklyCents, input.period],
     );
   }
   invalidateQueries();
@@ -83,11 +123,39 @@ export async function deleteEnvelope(db: SQLiteDatabase, id: number): Promise<vo
 // ---------- Dépenses ----------
 
 const EXPENSE_SELECT = `
-  SELECT x.*, e.name AS envelope_name, e.icon AS envelope_icon, e.color AS envelope_color
+  SELECT x.*, e.name AS envelope_name, e.icon AS envelope_icon, e.color AS envelope_color,
+    e.period AS envelope_period
   FROM expenses x JOIN envelopes e ON e.id = x.envelope_id`;
 
-export async function listExpensesForWeek(db: SQLiteDatabase, week: WeekKey): Promise<Expense[]> {
-  return db.getAllAsync<Expense>(`${EXPENSE_SELECT} WHERE x.week = ? ORDER BY x.date DESC, x.id DESC`, [week]);
+/** Condition « la dépense appartient au mois » selon la période de son enveloppe. */
+const IN_MONTH = `((e.period = 'week' AND x.week >= ? AND x.week <= ?) OR (e.period = 'month' AND substr(x.date, 1, 7) = ?))`;
+
+function monthParams(month: MonthKey): string[] {
+  const weeks = weeksOfMonth(month);
+  return [weeks[0], weeks[weeks.length - 1], month];
+}
+
+/** Dépenses du mois, d'une période d'enveloppe donnée (Variables = week, postes des Fixes = month). */
+export async function listExpensesForMonth(
+  db: SQLiteDatabase,
+  month: MonthKey,
+  period: EnvelopePeriod,
+): Promise<Expense[]> {
+  return db.getAllAsync<Expense>(
+    `${EXPENSE_SELECT} WHERE e.period = ? AND ${IN_MONTH} ORDER BY x.date DESC, x.id DESC`,
+    [period, ...monthParams(month)],
+  );
+}
+
+export async function listExpensesForEnvelope(
+  db: SQLiteDatabase,
+  envelopeId: number,
+  month: MonthKey,
+): Promise<Expense[]> {
+  return db.getAllAsync<Expense>(
+    `${EXPENSE_SELECT} WHERE x.envelope_id = ? AND ${IN_MONTH} ORDER BY x.date DESC, x.id DESC`,
+    [envelopeId, ...monthParams(month)],
+  );
 }
 
 export async function getExpense(db: SQLiteDatabase, id: number): Promise<Expense | null> {
@@ -116,32 +184,6 @@ export async function saveExpense(
 export async function deleteExpense(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM expenses WHERE id = ?', [id]);
   invalidateQueries();
-}
-
-// ---------- Bilan ----------
-
-export type WeekSummary = { week: WeekKey; budget_cents: number; spent_cents: number };
-
-/**
- * Semaines d'un mois (une semaine appartient au mois de son lundi) : budget
- * des enveloppes et total dépensé, semaine par semaine.
- */
-export async function getMonthWeeks(db: SQLiteDatabase, month: MonthKey): Promise<WeekSummary[]> {
-  const weeks = weeksOfMonth(month);
-  const [budget, rows] = await Promise.all([
-    db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(weekly_cents), 0) AS total FROM envelopes'),
-    db.getAllAsync<{ week: string; spent: number }>(
-      `SELECT week, SUM(amount_cents) AS spent FROM expenses
-       WHERE week >= ? AND week <= ? GROUP BY week`,
-      [weeks[0], weeks[weeks.length - 1]],
-    ),
-  ]);
-  const spentByWeek = new Map(rows.map((r) => [r.week, r.spent]));
-  return weeks.map((week) => ({
-    week,
-    budget_cents: budget?.total ?? 0,
-    spent_cents: spentByWeek.get(week) ?? 0,
-  }));
 }
 
 // ---------- Fin de semaine ----------

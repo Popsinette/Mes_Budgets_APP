@@ -14,7 +14,7 @@ export function SectionHeader({ title, actionLabel, onAction }: SectionHeaderPro
     <View style={styles.row}>
       <Text style={[styles.title, { color: theme.colors.textMuted }]}>{title}</Text>
       {actionLabel && onAction ? (
-        <Pressable onPress={onAction} hitSlop={8}>
+        <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button" accessibilityLabel={actionLabel}>
           <Text style={[styles.action, { color: theme.colors.text }]}>{actionLabel}</Text>
         </Pressable>
       ) : null}

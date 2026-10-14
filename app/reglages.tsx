@@ -66,13 +66,14 @@ export default function SettingsScreen() {
     confirmAction({
       title: 'Tout effacer',
       message:
-        'Toutes vos données (dépenses, enveloppes, revenus et charges fixes, épargne) seront définitivement supprimées de cet appareil. Cette action est irréversible.',
+        'Toutes vos données (dépenses, enveloppes, revenus et charges fixes, santé, cagnottes) seront définitivement supprimées de cet appareil. Cette action est irréversible.',
       confirmLabel: 'Tout effacer',
       destructive: true,
       onConfirm: () => {
         void (async () => {
           await db.withTransactionAsync(async () => {
             await db.execAsync(`
+              DELETE FROM health_expenses;
               DELETE FROM week_closures;
               DELETE FROM savings_moves;
               DELETE FROM savings_pots;
@@ -177,7 +178,7 @@ export default function SettingsScreen() {
           Mes Budgets · version {Constants.expoConfig?.version ?? '0.1.0'}
         </Body>
         <Body tone="muted" size={13.5}>
-          Charges fixes, enveloppes de la semaine et épargne — 100 % local.
+          Budget variable, charges fixes, revenus, santé et cagnottes — 100 % local.
         </Body>
       </Card>
     </Screen>

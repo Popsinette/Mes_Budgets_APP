@@ -1,17 +1,22 @@
 /** Tous les montants sont stockés en centimes (entiers) pour éviter les erreurs de virgule flottante. */
 
-export function formatCents(cents: number, options?: { signed?: boolean }): string {
+/**
+ * `compact` : sans centimes quand le montant est rond (« 24 700 € »), pour les
+ * petites cartes ; sinon toujours deux décimales.
+ */
+export function formatCents(cents: number, options?: { signed?: boolean; compact?: boolean }): string {
   const euros = cents / 100;
+  const digits = options?.compact && cents % 100 === 0 ? 0 : 2;
   let formatted: string;
   try {
     formatted = new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'EUR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
     }).format(Math.abs(euros));
   } catch {
-    formatted = `${Math.abs(euros).toFixed(2).replace('.', ',')} €`;
+    formatted = `${Math.abs(euros).toFixed(digits).replace('.', ',')} €`;
   }
   if (options?.signed) {
     return `${cents < 0 ? '−' : '+'}${formatted}`;

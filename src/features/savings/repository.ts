@@ -24,6 +24,7 @@ export type Pot = {
   initial_cents: number;
   target_cents: number | null;
   monthly_cents: number | null;
+  deadline: string | null;
   sort_order: number;
 };
 
@@ -75,6 +76,7 @@ export async function savePot(
     initialCents: number;
     targetCents: number | null;
     monthlyCents: number | null;
+    deadline: string | null;
   },
 ): Promise<void> {
   const values = [
@@ -85,17 +87,19 @@ export async function savePot(
     input.initialCents,
     input.targetCents,
     input.monthlyCents,
+    input.deadline,
   ];
   if (input.id) {
     await db.runAsync(
-      `UPDATE savings_pots SET name = ?, icon = ?, color = ?, kind = ?, initial_cents = ?, target_cents = ?, monthly_cents = ?
+      `UPDATE savings_pots SET name = ?, icon = ?, color = ?, kind = ?, initial_cents = ?, target_cents = ?, monthly_cents = ?,
+         deadline = ?
        WHERE id = ?`,
       [...values, input.id],
     );
   } else {
     await db.runAsync(
-      `INSERT INTO savings_pots (name, icon, color, kind, initial_cents, target_cents, monthly_cents, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM savings_pots), datetime('now'))`,
+      `INSERT INTO savings_pots (name, icon, color, kind, initial_cents, target_cents, monthly_cents, deadline, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM savings_pots), datetime('now'))`,
       values,
     );
   }
@@ -165,4 +169,29 @@ export async function getMonthSaved(db: SQLiteDatabase, month: MonthKey): Promis
     [month],
   );
   return row?.total ?? 0;
+}
+
+export type MoveWithPot = SavingsMove & { pot_name: string; pot_icon: string; pot_color: string };
+
+/** Tous les mouvements (« Mes virements »), du plus récent au plus ancien. */
+export async function listAllMoves(db: SQLiteDatabase): Promise<MoveWithPot[]> {
+  return db.getAllAsync<MoveWithPot>(
+    `SELECT m.*, p.name AS pot_name, p.icon AS pot_icon, p.color AS pot_color
+     FROM savings_moves m JOIN savings_pots p ON p.id = m.pot_id
+     ORDER BY m.date DESC, m.id DESC`,
+  );
+}
+
+/** Mouvements nets par mois ('yyyy-MM' → centimes) et total des valeurs de départ. */
+export async function getSavingsHistory(
+  db: SQLiteDatabase,
+): Promise<{ initial_cents: number; months: Array<{ month: MonthKey; net_cents: number }> }> {
+  const [initial, months] = await Promise.all([
+    db.getFirstAsync<{ total: number }>('SELECT COALESCE(SUM(initial_cents), 0) AS total FROM savings_pots'),
+    db.getAllAsync<{ month: MonthKey; net_cents: number }>(
+      `SELECT substr(date, 1, 7) AS month, SUM(amount_cents) AS net_cents
+       FROM savings_moves GROUP BY substr(date, 1, 7) ORDER BY month`,
+    ),
+  ]);
+  return { initial_cents: initial?.total ?? 0, months };
 }

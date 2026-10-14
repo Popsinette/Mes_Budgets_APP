@@ -1,78 +1,75 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Button } from '@/src/components/ui/Button';
+import { ProgressRing } from '@/src/components/charts/ProgressRing';
+import { AppHeader } from '@/src/components/ui/AppHeader';
 import { Card } from '@/src/components/ui/Card';
-import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
+import { CheckRow } from '@/src/components/ui/CheckRow';
 import { EmptyState } from '@/src/components/ui/EmptyState';
-import { FAB } from '@/src/components/ui/FAB';
-import { WeekSwitcher } from '@/src/components/ui/MonthSwitcher';
-import { ProgressBar } from '@/src/components/ui/ProgressBar';
+import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { Screen } from '@/src/components/ui/Screen';
-import { SectionHeader } from '@/src/components/ui/SectionHeader';
-import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
+import { Segmented } from '@/src/components/ui/Segmented';
+import { StatTrio } from '@/src/components/ui/StatTrio';
+import { Body, Caption, Heading, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
-  closeWeek,
   deleteExpense,
-  isWeekClosed,
-  listEnvelopesForWeek,
-  listExpensesForWeek,
-  type EnvelopeWithSpending,
+  listEnvelopesForMonth,
+  listExpensesForMonth,
+  type EnvelopeForMonth,
   type Expense,
 } from '@/src/features/envelopes/repository';
-import { useSelectedWeek } from '@/src/store/week';
-import { spacing, useTheme } from '@/src/theme';
-import {
-  currentWeekKey,
-  daysLeftInWeek,
-  longDayLabel,
-  shiftWeekKey,
-  todayIso,
-  weekLabel,
-  weekPaceRatio,
-} from '@/src/utils/dates';
+import { listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/src/features/fixed/repository';
+import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
+import { ExpenseList } from '@/src/components/ExpenseList';
+import { useSelectedMonth } from '@/src/store/month';
+import { radius, spacing, useTheme } from '@/src/theme';
+import { currentMonthKey, currentWeekKey, numericDate, weekProgressLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
-const remainingOf = (envelopes: EnvelopeWithSpending[] | undefined) =>
-  (envelopes ?? []).reduce((sum, e) => sum + e.weekly_cents - e.spent_cents, 0);
+type Tab = 'variables' | 'fixes' | 'revenus' | 'sante';
 
-export default function WeekScreen() {
-  const theme = useTheme();
-  const db = useSQLiteContext();
-  const week = useSelectedWeek((s) => s.week);
-  const setWeek = useSelectedWeek((s) => s.setWeek);
+const SEGMENTS: Array<{ key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  { key: 'variables', label: 'Variables', icon: 'basket-outline' },
+  { key: 'fixes', label: 'Fixes', icon: 'receipt-outline' },
+  { key: 'revenus', label: 'Revenus', icon: 'wallet-outline' },
+  { key: 'sante', label: 'Santé', icon: 'medkit-outline' },
+];
 
-  const thisWeek = currentWeekKey();
-  const isCurrent = week === thisWeek;
-  const isPast = week < thisWeek;
-  // Semaine à « solder » : celle affichée si elle est terminée, sinon la précédente.
-  const closingWeek = isPast ? week : isCurrent ? shiftWeekKey(week, -1) : null;
+const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);
 
-  const { data: envelopes } = useLiveQuery((db) => listEnvelopesForWeek(db, week), [week]);
-  const { data: expenses } = useLiveQuery((db) => listExpensesForWeek(db, week), [week]);
-  const { data: closing } = useLiveQuery(
-    async (db) => {
-      if (!closingWeek) return null;
-      const [closed, list] = await Promise.all([
-        isWeekClosed(db, closingWeek),
-        listEnvelopesForWeek(db, closingWeek),
-      ]);
-      // Une semaine sans aucune dépense n'a pas été suivie (app pas encore utilisée) : rien à solder.
-      const tracked = list.some((e) => e.spent_cents > 0);
-      return { closed: closed || !tracked, leftover: remainingOf(list) };
-    },
-    [closingWeek],
+export default function BudgetScreen() {
+  const month = useSelectedMonth((s) => s.month);
+  const setMonth = useSelectedMonth((s) => s.setMonth);
+  const [tab, setTab] = useState<Tab>('variables');
+
+  return (
+    <Screen bottomInset={90}>
+      <AppHeader title="Mon budget" />
+      <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
+      <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />
+      {tab === 'variables' ? <VariablesTab month={month} /> : null}
+      {tab === 'fixes' ? <FixedTab month={month} kind="charge" /> : null}
+      {tab === 'revenus' ? <FixedTab month={month} kind="income" /> : null}
+      {tab === 'sante' ? <HealthTab month={month} /> : null}
+    </Screen>
   );
+}
 
-  const budget = (envelopes ?? []).reduce((sum, e) => sum + e.weekly_cents, 0);
-  const remaining = remainingOf(envelopes);
-  const daysLeft = daysLeftInWeek(week);
-  const showClosing = closingWeek && closing && !closing.closed && closing.leftover > 0;
+/* ─────────────── Variables : enveloppes de la semaine ─────────────── */
 
-  const confirmDelete = (expense: Expense) => {
+function VariablesTab({ month }: { month: string }) {
+  const db = useSQLiteContext();
+  const week = currentWeekKey();
+  const { data: envelopes } = useLiveQuery((db) => listEnvelopesForMonth(db, month, week), [month, week]);
+  const { data: expenses } = useLiveQuery((db) => listExpensesForMonth(db, month, 'week'), [month]);
+  const weekly = (envelopes ?? []).filter((e) => e.period === 'week');
+
+  const confirmDelete = (expense: Expense) =>
     confirmAction({
       title: 'Supprimer la dépense',
       message: `Supprimer « ${expense.label} » (${formatCents(expense.amount_cents)}) ?`,
@@ -80,227 +77,405 @@ export default function WeekScreen() {
       destructive: true,
       onConfirm: () => void deleteExpense(db, expense.id),
     });
-  };
-
-  // Dépenses groupées par jour (déjà triées du plus récent au plus ancien).
-  const days: Array<{ day: string; items: Expense[] }> = [];
-  for (const expense of expenses ?? []) {
-    const last = days[days.length - 1];
-    if (last && last.day === expense.date) last.items.push(expense);
-    else days.push({ day: expense.date, items: [expense] });
-  }
 
   return (
-    <View style={{ flex: 1 }}>
-      <Screen bottomInset={80}>
-        <View style={styles.headerRow}>
-          <Title>Ma semaine</Title>
+    <>
+      <View style={styles.grid}>
+        {weekly.map((envelope) => (
+          <EnvelopeCard key={envelope.id} envelope={envelope} month={month} />
+        ))}
+        <AddTile label="Enveloppe" onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'week' } })} />
+      </View>
+
+      <Heading style={styles.sectionTitle}>Dernières dépenses</Heading>
+      <ExpenseList
+        expenses={expenses ?? []}
+        empty="Note chaque achat dès que tu le fais : ton reste se met à jour."
+        onDelete={confirmDelete}
+      />
+    </>
+  );
+}
+
+function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: string }) {
+  const theme = useTheme();
+  const left = envelope.budget_cents - envelope.spent_cents;
+  const ratio = envelope.budget_cents > 0 ? envelope.spent_cents / envelope.budget_cents : 0;
+  const isCurrent = month === currentMonthKey();
+  const weekLeft = envelope.weekly_cents - envelope.week_spent_cents;
+  return (
+    <Card
+      style={styles.envelopeCard}
+      onPress={() => router.push({ pathname: '/enveloppe-detail', params: { id: String(envelope.id), month } })}
+    >
+      <Body weight="semibold" size={16} numberOfLines={1}>
+        {envelope.name}
+      </Body>
+      <Body size={15}>
+        <Body weight="bold" size={15}>
+          {formatCents(envelope.spent_cents)}
+        </Body>
+        {` / ${formatCents(envelope.budget_cents)}`}
+      </Body>
+      <View style={styles.ringRow}>
+        <ProgressRing ratio={ratio} color={ratio > 1 ? theme.colors.danger : envelope.color} size={92} strokeWidth={6}>
+          <View style={[styles.ringCenter, { backgroundColor: envelope.color }]}>
+            <Ionicons
+              name={(envelope.icon in Ionicons.glyphMap ? envelope.icon : 'pricetag-outline') as keyof typeof Ionicons.glyphMap}
+              size={30}
+              color={theme.colors.onAccent}
+            />
+          </View>
+        </ProgressRing>
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.text} style={styles.chevron} />
+      </View>
+      <View style={[styles.envelopeFooter, { borderTopColor: theme.colors.hairline }]}>
+        <Body size={14} weight="semibold" style={{ fontStyle: 'italic' }} tone={left < 0 ? 'danger' : 'text'}>
+          {left < 0 ? 'Dépassé' : 'Reste'} : {formatCents(Math.abs(left))}
+        </Body>
+        {isCurrent && envelope.weekly_cents > 0 ? (
+          <Caption tone={weekLeft < 0 ? 'danger' : 'muted'}>
+            Cette semaine : {formatCents(weekLeft)}
+          </Caption>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+function AddTile({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Nouvelle ${label.toLowerCase()}`}
+      style={[styles.addTile, { borderColor: theme.colors.border }]}
+    >
+      <Ionicons name="add" size={18} color={theme.colors.textMuted} />
+      <Caption>{label}</Caption>
+    </Pressable>
+  );
+}
+
+/* ─────────────── Fixes & Revenus ─────────────── */
+
+function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' }) {
+  const theme = useTheme();
+  const db = useSQLiteContext();
+  const { data: items } = useLiveQuery((db) => listFixedForMonth(db, month), [month]);
+  const { data: envelopes } = useLiveQuery(
+    (db) => listEnvelopesForMonth(db, month, currentWeekKey()),
+    [month],
+  );
+  const list = (items ?? []).filter((i) => i.kind === kind);
+  const postes = (envelopes ?? []).filter((e) => e.period === 'month');
+  const isCharge = kind === 'charge';
+  const total = list.reduce((s, i) => s + i.amount_cents, 0);
+  const done = list.filter((i) => i.checked).reduce((s, i) => s + i.amount_cents, 0);
+  const isCurrent = month === currentMonthKey();
+  const today = new Date().getDate();
+
+  const toggle = (item: FixedItemForMonth) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void setFixedChecked(db, item.id, month, !item.checked);
+  };
+
+  return (
+    <>
+      <SectionTitle icon="bar-chart" label={isCharge ? 'Suivi des dépenses' : 'Suivi des revenus'} />
+      <StatTrio
+        stats={[
+          { label: 'Total', cents: total, icon: 'wallet-outline', color: theme.colors.secondary },
+          {
+            label: isCharge ? 'Réglé' : 'Crédité',
+            cents: done,
+            icon: 'checkmark-circle-outline',
+            color: theme.colors.rose,
+          },
+          {
+            label: isCharge ? 'À débiter' : 'À créditer',
+            cents: total - done,
+            icon: 'time-outline',
+            color: theme.colors.navy,
+            accent: isCharge ? theme.colors.primary : theme.colors.navy,
+          },
+        ]}
+        ratio={total > 0 ? done / total : 0}
+        ratioLabel={`${pct(done, total)} % ${isCharge ? 'réglé' : 'crédité'}`}
+      />
+
+      {isCharge ? (
+        <View style={styles.chips}>
+          {postes.map((poste) => (
+            <Pressable
+              key={poste.id}
+              onPress={() => router.push({ pathname: '/enveloppe-detail', params: { id: String(poste.id), month } })}
+              accessibilityRole="button"
+              accessibilityLabel={`${poste.name} : ${formatCents(poste.spent_cents)} sur ${formatCents(poste.budget_cents)}`}
+              style={[styles.chip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+            >
+              <View style={[styles.chipHead, { backgroundColor: poste.color }]}>
+                <Ionicons
+                  name={(poste.icon in Ionicons.glyphMap ? poste.icon : 'pricetag-outline') as keyof typeof Ionicons.glyphMap}
+                  size={14}
+                  color={theme.colors.onAccent}
+                />
+                <Body size={13} weight="semibold" color={theme.colors.onAccent} numberOfLines={1}>
+                  {poste.name}
+                </Body>
+              </View>
+              <View style={styles.chipBody}>
+                <Body
+                  size={13.5}
+                  weight="semibold"
+                  tone={poste.spent_cents > poste.budget_cents ? 'danger' : 'text'}
+                  numberOfLines={1}
+                >
+                  {formatCents(poste.spent_cents, { compact: true })}/{formatCents(poste.budget_cents, { compact: true })}
+                </Body>
+                <Ionicons name="chevron-forward" size={14} color={theme.colors.textMuted} />
+              </View>
+            </Pressable>
+          ))}
           <Pressable
-            hitSlop={8}
-            onPress={() => router.push('/reglages')}
+            onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month' } })}
             accessibilityRole="button"
-            accessibilityLabel="Réglages"
-            style={[styles.roundButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+            accessibilityLabel="Nouveau poste du mois"
+            style={[styles.chip, styles.chipAdd, { borderColor: theme.colors.border }]}
           >
-            <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
+            <Ionicons name="add" size={16} color={theme.colors.textMuted} />
+            <Caption>Poste</Caption>
           </Pressable>
         </View>
+      ) : null}
 
-        <WeekSwitcher week={week} onChange={setWeek} />
-
-        {/* Héros : ce qu'il reste à dépenser jusqu'à dimanche. */}
-        <View>
-          <Eyebrow>
-            {isCurrent ? 'Il me reste jusqu’à dimanche' : isPast ? 'Reste de la semaine' : 'Budget de la semaine'}
-          </Eyebrow>
-          <Money
-            cents={remaining}
-            size={46}
-            weight="xbold"
-            tone={remaining < 0 ? 'danger' : 'text'}
-            style={{ marginTop: 2 }}
+      {list.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={isCharge ? 'receipt-outline' : 'wallet-outline'}
+            title={isCharge ? 'Aucune charge fixe' : 'Aucun revenu'}
+            subtitle={
+              isCharge
+                ? 'Loyer, électricité, abonnements… ajoute-les avec le bouton +.'
+                : 'Salaire, CAF… ajoute-les avec le bouton +.'
+            }
           />
-          <Caption style={{ marginTop: 4 }}>
-            {budget === 0
-              ? 'Fixe le montant de tes enveloppes pour commencer.'
-              : isCurrent && remaining > 0
-                ? `${daysLeft} jour${daysLeft > 1 ? 's' : ''} restant${daysLeft > 1 ? 's' : ''} · soit ${formatCents(Math.floor(remaining / daysLeft))} par jour`
-                : `sur ${formatCents(budget)} prévus cette semaine`}
-          </Caption>
-        </View>
+        </Card>
+      ) : (
+        <Card style={styles.listCard}>
+          {list.map((item, i) => {
+            const late = !item.checked && isCurrent && item.day < today;
+            return (
+              <CheckRow
+                key={item.id}
+                icon={item.icon ?? (isCharge ? 'receipt-outline' : 'cash-outline')}
+                iconColor={late ? theme.colors.danger : theme.colors.secondary}
+                title={item.name}
+                subtitle={`Le ${item.day} du mois${late ? (isCharge ? ' · en retard' : ' · attendu') : ''}`}
+                cents={item.amount_cents}
+                sign={isCharge ? -1 : 1}
+                checked={item.checked}
+                onToggle={() => toggle(item)}
+                onPress={() => router.push({ pathname: '/fixe', params: { id: String(item.id), month } })}
+                last={i === list.length - 1}
+              />
+            );
+          })}
+        </Card>
+      )}
+    </>
+  );
+}
 
-        {showClosing ? (
-          <Card style={{ gap: spacing.md, backgroundColor: theme.colors.successSoft, borderColor: theme.colors.successSoft }}>
-            <View style={{ gap: 2 }}>
-              <Body weight="semibold">Bravo ! Semaine du {weekLabel(closingWeek)} terminée</Body>
-              <Caption>
-                Il te reste {formatCents(closing.leftover)} sur tes enveloppes. Mets-les de côté dans une poche
-                d’épargne.
-              </Caption>
-            </View>
-            <View style={styles.buttonsRow}>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="Mettre de côté"
-                  onPress={() =>
-                    router.push({
-                      pathname: '/mouvement',
-                      params: { week: closingWeek, amount: String(closing.leftover) },
-                    })
-                  }
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="Pas cette fois"
-                  variant="secondary"
-                  onPress={() => void closeWeek(db, { week: closingWeek, date: todayIso() })}
-                />
-              </View>
-            </View>
-          </Card>
-        ) : null}
+/* ─────────────── Santé ─────────────── */
 
-        <SectionHeader
-          title="Mes enveloppes"
-          actionLabel="Nouvelle"
-          onAction={() => router.push('/enveloppe')}
-        />
-        {(envelopes ?? []).map((envelope) => {
-          const left = envelope.weekly_cents - envelope.spent_cents;
-          const ratio = envelope.weekly_cents > 0 ? envelope.spent_cents / envelope.weekly_cents : 0;
-          return (
-            <Card
-              key={envelope.id}
-              style={{ gap: spacing.md }}
-              onPress={() => router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })}
-            >
-              <View style={styles.envelopeRow}>
-                <CategoryIcon icon={envelope.icon} color={envelope.color} size={42} />
-                <View style={{ flex: 1, gap: 1 }}>
-                  <Body weight="semibold" size={15.5}>
-                    {envelope.name}
-                  </Body>
-                  <Caption>
-                    {envelope.weekly_cents === 0
-                      ? 'Touchez pour fixer le montant'
-                      : `Dépensé ${formatCents(envelope.spent_cents)} sur ${formatCents(envelope.weekly_cents)}`}
-                  </Caption>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Money cents={left} size={20} weight="bold" tone={left < 0 ? 'danger' : 'text'} />
-                  <Caption>{left < 0 ? 'de dépassement' : 'restant'}</Caption>
-                </View>
-              </View>
-              {envelope.weekly_cents > 0 ? (
-                <ProgressBar
-                  ratio={ratio}
-                  color={ratio > 1 ? theme.colors.danger : ratio > 0.9 ? theme.colors.warning : envelope.color}
-                  markerRatio={weekPaceRatio(week)}
-                />
-              ) : null}
-              <Pressable
-                onPress={() =>
-                  router.push({ pathname: '/depense', params: { week, envelopeId: String(envelope.id) } })
-                }
-                accessibilityRole="button"
-                accessibilityLabel={`Ajouter une dépense ${envelope.name}`}
-                style={[styles.addRow, { borderColor: theme.colors.border }]}
-              >
-                <Ionicons name="add" size={17} color={theme.colors.text} />
-                <Body weight="semibold" size={13.5}>
-                  Dépense {envelope.name}
-                </Body>
-              </Pressable>
-            </Card>
-          );
-        })}
+function HealthTab({ month }: { month: string }) {
+  const theme = useTheme();
+  const db = useSQLiteContext();
+  const { data: items } = useLiveQuery((db) => listHealthForMonth(db, month), [month]);
+  const list = items ?? [];
+  const advanced = list.reduce((s, h) => s + h.amount_cents, 0);
+  const refund = list.reduce((s, h) => s + h.refund_cents, 0);
 
-        <SectionHeader title="Dépenses de la semaine" />
-        {days.length === 0 ? (
-          <Card>
-            <EmptyState
-              icon="receipt-outline"
-              title="Aucune dépense"
-              subtitle="Note chaque achat dès que tu le fais : ton reste jusqu’à dimanche se met à jour."
-            />
-          </Card>
-        ) : (
-          <Card style={{ paddingVertical: spacing.sm }}>
-            {days.map(({ day, items }, dayIndex) => (
-              <View key={day}>
-                <Eyebrow style={{ marginTop: dayIndex === 0 ? spacing.xs : spacing.md, marginBottom: spacing.xs }}>
-                  {longDayLabel(day)}
-                </Eyebrow>
-                {items.map((expense) => (
-                  <Pressable
-                    key={expense.id}
-                    onPress={() => router.push({ pathname: '/depense', params: { id: String(expense.id) } })}
-                    onLongPress={() => confirmDelete(expense)}
-                    style={({ pressed }) => [styles.expenseRow, { opacity: pressed ? 0.6 : 1 }]}
+  const settle = (item: HealthExpense) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void setHealthSettled(db, item.id, item.settled !== 1);
+  };
+
+  return (
+    <>
+      <StatTrio
+        stats={[
+          { label: 'Avancé', cents: advanced, icon: 'wallet-outline', color: theme.colors.secondary },
+          { label: 'Remboursé', cents: refund, icon: 'checkmark-circle-outline', color: theme.colors.rose },
+          {
+            label: 'Reste à charge',
+            cents: advanced - refund,
+            icon: 'time-outline',
+            color: theme.colors.navy,
+            accent: theme.colors.primary,
+          },
+        ]}
+      />
+      {list.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon="medkit-outline"
+            title="Aucun frais de santé"
+            subtitle="Note ce que tu avances (pharmacie, médecin…) et le remboursement attendu."
+          />
+        </Card>
+      ) : (
+        <Card style={styles.listCard}>
+          {list.map((item, i) => (
+            <CheckRow
+              key={item.id}
+              icon={item.settled ? 'checkmark-done-outline' : 'medkit-outline'}
+              iconColor={item.settled ? theme.colors.navy : theme.colors.secondary}
+              title={item.label}
+              subtitle={`${numericDate(item.date)} · remb. ${formatCents(item.refund_cents)}`}
+              cents={item.amount_cents}
+              sign={-1}
+              onPress={() => router.push({ pathname: '/sante', params: { id: String(item.id) } })}
+              trailing={
+                <Pressable
+                  onPress={() => settle(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.settled ? `${item.label} : terminé` : `Solder ${item.label}`}
+                  style={[
+                    styles.badge,
+                    item.settled
+                      ? { backgroundColor: theme.colors.navy, borderColor: theme.colors.navy }
+                      : { borderColor: theme.colors.primary },
+                  ]}
+                >
+                  <Caption
+                    style={{ fontSize: 12 }}
+                    color={item.settled ? theme.colors.onAccent : theme.colors.text}
                   >
-                    <CategoryIcon icon={expense.envelope_icon} color={expense.envelope_color} size={34} />
-                    <View style={{ flex: 1 }}>
-                      <Body weight="medium" numberOfLines={1}>
-                        {expense.label}
-                      </Body>
-                      <Caption>{expense.envelope_name}</Caption>
-                    </View>
-                    <Money cents={-expense.amount_cents} size={15} />
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-          </Card>
-        )}
-        {days.length > 0 ? (
-          <Caption style={{ textAlign: 'center' }}>
-            Touchez une dépense pour la modifier · appui long pour la supprimer
-          </Caption>
-        ) : null}
-      </Screen>
-      <FAB onPress={() => router.push({ pathname: '/depense', params: { week } })} />
+                    {item.settled ? 'Terminé' : 'Solder'}
+                  </Caption>
+                </Pressable>
+              }
+              last={i === list.length - 1}
+            />
+          ))}
+        </Card>
+      )}
+    </>
+  );
+}
+
+function SectionTitle({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.sectionRow}>
+      <Ionicons name={icon} size={16} color={theme.colors.primary} />
+      <Body weight="semibold">{label}</Body>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  envelopeCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  ringRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    marginVertical: spacing.xs,
   },
-  roundButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
+  ringCenter: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  envelopeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  chevron: {
+    position: 'absolute',
+    right: -26,
   },
-  addRow: {
+  envelopeFooter: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: spacing.sm,
+    gap: 2,
+  },
+  addTile: {
+    flexBasis: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.sm,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderStyle: 'dashed',
   },
-  buttonsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  sectionTitle: {
+    marginTop: spacing.sm,
+    letterSpacing: 0.4,
   },
-  expenseRow: {
+  sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  listCard: {
+    paddingVertical: spacing.xs,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  chip: {
+    flexBasis: '31%',
+    flexGrow: 1,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  chipHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+  },
+  chipBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     paddingVertical: spacing.sm,
+  },
+  chipAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderStyle: 'dashed',
+    minHeight: 64,
+  },
+  badge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1.5,
   },
 });

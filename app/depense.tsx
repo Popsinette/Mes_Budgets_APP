@@ -18,12 +18,16 @@ import {
   type Expense,
 } from '@/src/features/envelopes/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentWeekKey, todayIso, weekDays, weekKeyOf, weekdayLabel } from '@/src/utils/dates';
+import { currentMonthKey, isoDayInMonth, todayIso } from '@/src/utils/dates';
+import { useSelectedMonth } from '@/src/store/month';
+import { DatePickerGrid } from '@/src/components/ui/DatePickerGrid';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { centsToInput, parseAmountToCents } from '@/src/utils/money';
 
 export default function ExpenseModal() {
-  const params = useLocalSearchParams<{ id?: string; week?: string; envelopeId?: string }>();
+  const params = useLocalSearchParams<{ id?: string; month?: string; envelopeId?: string }>();
+  const globalMonth = useSelectedMonth((s) => s.month);
+  const month = params.month ?? globalMonth;
   const id = params.id ? Number(params.id) : null;
   const { data: envelopes } = useLiveQuery((db) => listEnvelopes(db));
   const { data: expense } = useLiveQuery(async (db) => (id ? getExpense(db, id) : null), [id]);
@@ -33,7 +37,7 @@ export default function ExpenseModal() {
     <ExpenseForm
       envelopes={envelopes}
       expense={expense ?? null}
-      week={params.week ?? currentWeekKey()}
+      defaultDate={month === currentMonthKey() ? todayIso() : isoDayInMonth(month, 1)}
       envelopeId={params.envelopeId ? Number(params.envelopeId) : null}
     />
   );
@@ -42,27 +46,23 @@ export default function ExpenseModal() {
 function ExpenseForm({
   envelopes,
   expense,
-  week: initialWeek,
+  defaultDate,
   envelopeId,
 }: {
   envelopes: Envelope[];
   expense: Expense | null;
-  week: string;
+  defaultDate: string;
   envelopeId: number | null;
 }) {
   const theme = useTheme();
   const db = useSQLiteContext();
-  const week = expense ? expense.week : initialWeek;
-  const days = weekDays(week);
-  const today = todayIso();
 
   const [amount, setAmount] = useState(expense ? centsToInput(expense.amount_cents) : '');
   const [label, setLabel] = useState(expense?.label ?? '');
   const [selectedEnvelope, setSelectedEnvelope] = useState<number | null>(
     expense?.envelope_id ?? envelopeId ?? envelopes[0]?.id ?? null,
   );
-  // Par défaut : aujourd'hui si la semaine est en cours, sinon son lundi.
-  const [date, setDate] = useState(expense?.date ?? (weekKeyOf(today) === week ? today : week));
+  const [date, setDate] = useState(expense?.date ?? defaultDate);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -141,43 +141,7 @@ function ExpenseForm({
 
       <FormField label="Libellé (optionnel)" value={label} onChangeText={setLabel} placeholder="Marché, coiffeur, cadeau…" />
 
-      <View style={{ gap: spacing.sm }}>
-        <Eyebrow>Jour</Eyebrow>
-        <View style={styles.days}>
-          {days.map((day) => {
-            const selected = day === date;
-            return (
-              <Pressable
-                key={day}
-                onPress={() => setDate(day)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                accessibilityLabel={weekdayLabel(day)}
-                style={[
-                  styles.day,
-                  {
-                    backgroundColor: selected ? theme.colors.primary : theme.colors.card,
-                    borderColor: selected ? theme.colors.primary : day === today ? theme.colors.text : theme.colors.border,
-                  },
-                ]}
-              >
-                {weekdayLabel(day)
-                  .split(' ')
-                  .map((part, i) => (
-                    <Body
-                      key={part}
-                      size={i === 0 ? 11 : 15}
-                      weight={i === 0 ? 'medium' : 'semibold'}
-                      color={selected ? theme.colors.onPrimary : i === 0 ? theme.colors.textMuted : theme.colors.text}
-                    >
-                      {part.replace('.', '')}
-                    </Body>
-                  ))}
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
+      <DatePickerGrid value={date} onChange={setDate} />
 
       <Button label={expense ? 'Enregistrer' : 'Ajouter la dépense'} onPress={() => void save()} loading={saving} />
       {expense ? <Button label="Supprimer" variant="danger" onPress={remove} /> : null}
@@ -200,16 +164,5 @@ const styles = StyleSheet.create({
     padding: spacing.sm + 2,
     borderRadius: radius.md,
     borderWidth: 1.5,
-  },
-  days: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  day: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
   },
 });

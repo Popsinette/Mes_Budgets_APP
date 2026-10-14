@@ -27,6 +27,7 @@ export type FixedItem = {
   frequency: Frequency;
   start_month: MonthKey;
   end_month: MonthKey | null;
+  icon: string | null;
 };
 
 export type FixedItemForMonth = FixedItem & { checked: boolean };
@@ -67,22 +68,23 @@ export async function saveFixedItem(
     day: number;
     frequency: Frequency;
     startMonth: MonthKey;
+    icon: string | null;
   },
 ): Promise<void> {
   // Un élément ponctuel ne vaut que pour son mois.
   const endMonth = input.frequency === 'once' ? input.startMonth : null;
   if (input.id) {
     await db.runAsync(
-      `UPDATE fixed_items SET kind = ?, name = ?, amount_cents = ?, day = ?, frequency = ?, start_month = ?,
+      `UPDATE fixed_items SET kind = ?, name = ?, amount_cents = ?, day = ?, frequency = ?, start_month = ?, icon = ?,
          end_month = CASE WHEN ? IS NOT NULL THEN ? WHEN frequency = 'once' THEN NULL ELSE end_month END
        WHERE id = ?`,
-      [input.kind, input.name, input.amountCents, input.day, input.frequency, input.startMonth, endMonth, endMonth, input.id],
+      [input.kind, input.name, input.amountCents, input.day, input.frequency, input.startMonth, input.icon, endMonth, endMonth, input.id],
     );
   } else {
     await db.runAsync(
-      `INSERT INTO fixed_items (kind, name, amount_cents, day, frequency, start_month, end_month, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [input.kind, input.name, input.amountCents, input.day, input.frequency, input.startMonth, endMonth],
+      `INSERT INTO fixed_items (kind, name, amount_cents, day, frequency, start_month, end_month, icon, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [input.kind, input.name, input.amountCents, input.day, input.frequency, input.startMonth, endMonth, input.icon],
     );
   }
   invalidateQueries();

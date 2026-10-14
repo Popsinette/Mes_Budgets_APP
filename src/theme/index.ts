@@ -2,20 +2,17 @@ import { useColorScheme } from 'react-native';
 import { useThemePref } from '@/src/store/themePref';
 
 /**
- * Direction « Précision tranquille », déclinaison chaleureuse : fond crème,
- * texte et actions en brun profond, accents fonctionnels sauge (positif) et
- * terracotta (dépense). Le thème sombre est un brun chaud — jamais de noir.
  * Typographie appariée Schibsted Grotesk (titres + montants) /
  * Instrument Sans (corps).
  */
 
 export const palette = {
-  ink: '#3A2E21', // brun profond — la couleur d'action
-  green: '#5F8B6D', // sauge
-  greenDark: '#26352B',
-  amber: '#B7791F',
-  brick: '#B4674E', // terracotta douce
-  slate: '#84776A',
+  terracotta: '#A8654A', // action principale (onglet actif, boutons)
+  slate: '#5E6B66', // vert ardoise (FAB, actions secondaires)
+  navy: '#2E3B4E', // bleu nuit (« à venir »)
+  rose: '#D49A86', // vieux rose (« réglé »)
+  gold: '#C9A45C', // or doux
+  sage: '#8A9682',
 };
 
 /**
@@ -62,11 +59,19 @@ export type Theme = {
     text: string;
     textMuted: string;
     border: string;
-    /** Séparateur très discret (filets de « grand livre »). */
+    /** Séparateur très discret (filets entre les lignes). */
     hairline: string;
+    /** Couleur d'action : terracotta (onglet actif, boutons principaux). */
     primary: string;
     onPrimary: string;
     primarySoft: string;
+    /** Vert ardoise : FAB, actions secondaires pleines. */
+    secondary: string;
+    /** Bleu nuit : ce qui reste « à venir / à débiter ». */
+    navy: string;
+    /** Vieux rose : ce qui est « réglé / crédité ». */
+    rose: string;
+    gold: string;
     success: string;
     successSoft: string;
     warning: string;
@@ -75,62 +80,74 @@ export type Theme = {
     dangerSoft: string;
     income: string;
     expense: string;
-    /** Texte/icônes posés sur une surface encre (boutons, pastilles pleines). */
+    /** Texte/icônes posés sur une surface pleine (boutons, pastilles). */
     onAccent: string;
     onAccentMuted: string;
   };
 };
 
+/**
+ * Direction « Budgetiz » : fond gris très clair, cartes blanches arrondies,
+ * terracotta pour l'action, vert ardoise, bleu nuit et vieux rose pour les
+ * pastilles d'état. Thème sombre : brun-gris chaud, jamais de noir pur.
+ */
 export const lightTheme: Theme = {
   dark: false,
   colors: {
-    background: '#F6F0E6', // crème
-    card: '#FDFAF4', // ivoire
-    cardMuted: '#EFE7D9',
-    text: '#33291E', // brun foncé
-    textMuted: '#84776A',
-    border: '#E6DCCB',
-    hairline: '#ECE3D4',
-    primary: '#4A3B2C', // brun — couleur d'action
-    onPrimary: '#FBF6EC',
-    primarySoft: '#ECE3D4',
-    success: palette.green, // sauge
+    background: '#F6F5F2',
+    card: '#FFFFFF',
+    cardMuted: '#EFEDE8',
+    text: '#26282B',
+    textMuted: '#85827C',
+    border: '#E7E4DE',
+    hairline: '#EDEBE6',
+    primary: palette.terracotta,
+    onPrimary: '#FFFFFF',
+    primarySoft: '#F3E6E0',
+    secondary: palette.slate,
+    navy: palette.navy,
+    rose: palette.rose,
+    gold: palette.gold,
+    success: '#5F8B6D',
     successSoft: '#E4EEE6',
-    warning: palette.amber,
+    warning: '#B7791F',
     warningSoft: '#F3EAD7',
-    danger: palette.brick, // terracotta douce
-    dangerSoft: '#F3E3DC',
-    income: palette.green,
-    expense: palette.brick,
-    onAccent: '#FBF6EC',
-    onAccentMuted: 'rgba(251,246,236,0.78)',
+    danger: '#B4523A',
+    dangerSoft: '#F5E1DA',
+    income: '#4F7A61',
+    expense: palette.terracotta,
+    onAccent: '#FFFFFF',
+    onAccentMuted: 'rgba(255,255,255,0.8)',
   },
 };
 
-// Thème sombre : brun chaud profond (cacao), jamais de noir.
 export const darkTheme: Theme = {
   dark: true,
   colors: {
-    background: '#221B14',
-    card: '#2B2219',
-    cardMuted: '#362B20',
-    text: '#F2EADD', // crème
-    textMuted: '#A99C8B',
-    border: '#3D3225',
-    hairline: '#352B1F',
-    primary: '#EFE5D2', // crème — couleur d'action sur fond cacao
-    onPrimary: '#2B2219',
-    primarySoft: '#3D3225',
-    success: '#7FAE8D', // sauge claire
+    background: '#1E1C1A',
+    card: '#2A2724',
+    cardMuted: '#36322E',
+    text: '#F1EEE9',
+    textMuted: '#A7A199',
+    border: '#3A3632',
+    hairline: '#332F2B',
+    primary: '#C9805F',
+    onPrimary: '#1E1C1A',
+    primarySoft: '#43302A',
+    secondary: '#8A9A93',
+    navy: '#8FA3BF',
+    rose: '#DDA996',
+    gold: '#D6B474',
+    success: '#7FAE8D',
     successSoft: '#26352B',
     warning: '#D3A24C',
     warningSoft: '#3B2F17',
-    danger: '#D08A72', // terracotta claire
+    danger: '#D98A72',
     dangerSoft: '#41291F',
-    income: '#7FAE8D',
-    expense: '#D08A72',
-    onAccent: '#2B2219',
-    onAccentMuted: 'rgba(43,34,25,0.72)',
+    income: '#8FBE9D',
+    expense: '#D8977A',
+    onAccent: '#1E1C1A',
+    onAccentMuted: 'rgba(30,28,26,0.75)',
   },
 };
 
