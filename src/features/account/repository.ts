@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { listFixedForMonth } from '@/src/features/fixed/repository';
 import { listPots } from '@/src/features/savings/repository';
+import { getMonthSummary } from '@/src/features/summary/repository';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { currentMonthKey, currentWeekKey, weeksOfMonth, type MonthKey } from '@/src/utils/dates';
 
@@ -37,6 +38,16 @@ export type AccountStatus = {
   pending_refunds_cents: number;
   /** Solde prévu en fin de mois. */
   end_of_month_cents: number;
+  /** Plan du mois (= la pastille « Prévisionnel ») : revenus − toutes les dépenses du mois. */
+  month_forecast_cents: number;
+  /** Virements d'épargne du mois hors plan (dépôts / retraits manuels). */
+  extra_savings_cents: number;
+  /**
+   * Solde de début de mois déduit : fin de mois − plan du mois + virements
+   * hors plan. Sert de contrôle : s'il paraît faux, une coche ou une saisie
+   * ne correspond pas à la réalité du compte.
+   */
+  implied_start_cents: number;
 };
 
 export async function getAccount(db: SQLiteDatabase): Promise<Account | null> {
@@ -73,9 +84,9 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
   if (!account) return null;
   const since = account.start_at;
   const month = currentMonthKey();
-  const week = currentWeekKey();
 
-  const [moved, fixed, envelopes, pots, pending] = await Promise.all([
+  const weeks = weeksOfMonth(month);
+  const [moved, fixed, envelopes, pots, pending, summary, monthMoves] = await Promise.all([
     db.getFirstAsync<{
       incomes: number;
       charges: number;
@@ -96,10 +107,19 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
       [since, since, since, since, since, since],
     ),
     listFixedForMonth(db, month),
-    listEnvelopesForMonth(db, month, week),
+    listEnvelopesForMonth(db, month, currentWeekKey()),
     listPots(db, month),
     db.getFirstAsync<{ total: number }>(
       'SELECT COALESCE(SUM(refund_cents), 0) AS total FROM health_expenses WHERE settled = 0',
+    ),
+    getMonthSummary(db, month),
+    db.getFirstAsync<{ weeks_saved: number; extra: number }>(
+      `SELECT
+         COALESCE((SELECT SUM(amount_cents) FROM savings_moves
+                   WHERE week IN (${weeks.map(() => '?').join(', ')})), 0) AS weeks_saved,
+         COALESCE((SELECT SUM(amount_cents) FROM savings_moves
+                   WHERE substr(date, 1, 7) = ? AND plan_month IS NULL AND week IS NULL), 0) AS extra`,
+      [...weeks, month],
     ),
   ]);
 
@@ -108,19 +128,18 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
 
   const upcomingIncomes = fixed.filter((f) => f.kind === 'income' && !f.checked).reduce((s, f) => s + f.amount_cents, 0);
   const upcomingCharges = fixed.filter((f) => f.kind === 'charge' && !f.checked).reduce((s, f) => s + f.amount_cents, 0);
-  // Enveloppes : ce qui reste à dépenser d'ici la fin du mois. Les semaines
-  // passées ne comptent plus (leur reste est resté sur le compte, ou a été
-  // mis de côté — ce qui est déjà un mouvement d'épargne).
-  const weeks = weeksOfMonth(month);
-  const futureWeeks = weeks.filter((w) => w > week).length;
-  const inMonth = weeks.includes(week);
-  const envelopesLeft = envelopes.reduce((s, e) => {
-    if (e.period === 'month') return s + Math.max(0, e.budget_cents - e.spent_cents);
-    const thisWeek = inMonth ? Math.max(0, e.weekly_cents - e.week_spent_cents) : 0;
-    return s + thisWeek + e.weekly_cents * futureWeeks;
-  }, 0);
+  // Enveloppes : le même « Reste » que les cartes et la pastille — budget du
+  // mois − dépensé (0 si dépassé). Les restes de semaines déjà mis de côté
+  // sont partis vers l'épargne (mouvement déjà compté) : on les retire.
+  const weeksSaved = monthMoves?.weeks_saved ?? 0;
+  const envelopesLeft = Math.max(
+    0,
+    envelopes.reduce((s, e) => s + Math.max(0, e.budget_cents - e.spent_cents), 0) - weeksSaved,
+  );
   const savingsLeft = pots.filter((p) => p.plan_done !== 1).reduce((s, p) => s + (p.monthly_cents ?? 0), 0);
   const pendingRefunds = pending?.total ?? 0;
+  const endOfMonth = balance + upcomingIncomes - upcomingCharges - envelopesLeft - savingsLeft + pendingRefunds;
+  const extraSavings = monthMoves?.extra ?? 0;
 
   return {
     account,
@@ -136,7 +155,10 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
     envelopes_left_cents: envelopesLeft,
     savings_left_cents: savingsLeft,
     pending_refunds_cents: pendingRefunds,
-    end_of_month_cents: balance + upcomingIncomes - upcomingCharges - envelopesLeft - savingsLeft + pendingRefunds,
+    end_of_month_cents: endOfMonth,
+    month_forecast_cents: summary.forecast_left_cents,
+    extra_savings_cents: extraSavings,
+    implied_start_cents: endOfMonth - summary.forecast_left_cents + extraSavings,
   };
 }
 
