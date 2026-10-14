@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { HBars } from '@/src/components/charts/HBars';
 import { LineChart, type LinePoint } from '@/src/components/charts/LineChart';
+import { InsightsCard } from '@/src/components/InsightsCard';
 import { AppHeader } from '@/src/components/ui/AppHeader';
 import { Card } from '@/src/components/ui/Card';
 import { EmptyState } from '@/src/components/ui/EmptyState';
@@ -72,6 +73,7 @@ export default function AnalysisScreen() {
   return (
     <Screen bottomInset={90}>
       <AppHeader title="Analyse de mon budget" />
+      <InsightsCard month={month} />
 
       <View style={styles.row}>
         <Card style={styles.half}>
