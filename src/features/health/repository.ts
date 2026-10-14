@@ -35,20 +35,27 @@ export async function saveHealthExpense(
   const values = [input.label, input.date, input.amountCents, input.refundCents, input.settled ? 1 : 0];
   if (input.id) {
     await db.runAsync(
-      'UPDATE health_expenses SET label = ?, date = ?, amount_cents = ?, refund_cents = ?, settled = ? WHERE id = ?',
-      [...values, input.id],
+      `UPDATE health_expenses SET label = ?, date = ?, amount_cents = ?, refund_cents = ?,
+         settled_at = CASE WHEN ? = 1 AND settled = 0 THEN datetime('now') WHEN ? = 0 THEN NULL ELSE settled_at END,
+         settled = ?
+       WHERE id = ?`,
+      [input.label, input.date, input.amountCents, input.refundCents, values[4], values[4], values[4], input.id],
     );
   } else {
     await db.runAsync(
-      'INSERT INTO health_expenses (label, date, amount_cents, refund_cents, settled) VALUES (?, ?, ?, ?, ?)',
-      values,
+      `INSERT INTO health_expenses (label, date, amount_cents, refund_cents, settled, created_at, settled_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'), CASE WHEN ? = 1 THEN datetime('now') END)`,
+      [...values, values[4]],
     );
   }
   invalidateQueries();
 }
 
 export async function setHealthSettled(db: SQLiteDatabase, id: number, settled: boolean): Promise<void> {
-  await db.runAsync('UPDATE health_expenses SET settled = ? WHERE id = ?', [settled ? 1 : 0, id]);
+  await db.runAsync(
+    "UPDATE health_expenses SET settled = ?, settled_at = CASE WHEN ? = 1 THEN datetime('now') END WHERE id = ?",
+    [settled ? 1 : 0, settled ? 1 : 0, id],
+  );
   invalidateQueries();
 }
 

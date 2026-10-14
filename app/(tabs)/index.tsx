@@ -24,6 +24,7 @@ import {
 } from '@/src/features/envelopes/repository';
 import { listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/src/features/fixed/repository';
 import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
+import { AccountCard } from '@/src/components/AccountCard';
 import { ExpenseList } from '@/src/components/ExpenseList';
 import { ForecastPill } from '@/src/components/ForecastPill';
 import { useSelectedMonth } from '@/src/store/month';
@@ -53,6 +54,7 @@ export default function BudgetScreen() {
       <AppHeader title="Mon budget" />
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
       <ForecastPill month={month} />
+      <AccountCard />
       <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />
       {tab === 'variables' ? <VariablesTab month={month} /> : null}
       {tab === 'fixes' ? <FixedTab month={month} kind="charge" /> : null}

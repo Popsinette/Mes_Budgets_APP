@@ -114,6 +114,27 @@ CREATE TABLE health_expenses (
 CREATE INDEX idx_health_date ON health_expenses(date);
 `;
 
+/**
+ * V12 — « Mon compte » (un seul compte courant) :
+ * - `account` (une ligne, id = 1) : solde saisi depuis la banque et l'instant
+ *   de la saisie (`start_at`, horodatage SQLite UTC) ;
+ * - horodatage d'enregistrement (`created_at`) des dépenses, frais de santé et
+ *   mouvements d'épargne, et `settled_at` du remboursement santé. Le solde
+ *   estimé ne compte que ce qui est noté / coché APRÈS la saisie du solde
+ *   (le solde bancaire inclut déjà le reste). Lignes existantes : NULL = avant.
+ */
+const MIGRATION_V12 = `
+CREATE TABLE account (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  start_cents INTEGER NOT NULL,
+  start_at TEXT NOT NULL
+);
+ALTER TABLE expenses ADD COLUMN created_at TEXT;
+ALTER TABLE health_expenses ADD COLUMN created_at TEXT;
+ALTER TABLE health_expenses ADD COLUMN settled_at TEXT;
+ALTER TABLE savings_moves ADD COLUMN created_at TEXT;
+`;
+
 const DEFAULT_ENVELOPES = `
 INSERT INTO envelopes (name, icon, color, weekly_cents, sort_order, created_at) VALUES
   ('Courses', 'cart-outline', '#4FA173', 0, 0, datetime('now')),
@@ -237,6 +258,13 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.execAsync(MIGRATION_V11);
     });
     await db.execAsync('PRAGMA user_version = 11');
+  }
+
+  if (current < 12) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V12);
+    });
+    await db.execAsync('PRAGMA user_version = 12');
   }
 }
 
