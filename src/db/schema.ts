@@ -10,7 +10,7 @@ import { migrateLegacyToV9 } from './legacy';
  *    mois par mois.
  * 2. `envelopes` + `expenses` — budget variable en enveloppes **hebdomadaires**
  *    (Courses, Autres…) ; chaque dépense est rangée dans la semaine de son
- *    lundi (`week`), et une semaine appartient au mois de son lundi.
+ *    lundi (`week`), et une semaine appartient au mois de son jeudi (cf. `monthOfWeek`).
  * 3. `savings_pots` + `savings_moves` — poches d'épargne (« Urgence & avenir »,
  *    « Projets & pépins »…) ; solde = valeur de départ + Σ mouvements.
  *

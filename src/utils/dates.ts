@@ -84,9 +84,13 @@ export function weekLabel(week: WeekKey): string {
     : `${format(start, 'd MMM', { locale: fr })} – ${format(end, 'd MMM', { locale: fr })}`;
 }
 
-/** Une semaine appartient au mois de son lundi : un mois compte 4 ou 5 semaines. */
+/**
+ * Mois d'une semaine : celui qui contient son jeudi, c.-à-d. le mois qui a le
+ * plus de jours de la semaine (règle des calendriers ISO). Un mois compte 4
+ * ou 5 semaines ; la semaine du 30 nov. au 6 déc. 2026 est en décembre.
+ */
 export function monthOfWeek(week: WeekKey): MonthKey {
-  return week.slice(0, 7);
+  return toIsoDay(addDays(parseIso(week), 3)).slice(0, 7);
 }
 
 /** Les semaines (lundis) d'un mois. */
