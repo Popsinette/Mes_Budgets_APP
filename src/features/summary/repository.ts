@@ -141,3 +141,29 @@ export async function getBalanceHistory(db: SQLiteDatabase, upTo: MonthKey): Pro
     }))
     .filter((p, i) => p.income_cents !== 0 || summaries[i].expense_cents !== 0);
 }
+
+export type PlanMonth = {
+  month: MonthKey;
+  income_cents: number;
+  /** Dépenses prévues : charges fixes + enveloppes (budget) + dépassements et santé déjà connus. */
+  expense_cents: number;
+  savings_cents: number;
+  /** Reste prévisionnel du mois (= la pastille) — indépendant du solde du compte. */
+  left_cents: number;
+};
+
+/** Plan des `count` mois à partir de `from` : revenus, dépenses prévues, épargne, reste. */
+export async function getPlanOutlook(db: SQLiteDatabase, from: MonthKey, count = 6): Promise<PlanMonth[]> {
+  const months = Array.from({ length: count }, (_, i) => shiftMonthKey(from, i));
+  const summaries = await Promise.all(months.map((m) => getMonthSummary(db, m)));
+  return months.map((month, i) => {
+    const s = summaries[i];
+    return {
+      month,
+      income_cents: s.income_cents,
+      expense_cents: s.income_cents - s.savings_planned_cents - s.forecast_left_cents,
+      savings_cents: s.savings_planned_cents,
+      left_cents: s.forecast_left_cents,
+    };
+  });
+}

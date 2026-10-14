@@ -17,6 +17,7 @@ Calquée sur **Budgetiz** (méthode Deux Sœurs Un Agenda) : simple, sans connex
 - **Mon plan du mois** (Synthèse) — revenus − charges − postes − enveloppes − épargne programmée = reste à répartir, puis le reste prévisionnel avec les dépassements. Une **pastille** sur l'écran Budget passe au rouge dès que le mois l'est, et le formulaire de dépense prévient avant d'enregistrer.
 - **Mon compte** — tu saisis le solde de ton compte courant une fois ; l'app le tient à jour avec ce que tu notes et coches, prévoit le solde de fin de mois et te montre l'écart avec ta banque.
 - **Mes enveloppes** — tous les montants (par semaine / par mois) au même endroit.
+- **Les prochains mois** (Synthèse) — le plan de chaque mois à venir (revenus − charges − enveloppes − épargne), sans tenir compte du solde actuel.
 - **Synthèse** — revenus, dépenses, solde, poste le plus dépensé, taux d'épargne, total des avoirs, répartition des dépenses.
 - **Bouton +** — dépense, charge fixe, revenu, frais de santé ou virement d'épargne en un geste.
 - **Export** JSON / CSV, **verrouillage biométrique**, thème clair / sombre, interface en français.

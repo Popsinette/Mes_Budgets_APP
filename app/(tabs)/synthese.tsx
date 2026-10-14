@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View } from 'react-native';
 import { HBars } from '@/src/components/charts/HBars';
+import { OutlookCard } from '@/src/components/OutlookCard';
 import { PlanCard } from '@/src/components/PlanCard';
 import { AppHeader } from '@/src/components/ui/AppHeader';
 import { Card } from '@/src/components/ui/Card';
@@ -37,6 +38,7 @@ export default function SummaryScreen() {
       <AppHeader title="Synthèse" />
       <MonthSwitcher month={month} onChange={setMonth} />
       {summary ? <PlanCard summary={summary} month={month} /> : null}
+      <OutlookCard />
 
       <View style={styles.row}>
         <Tile icon="layers-outline" color={theme.colors.secondary} title="Revenus" cents={income} caption="Entrées du mois" />
