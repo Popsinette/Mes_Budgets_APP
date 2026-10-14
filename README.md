@@ -5,14 +5,14 @@ Une seule base de code (React Native + Expo), une interface soignée, et aucune 
 
 ## ✨ Fonctionnalités
 
-- **Tableau de bord** — solde du mois (revenus − dépenses), répartition des dépenses par catégorie (graphique en anneau), **évolution revenus/dépenses sur 6 mois** (histogramme), aperçu des budgets, factures à venir et épargne.
-- **Budgets mensuels** — un budget par catégorie et par mois, barres de progression avec alertes visuelles (orange à 85 %, rouge en dépassement), navigation de mois en mois, recopie des budgets du mois précédent en un geste.
-- **Plan d'épargne** — objectifs d'épargne (vacances, voiture, fonds d'urgence…) avec montant cible, versement mensuel prévu, progression et historique des versements.
-- **Factures** — factures récurrentes avec jour d'échéance, pointage payé/à payer mois par mois, total réglé sur le mois. La dépense créée au pointage est datée du jour où l'on pointe.
-- **Transactions** — dépenses et revenus, catégorisés, avec notes.
-- **Export des données** — sauvegarde complète en JSON ou transactions en CSV (compatible Excel/Numbers), via la feuille de partage du système (AirDrop, Fichiers, mail…).
-- **Verrouillage biométrique** — Face ID / Touch ID / empreinte exigé à chaque ouverture (option activable dans les réglages) ; l'app se reverrouille dès qu'elle passe en arrière-plan.
-- **Mode sombre** automatique, montants au format français (€), interface entièrement en français.
+Inspirée de **Budgetiz** (méthode Deux Sœurs Un Agenda) : simple, sans connexion bancaire, trois axes.
+
+- **Ma semaine** — des enveloppes hebdomadaires (Courses et Autres par défaut, d'autres au besoin). On note chaque achat ; le grand chiffre dit **ce qu'il reste jusqu'à dimanche**, et combien par jour. En fin de semaine, le reste se **met de côté** dans une poche d'épargne en un geste.
+- **Mon mois** — revenus et charges fixes planifiés (loyer, factures, abonnements, assurance annuelle…), mensuels, trimestriels, annuels ou ponctuels, à **cocher** quand ils sont reçus / prélevés (badges « en retard » / « bientôt »). Le plan du mois : revenus − charges − épargne programmée − enveloppes = **reste à vivre prévu**, puis le bilan semaine par semaine.
+- **Mon épargne** — des poches « Urgence & avenir » (sécurité) et « Projets & pépins » (vacances, réparations, cadeaux…), avec objectif, versement mensuel programmé à cocher, dépôts / retraits et historique.
+- **Export des données** — sauvegarde complète en JSON ou dépenses en CSV (Excel/Numbers), via la feuille de partage du système.
+- **Verrouillage biométrique** — Face ID / Touch ID / empreinte, reverrouillage en arrière-plan.
+- **Thème clair / sombre**, montants au format français, interface entièrement en français.
 
 ## 🔒 Sécurité et confidentialité
 
@@ -32,7 +32,6 @@ Une seule base de code (React Native + Expo), une interface soignée, et aucune 
 | Sécurité | `expo-secure-store` (Keychain/Keystore) + `expo-crypto` + `expo-local-authentication` |
 | Export | `expo-file-system` + `expo-sharing` (feuille de partage système) |
 | État | Zustand (invalidation des requêtes) + hooks `useLiveQuery` |
-| Graphiques | `react-native-svg` (anneau des dépenses, léger et sans dépendance lourde) |
 | Dates | `date-fns` (locale française) |
 
 ## 📁 Arborescence
@@ -42,59 +41,39 @@ Mes_Budgets_APP/
 ├── app/                          # Écrans (routage par fichiers — expo-router)
 │   ├── _layout.tsx               # Racine : SQLiteProvider (base chiffrée) + pile de navigation
 │   ├── (tabs)/
-│   │   ├── _layout.tsx           # Barre d'onglets
-│   │   ├── index.tsx             # 🏠 Tableau de bord
-│   │   ├── budgets.tsx           # 💰 Budgets mensuels par catégorie
-│   │   ├── epargne.tsx           # 📈 Plan d'épargne et objectifs
-│   │   └── factures.tsx          # 🧾 Factures récurrentes
-│   ├── nouvelle-transaction.tsx  # Modale : dépense / revenu
-│   ├── nouveau-budget.tsx        # Modale : budget mensuel d'une catégorie
-│   ├── nouvel-objectif.tsx       # Modale : objectif d'épargne
-│   ├── verser.tsx                # Modale : versement sur un objectif
-│   ├── nouvelle-facture.tsx      # Modale : facture récurrente
-│   └── reglages.tsx              # Modale : sécurité, effacement des données
+│   │   ├── index.tsx             # 👛 Ma semaine : enveloppes, reste jusqu'à dimanche, dépenses
+│   │   ├── mois.tsx              # 📅 Mon mois : plan, revenus et charges fixes à cocher, semaines
+│   │   └── epargne.tsx           # 🌿 Mon épargne : poches, versements programmés
+│   ├── depense.tsx               # Modale : dépense (enveloppe, jour de la semaine)
+│   ├── enveloppe.tsx             # Modale : enveloppe hebdomadaire
+│   ├── fixe.tsx                  # Modale : revenu / charge fixe planifié
+│   ├── poche.tsx                 # Modale : poche d'épargne
+│   ├── poche-detail.tsx          # Modale : solde, objectif, historique d'une poche
+│   ├── mouvement.tsx             # Modale : dépôt / retrait / reste de la semaine
+│   └── reglages.tsx              # Modale : apparence, sécurité, export, effacement
 ├── src/
-│   ├── db/
-│   │   ├── index.ts              # Ouverture de la base + PRAGMA key (SQLCipher)
-│   │   ├── key.ts                # Génération/lecture de la clé dans le Keychain/Keystore
-│   │   ├── schema.ts             # Schéma SQL, migrations, catégories par défaut
-│   │   └── useLiveQuery.ts       # Requêtes réactives (relancées après chaque mutation)
-│   ├── features/                 # Accès aux données, par domaine métier
-│   │   ├── categories/repository.ts
-│   │   ├── transactions/repository.ts
-│   │   ├── budgets/repository.ts
-│   │   ├── savings/repository.ts
-│   │   ├── bills/repository.ts
-│   │   └── export/exporter.ts    # Export JSON complet / CSV des transactions
-│   ├── components/
-│   │   ├── BiometricGate.tsx     # Écran de verrouillage Face ID / empreinte
-│   │   ├── ui/                   # Card, Button, FAB, ProgressBar, MonthSwitcher,
-│   │   │                         # CategoryPicker, FormField, EmptyState…
-│   │   └── charts/               # DonutChart (anneau SVG), BarChart (évolution mensuelle)
-│   ├── theme/index.ts            # Palette clair/sombre, espacements, rayons
-│   ├── store/
-│   │   ├── invalidation.ts       # Compteur global d'invalidation (Zustand)
-│   │   └── security.ts           # Préférence et état du verrouillage biométrique
-│   └── utils/
-│       ├── money.ts              # Format € (fr-FR), parsing de saisie, centimes
-│       └── dates.ts              # Clés de mois 'yyyy-MM', libellés français
-├── assets/                       # Icônes et splash screen
-├── app.json                      # Config Expo (plugins : expo-router, SQLCipher, splash)
-├── package.json
-└── tsconfig.json                 # TypeScript strict + alias @/
+│   ├── db/                       # Ouverture chiffrée, schéma V10, chaîne héritée (legacy.ts)
+│   ├── features/                 # envelopes/, fixed/, savings/, export/
+│   ├── components/               # BiometricGate + ui/ (Card, Button, FAB, ProgressBar…)
+│   ├── theme/index.ts            # Palette clair/sombre, typographie, espacements
+│   ├── store/                    # Mois / semaine affichés, invalidation, thème, sécurité
+│   └── utils/                    # Montants (centimes), dates (mois, semaines lundi → dimanche)
+└── app.json                      # Config Expo (plugins : expo-router, SQLCipher, splash)
 ```
 
 ## 🗄 Modèle de données
 
 ```
-categories        (id, name, icon, color, sort_order)
-transactions      (id, category_id, label, amount_cents, type, date, month, note)
-budgets           (id, category_id, month 'yyyy-MM', amount_cents)   UNIQUE(category_id, month)
-savings_goals     (id, name, icon, color, target_cents, monthly_cents, created_at)
-savings_entries   (id, goal_id, amount_cents, date, note)
-bills             (id, name, amount_cents, due_day, category_id, active, created_at)
-bill_payments     (id, bill_id, month 'yyyy-MM', paid_at)            UNIQUE(bill_id, month)
+envelopes      (id, name, icon, color, weekly_cents, sort_order)
+expenses       (id, envelope_id, label, amount_cents, date, week = lundi)
+fixed_items    (id, kind income|charge, name, amount_cents, day, frequency, start_month, end_month)
+fixed_checks   (item_id, month)                                   coche « reçu / prélevé »
+savings_pots   (id, name, icon, color, kind securite|projet, initial_cents, target_cents, monthly_cents)
+savings_moves  (id, pot_id, amount_cents ±, date, note, plan_month, week)
+week_closures  (week)                                             semaine soldée
 ```
+
+Une base créée par une version précédente est convertie automatiquement au premier lancement (budgets → enveloppes, factures → charges fixes, comptes → poches).
 
 ## 🚀 Démarrer
 

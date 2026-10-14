@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { EmptyState } from '@/src/components/ui/EmptyState';
@@ -15,18 +14,22 @@ import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
-  deleteTransfer,
-  getSavingsOverview,
-  listAccountsWithBalance,
-  listTransfersForMonth,
-  setTransferDone,
-  type SavingsTransfer,
+  getMonthSaved,
+  listPots,
+  POT_KIND_LABELS,
+  setPlanDone,
+  type PotKind,
+  type PotWithBalance,
 } from '@/src/features/savings/repository';
 import { useSelectedMonth } from '@/src/store/month';
-import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, monthKeyLabel, shortDayLabel } from '@/src/utils/dates';
-import { confirmAction } from '@/src/utils/dialogs';
+import { spacing, useTheme } from '@/src/theme';
+import { currentMonthKey, isoDayInMonth, monthKeyLabel, todayIso } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
+
+const KIND_HINTS: Record<PotKind, string> = {
+  securite: 'Ton matelas de sécurité : on n’y touche pas.',
+  projet: 'Vacances, réparations, cadeaux… l’épargne qui sert.',
+};
 
 export default function SavingsScreen() {
   const theme = useTheme();
@@ -34,195 +37,147 @@ export default function SavingsScreen() {
   const month = useSelectedMonth((s) => s.month);
   const setMonth = useSelectedMonth((s) => s.setMonth);
 
-  const { data: accounts } = useLiveQuery((db) => listAccountsWithBalance(db));
-  const { data: overview } = useLiveQuery((db) => getSavingsOverview(db));
-  const { data: transfers } = useLiveQuery((db) => listTransfersForMonth(db, month), [month]);
+  const { data: pots } = useLiveQuery((db) => listPots(db, month), [month]);
+  const { data: saved } = useLiveQuery((db) => getMonthSaved(db, month), [month]);
 
-  const totalReal = overview?.total_real_cents ?? 0;
-  const totalPlanned = overview?.total_planned_cents ?? 0;
+  const total = (pots ?? []).reduce((s, p) => s + p.balance_cents, 0);
+  const monthName = monthKeyLabel(month).split(' ')[0];
 
-  const transfersByAccount = useMemo(() => {
-    const map = new Map<number, SavingsTransfer[]>();
-    for (const t of transfers ?? []) {
-      const list = map.get(t.account_id) ?? [];
-      list.push(t);
-      map.set(t.account_id, list);
-    }
-    return map;
-  }, [transfers]);
-
-  const toggleDone = (t: SavingsTransfer) => {
+  const togglePlan = (pot: PotWithBalance) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void setTransferDone(db, t.id, t.done !== 1);
+    const date = month === currentMonthKey() ? todayIso() : isoDayInMonth(month, 1);
+    void setPlanDone(db, pot, month, pot.plan_done !== 1, date);
   };
 
-  const confirmDeleteTransfer = (t: SavingsTransfer) => {
-    confirmAction({
-      title: 'Supprimer le virement',
-      message: `Supprimer ce ${t.amount_cents < 0 ? 'retrait' : 'virement'} de ${formatCents(Math.abs(t.amount_cents))} ?`,
-      confirmLabel: 'Supprimer',
-      destructive: true,
-      onConfirm: () => void deleteTransfer(db, t.id),
-    });
+  const renderPot = (pot: PotWithBalance) => {
+    const ratio = pot.target_cents ? pot.balance_cents / pot.target_cents : 0;
+    const done = pot.plan_done === 1;
+    return (
+      <Card
+        key={pot.id}
+        style={{ gap: spacing.md }}
+        onPress={() => router.push({ pathname: '/poche-detail', params: { id: String(pot.id) } })}
+      >
+        <View style={styles.row}>
+          <CategoryIcon icon={pot.icon} color={pot.color} size={42} />
+          <View style={{ flex: 1, gap: 1 }}>
+            <Body weight="semibold" size={15.5}>
+              {pot.name}
+            </Body>
+            {pot.target_cents ? (
+              <Caption>
+                {Math.round(ratio * 100)} % de {formatCents(pot.target_cents)}
+              </Caption>
+            ) : (
+              <Caption>Pas d’objectif</Caption>
+            )}
+          </View>
+          <Money cents={pot.balance_cents} size={19} weight="bold" />
+        </View>
+        {pot.target_cents ? (
+          <ProgressBar ratio={ratio} color={ratio >= 1 ? theme.colors.success : pot.color} />
+        ) : null}
+        {pot.monthly_cents ? (
+          <Pressable
+            onPress={() => togglePlan(pot)}
+            style={styles.planRow}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: done }}
+            accessibilityLabel={`Versement de ${monthName}`}
+          >
+            <Ionicons
+              name={done ? 'checkmark-circle' : 'ellipse-outline'}
+              size={22}
+              color={done ? theme.colors.success : theme.colors.textMuted}
+            />
+            <Caption style={{ flex: 1 }}>
+              Versement de {monthName} {done ? 'fait' : 'à faire'}
+            </Caption>
+            <Money cents={pot.monthly_cents} size={14} tone={done ? 'success' : 'muted'} />
+          </Pressable>
+        ) : null}
+      </Card>
+    );
   };
+
+  const kinds: PotKind[] = ['securite', 'projet'];
 
   return (
     <View style={{ flex: 1 }}>
       <Screen bottomInset={80}>
-        <Title>Épargne</Title>
+        <Title>Mon épargne</Title>
 
-        <View style={styles.hero}>
+        <View>
           <Eyebrow tone="success">Épargne totale</Eyebrow>
-          <Money cents={totalReal} size={44} weight="xbold" tone="success" style={{ marginTop: 2 }} />
+          <Money cents={total} size={44} weight="xbold" tone="success" style={{ marginTop: 2 }} />
           <Caption style={{ marginTop: 4 }}>
-            {totalPlanned > totalReal
-              ? `${formatCents(totalPlanned)} avec les virements prévus`
-              : 'Somme de tous vos comptes'}
+            {saved && saved !== 0
+              ? `${formatCents(saved, { signed: true })} en ${monthName}`
+              : `Rien mis de côté en ${monthName} pour l’instant`}
           </Caption>
         </View>
 
         <MonthSwitcher month={month} onChange={setMonth} />
 
-        <SectionHeader title="Mes comptes" actionLabel="Nouveau compte" onAction={() => router.push('/nouveau-compte')} />
-
-        {(accounts ?? []).length === 0 ? (
+        {(pots ?? []).length === 0 ? (
           <Card>
             <EmptyState
-              icon="wallet-outline"
-              title="Aucun compte d’épargne"
-              subtitle="Créez un compte (Livret A, LDDS…) avec sa valeur de départ via « Nouveau »."
+              icon="leaf-outline"
+              title="Aucune poche d’épargne"
+              subtitle="Crée une poche « Urgence & avenir » pour ta sécurité, puis des poches pour tes projets."
             />
           </Card>
-        ) : (
-          (accounts ?? []).map((account) => {
-            const ratio = account.target_cents ? account.real_cents / account.target_cents : 0;
-            const done = account.target_cents ? ratio >= 1 : false;
-            const monthTransfers = transfersByAccount.get(account.id) ?? [];
-            return (
-              <Card
-                key={account.id}
-                style={{ gap: spacing.md }}
-                onPress={() =>
-                  router.push({
-                    pathname: '/nouveau-compte',
-                    params: {
-                      id: String(account.id),
-                      name: account.name,
-                      icon: account.icon,
-                      color: account.color,
-                      initial: String(account.initial_cents),
-                      ...(account.target_cents ? { target: String(account.target_cents) } : {}),
-                      ...(account.monthly_cents ? { monthly: String(account.monthly_cents) } : {}),
-                    },
-                  })
-                }
-              >
-                <View style={styles.accountRow}>
-                  <CategoryIcon icon={account.icon} color={account.color} size={44} />
-                  <View style={{ flex: 1, gap: 1 }}>
-                    <Body weight="semibold" size={15.5}>
-                      {account.name}
-                    </Body>
-                    <Caption>
-                      dont {formatCents(account.initial_cents)} de départ
-                      {account.monthly_cents ? ` · ${formatCents(account.monthly_cents)}/mois prévu` : ''}
-                    </Caption>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 1 }}>
-                    <Money cents={account.real_cents} size={17} weight="bold" />
-                    {account.target_cents ? (
-                      // Texte en encre : la couleur du compte vit sur la barre, pas sur les chiffres.
-                      <Caption>
-                        {Math.round(ratio * 100)} % de {formatCents(account.target_cents)}
-                      </Caption>
-                    ) : null}
-                  </View>
-                </View>
+        ) : null}
 
-                {account.target_cents ? (
-                  <ProgressBar ratio={ratio} color={done ? theme.colors.success : account.color} />
-                ) : null}
+        {kinds.map((kind) => {
+          const list = (pots ?? []).filter((p) => p.kind === kind);
+          if (list.length === 0) return null;
+          return (
+            <View key={kind} style={{ gap: spacing.md }}>
+              <View>
+                <SectionHeader title={POT_KIND_LABELS[kind]} />
+                <Caption>{KIND_HINTS[kind]}</Caption>
+              </View>
+              {list.map(renderPot)}
+            </View>
+          );
+        })}
 
-                {/* Virements du mois : coche « effectué » comme les factures.
-                    Un montant négatif = retrait vers le compte courant. */}
-                {monthTransfers.map((t) => {
-                  const isDone = t.done === 1;
-                  const isWithdraw = t.amount_cents < 0;
-                  return (
-                    <Pressable
-                      key={t.id}
-                      style={styles.transferRow}
-                      onPress={() => toggleDone(t)}
-                      onLongPress={() => confirmDeleteTransfer(t)}
-                    >
-                      <Ionicons
-                        name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
-                        size={22}
-                        color={isDone ? theme.colors.success : theme.colors.textMuted}
-                      />
-                      <Caption style={{ flex: 1 }}>
-                        {isWithdraw ? 'Retrait' : 'Virement'} du {shortDayLabel(t.date)}
-                        {isWithdraw ? ' → compte courant' : ''}
-                        {t.note ? ` · ${t.note}` : ''}
-                        {isDone ? '' : ' · prévu'}
-                      </Caption>
-                      <Money
-                        cents={t.amount_cents}
-                        size={14}
-                        signed
-                        tone={isDone ? (isWithdraw ? 'expense' : 'success') : 'muted'}
-                      />
-                    </Pressable>
-                  );
-                })}
-
-                <Pressable
-                  style={[styles.addTransfer, { borderColor: theme.colors.border }]}
-                  onPress={() =>
-                    router.push({ pathname: '/virement', params: { accountId: String(account.id), month } })
-                  }
-                >
-                  <Ionicons name="add" size={17} color={theme.colors.text} />
-                  <Body weight="semibold" size={13.5}>
-                    Virement de {monthKeyLabel(month).split(' ')[0]}
-                  </Body>
-                </Pressable>
-              </Card>
-            );
-          })
-        )}
-
-        <Caption style={{ textAlign: 'center' }}>
-          Touchez un compte pour le modifier · cochez un virement quand il est fait · appui long pour le
-          supprimer
-        </Caption>
+        <Pressable
+          onPress={() => router.push('/poche')}
+          style={[styles.newPot, { borderColor: theme.colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel="Nouvelle poche"
+        >
+          <Ionicons name="add" size={18} color={theme.colors.text} />
+          <Body weight="semibold" size={14}>
+            Nouvelle poche
+          </Body>
+        </Pressable>
       </Screen>
-      <FAB onPress={() => router.push({ pathname: '/virement', params: { month } })} />
+      <FAB onPress={() => router.push('/mouvement')} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    paddingTop: spacing.xs,
-  },
-  accountRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  transferRow: {
+  planRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  addTransfer: {
+  newPot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
   },

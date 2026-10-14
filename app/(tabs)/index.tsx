@@ -1,471 +1,265 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { BarChart } from '@/src/components/charts/BarChart';
+import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
-import { DonutChart } from '@/src/components/charts/DonutChart';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { FAB } from '@/src/components/ui/FAB';
-import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
+import { WeekSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money, Title } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
-import { getBillsSummary, listBillsForMonth } from '@/src/features/bills/repository';
-import { listBudgetsWithSpending } from '@/src/features/budgets/repository';
 import {
-  getPlannedSavingsForMonth,
-  getRealSavingsForMonth,
-  getSavingsOverview,
-} from '@/src/features/savings/repository';
+  closeWeek,
+  deleteExpense,
+  isWeekClosed,
+  listEnvelopesForWeek,
+  listExpensesForWeek,
+  type EnvelopeWithSpending,
+  type Expense,
+} from '@/src/features/envelopes/repository';
+import { useSelectedWeek } from '@/src/store/week';
+import { spacing, useTheme } from '@/src/theme';
 import {
-  getMonthlySeries,
-  getMonthTotals,
-  getSpendingByCategory,
-  listTransactionsForMonth,
-} from '@/src/features/transactions/repository';
-import { useSelectedMonth } from '@/src/store/month';
-import { radius, spacing, useTheme } from '@/src/theme';
-import {
-  currentMonthKey,
-  lastMonthKeys,
-  monthKeyLabel,
-  monthPaceRatio,
-  shortDayLabel,
-  shortMonthLabel,
+  currentWeekKey,
+  daysLeftInWeek,
+  longDayLabel,
+  shiftWeekKey,
+  todayIso,
+  weekLabel,
+  weekPaceRatio,
 } from '@/src/utils/dates';
+import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
-export default function DashboardScreen() {
+const remainingOf = (envelopes: EnvelopeWithSpending[] | undefined) =>
+  (envelopes ?? []).reduce((sum, e) => sum + e.weekly_cents - e.spent_cents, 0);
+
+export default function WeekScreen() {
   const theme = useTheme();
-  // Mois global : le sélecteur ci-dessous pilote tous les écrans de l'app.
-  const month = useSelectedMonth((s) => s.month);
-  const setMonth = useSelectedMonth((s) => s.setMonth);
+  const db = useSQLiteContext();
+  const week = useSelectedWeek((s) => s.week);
+  const setWeek = useSelectedWeek((s) => s.setWeek);
 
-  const { data: totals } = useLiveQuery((db) => getMonthTotals(db, month), [month]);
-  const { data: spending } = useLiveQuery((db) => getSpendingByCategory(db, month), [month]);
-  const { data: budgets } = useLiveQuery((db) => listBudgetsWithSpending(db, month), [month]);
-  const { data: bills } = useLiveQuery((db) => listBillsForMonth(db, month), [month]);
-  const { data: billsSummary } = useLiveQuery((db) => getBillsSummary(db, month), [month]);
-  const { data: savings } = useLiveQuery((db) => getSavingsOverview(db));
-  const { data: plannedSavings } = useLiveQuery((db) => getPlannedSavingsForMonth(db, month), [month]);
-  const { data: realSavings } = useLiveQuery((db) => getRealSavingsForMonth(db, month), [month]);
-  const { data: transactions } = useLiveQuery((db) => listTransactionsForMonth(db, month), [month]);
-  const { data: series } = useLiveQuery((db) => getMonthlySeries(db, lastMonthKeys(6)), [month]);
+  const thisWeek = currentWeekKey();
+  const isCurrent = week === thisWeek;
+  const isPast = week < thisWeek;
+  // Semaine à « solder » : celle affichée si elle est terminée, sinon la précédente.
+  const closingWeek = isPast ? week : isCurrent ? shiftWeekKey(week, -1) : null;
 
-  const income = totals?.income_cents ?? 0;
-  const expense = totals?.expense_cents ?? 0;
-  const pendingCount = totals?.pending_count ?? 0;
-  const monthLabel = monthKeyLabel(month);
-  const upcomingBills = (bills ?? []).filter((b) => !b.paid_at).slice(0, 3);
-  const topBudgets = (budgets ?? []).slice(0, 3);
-  const recentTransactions = (transactions ?? []).slice(0, 4);
-
-  const billsTotal = billsSummary?.total_cents ?? 0;
-  const unpaidBillsTotal = billsTotal - (billsSummary?.paid_cents ?? 0);
-  const budgetsTotal = (budgets ?? []).reduce((sum, b) => sum + b.amount_cents, 0);
-  const savingsPlanned = plannedSavings ?? 0; // tous les virements du mois (dépôts +, retraits −)
-  const savingsReal = realSavings ?? 0; // virements cochés « effectués » uniquement
-
-  // Solde réel « pointé » = ce qui est réellement passé sur le compte courant :
-  // opérations pointées, moins l'épargne réellement virée (un retrait, négatif, s'y rajoute).
-  const realBalance =
-    (totals?.cleared_income_cents ?? 0) - (totals?.cleared_expense_cents ?? 0) - savingsReal;
-
-  // Trois soldes, trois questions :
-  // 1. Solde réel (héros) : ce qui est passé sur le compte.
-  // 2. Solde à venir : le réel ± tout ce qui est déjà connu mais pas encore
-  //    passé — opérations saisies à venir, factures restantes, épargne du mois.
-  //    Chaque dépense saisie le fait bouger, budget ou non.
-  const upcomingBalance = income - expense - unpaidBillsTotal - savingsPlanned;
-  // 3. Prévisionnel avec budgets : le solde à venir moins ce qu'il reste à
-  //    dépenser dans les budgets (un budget posé est une dépense prévue).
-  const remainingBudgets = (budgets ?? []).reduce(
-    (sum, b) => sum + Math.max(0, b.amount_cents - b.spent_cents),
-    0,
+  const { data: envelopes } = useLiveQuery((db) => listEnvelopesForWeek(db, week), [week]);
+  const { data: expenses } = useLiveQuery((db) => listExpensesForWeek(db, week), [week]);
+  const { data: closing } = useLiveQuery(
+    async (db) => {
+      if (!closingWeek) return null;
+      const [closed, list] = await Promise.all([
+        isWeekClosed(db, closingWeek),
+        listEnvelopesForWeek(db, closingWeek),
+      ]);
+      // Une semaine sans aucune dépense n'a pas été suivie (app pas encore utilisée) : rien à solder.
+      const tracked = list.some((e) => e.spent_cents > 0);
+      return { closed: closed || !tracked, leftover: remainingOf(list) };
+    },
+    [closingWeek],
   );
-  const plannedBalance = upcomingBalance - remainingBudgets;
 
-  // Reste à vivre prévisionnel : revenus − factures − budgets alloués − épargne
-  // prévue − dépenses sans catégorie (déjà parties, aucun budget ne peut les
-  // couvrir). Plan tenu ⇒ égal au prévisionnel avec budgets ; sinon l'écart
-  // = les dépassements réels (overrunReal).
-  const uncategorized = totals?.uncategorized_expense_cents ?? 0;
-  const freeExpense = expense - (billsSummary?.paid_cents ?? 0) - uncategorized;
-  const budgetedSpent = (budgets ?? []).reduce((sum, b) => sum + b.spent_cents, 0);
-  const overBudgets = (budgets ?? []).reduce(
-    (sum, b) => sum + Math.max(0, b.spent_cents - b.amount_cents),
-    0,
-  );
-  const overrunReal = overBudgets + Math.max(0, freeExpense - budgetedSpent);
-  const remainingToLive = income - billsTotal - budgetsTotal - savingsPlanned - uncategorized;
+  const budget = (envelopes ?? []).reduce((sum, e) => sum + e.weekly_cents, 0);
+  const remaining = remainingOf(envelopes);
+  const daysLeft = daysLeftInWeek(week);
+  const showClosing = closingWeek && closing && !closing.closed && closing.leftover > 0;
+
+  const confirmDelete = (expense: Expense) => {
+    confirmAction({
+      title: 'Supprimer la dépense',
+      message: `Supprimer « ${expense.label} » (${formatCents(expense.amount_cents)}) ?`,
+      confirmLabel: 'Supprimer',
+      destructive: true,
+      onConfirm: () => void deleteExpense(db, expense.id),
+    });
+  };
+
+  // Dépenses groupées par jour (déjà triées du plus récent au plus ancien).
+  const days: Array<{ day: string; items: Expense[] }> = [];
+  for (const expense of expenses ?? []) {
+    const last = days[days.length - 1];
+    if (last && last.day === expense.date) last.items.push(expense);
+    else days.push({ day: expense.date, items: [expense] });
+  }
 
   return (
     <View style={{ flex: 1 }}>
       <Screen bottomInset={80}>
         <View style={styles.headerRow}>
-          <View style={{ gap: 2 }}>
-            <Eyebrow>Bonjour</Eyebrow>
-            <Title>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</Title>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              hitSlop={8}
-              onPress={() => router.push('/annee')}
-              accessibilityRole="button"
-              accessibilityLabel="Vue annuelle"
-              style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-            >
-              <Ionicons name="calendar-outline" size={19} color={theme.colors.text} />
-            </Pressable>
-            <Pressable
-              hitSlop={8}
-              onPress={() => router.push('/reglages')}
-              accessibilityRole="button"
-              accessibilityLabel="Réglages"
-              style={[styles.gearButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-            >
-              <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
-            </Pressable>
-          </View>
+          <Title>Ma semaine</Title>
+          <Pressable
+            hitSlop={8}
+            onPress={() => router.push('/reglages')}
+            accessibilityRole="button"
+            accessibilityLabel="Réglages"
+            style={[styles.roundButton, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+          >
+            <Ionicons name="settings-outline" size={19} color={theme.colors.text} />
+          </Pressable>
         </View>
 
-        <MonthSwitcher month={month} onChange={setMonth} />
+        <WeekSwitcher week={week} onChange={setWeek} />
 
-        {/* Héros typographique : le montant porte la page, pas une carte en dégradé.
-            Trois soldes : réel (grand) → à venir → prévisionnel avec budgets. */}
-        <View style={styles.hero}>
-          <Eyebrow>Solde réel · pointé</Eyebrow>
+        {/* Héros : ce qu'il reste à dépenser jusqu'à dimanche. */}
+        <View>
+          <Eyebrow>
+            {isCurrent ? 'Il me reste jusqu’à dimanche' : isPast ? 'Reste de la semaine' : 'Budget de la semaine'}
+          </Eyebrow>
           <Money
-            cents={realBalance}
+            cents={remaining}
             size={46}
             weight="xbold"
-            tone={realBalance < 0 ? 'danger' : 'text'}
+            tone={remaining < 0 ? 'danger' : 'text'}
             style={{ marginTop: 2 }}
           />
-          <View style={styles.heroRows}>
-            <Pressable
-              style={styles.heroRow}
-              onPress={() => router.push('/operations')}
-              accessibilityRole="button"
-              accessibilityLabel="Solde à venir — voir les opérations"
-            >
-              <View style={{ flex: 1, gap: 1 }}>
-                <Body weight="semibold" size={14}>
-                  Solde à venir
-                </Body>
-                <Caption>
-                  {pendingCount > 0
-                    ? `${pendingCount} opération${pendingCount > 1 ? 's' : ''} à venir, factures et épargne restantes comprises`
-                    : 'factures et épargne restantes comprises'}
-                </Caption>
-              </View>
-              <Money
-                cents={upcomingBalance}
-                size={17}
-                weight="semibold"
-                tone={upcomingBalance < 0 ? 'danger' : 'text'}
-              />
-            </Pressable>
-            <View style={[styles.heroRowDivider, { backgroundColor: theme.colors.hairline }]} />
-            <View style={styles.heroRow}>
-              <View style={{ flex: 1, gap: 1 }}>
-                <Body weight="semibold" size={14}>
-                  Prévisionnel avec budgets
-                </Body>
-                <Caption>si vos budgets sont dépensés en entier</Caption>
-              </View>
-              <Money
-                cents={plannedBalance}
-                size={17}
-                weight="semibold"
-                tone={plannedBalance < 0 ? 'danger' : 'muted'}
-              />
-            </View>
-          </View>
+          <Caption style={{ marginTop: 4 }}>
+            {budget === 0
+              ? 'Fixe le montant de tes enveloppes pour commencer.'
+              : isCurrent && remaining > 0
+                ? `${daysLeft} jour${daysLeft > 1 ? 's' : ''} restant${daysLeft > 1 ? 's' : ''} · soit ${formatCents(Math.floor(remaining / daysLeft))} par jour`
+                : `sur ${formatCents(budget)} prévus cette semaine`}
+          </Caption>
         </View>
 
-        <View style={styles.quickActions}>
-          {(
-            [
-              ['Dépense', 'remove', 'expense', { pathname: '/nouvelle-transaction', params: { type: 'expense' } }],
-              ['Revenu', 'add', 'income', { pathname: '/nouvelle-transaction', params: { type: 'income' } }],
-              ['Épargner', 'trending-up', 'primary', '/epargne'],
-            ] as const
-          ).map(([label, icon, tone, target]) => {
-            const color =
-              tone === 'expense'
-                ? theme.colors.expense
-                : tone === 'income'
-                  ? theme.colors.income
-                  : theme.colors.text;
-            return (
-              <Pressable
-                key={label}
-                onPress={() => router.push(target as never)}
-                style={[styles.quickAction, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-              >
-                <Ionicons name={icon} size={18} color={color} />
-                <Body weight="semibold" size={13.5}>
-                  {label}
-                </Body>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionHeader title="Reste à vivre prévisionnel" />
-        <Card style={{ gap: spacing.lg }}>
-          <View style={styles.rtvRow}>
-            <View style={styles.rtvCol}>
-              <Money
-                cents={remainingToLive}
-                size={30}
-                weight="bold"
-                tone={remainingToLive < 0 ? 'danger' : 'text'}
-              />
+        {showClosing ? (
+          <Card style={{ gap: spacing.md, backgroundColor: theme.colors.successSoft, borderColor: theme.colors.successSoft }}>
+            <View style={{ gap: 2 }}>
+              <Body weight="semibold">Bravo ! Semaine du {weekLabel(closingWeek)} terminée</Body>
               <Caption>
-                si vous tenez vos budgets — factures, budgets alloués et épargne mis de côté
+                Il te reste {formatCents(closing.leftover)} sur tes enveloppes. Mets-les de côté dans une poche
+                d’épargne.
               </Caption>
             </View>
-          </View>
-
-          {income === 0 ? (
-            <Body tone="muted" size={13}>
-              Ajoutez vos revenus du mois (bouton « Revenu ») pour un calcul complet.
-            </Body>
-          ) : null}
-
-          <View style={{ gap: spacing.sm }}>
-            {(
-              [
-                ['Revenus du mois', income],
-                ['Factures récurrentes', -billsTotal],
-                ['Budgets alloués', -budgetsTotal],
-                ['Épargne prévue', -savingsPlanned],
-                ...(uncategorized > 0
-                  ? ([['Dépenses sans catégorie', -uncategorized]] as Array<[string, number]>)
-                  : []),
-              ] as Array<[string, number]>
-            ).map(([label, value]) => (
-              <View key={label} style={styles.breakdownRow}>
-                <Body tone="muted" size={13.5}>
-                  {label}
-                </Body>
-                <Money cents={value} size={13.5} weight="semibold" signed tone={value < 0 ? 'text' : 'success'} />
+            <View style={styles.buttonsRow}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Mettre de côté"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/mouvement',
+                      params: { week: closingWeek, amount: String(closing.leftover) },
+                    })
+                  }
+                />
               </View>
-            ))}
-          </View>
-
-          {/* Pont vers le héros : le prévisionnel avec budgets, avec la raison
-              de l'écart éventuel (les dépassements réels). */}
-          <View style={[styles.compareBox, { borderTopColor: theme.colors.hairline }]}>
-            <View style={styles.breakdownRow}>
-              <Body tone="muted" size={13.5}>
-                Prévisionnel avec budgets
-              </Body>
-              <Money cents={plannedBalance} size={13.5} weight="semibold" />
-            </View>
-            <Caption>
-              {overrunReal === 0
-                ? 'Identique : votre plan est tenu, aucune dépense ne déborde des budgets.'
-                : `Vos dépassements réels (${formatCents(overrunReal)} au-delà des budgets) l'abaissent d'autant.`}
-            </Caption>
-          </View>
-        </Card>
-
-        <SectionHeader title="Dépenses par catégorie" />
-        <Card style={styles.donutCard}>
-          {(spending ?? []).length === 0 ? (
-            <EmptyState
-              icon="pie-chart-outline"
-              title="Aucune dépense ce mois-ci"
-              subtitle="Ajoutez votre première transaction avec le bouton +"
-            />
-          ) : (
-            <View style={styles.donutRow}>
-              <DonutChart
-                slices={(spending ?? []).map((s) => ({ value: s.spent_cents, color: s.category_color }))}
-                centerLabel={formatCents(expense)}
-                centerSubLabel="dépensés"
-              />
-              <View style={styles.legend}>
-                {(spending ?? []).slice(0, 5).map((s) => {
-                  const pct = expense > 0 ? Math.round((s.spent_cents / expense) * 100) : 0;
-                  return (
-                    <View key={String(s.category_id)} style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: s.category_color }]} />
-                      <Body size={13} numberOfLines={1} style={{ flex: 1 }}>
-                        {s.category_name}
-                      </Body>
-                      {/* Le texte reste en encre : la pastille porte l'identité, pas le chiffre. */}
-                      <Caption style={styles.legendPct}>{pct} %</Caption>
-                    </View>
-                  );
-                })}
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Pas cette fois"
+                  variant="secondary"
+                  onPress={() => void closeWeek(db, { week: closingWeek, date: todayIso() })}
+                />
               </View>
             </View>
-          )}
-        </Card>
+          </Card>
+        ) : null}
 
-        <SectionHeader title="Évolution sur 6 mois" />
-        <Card style={{ gap: spacing.md }}>
-          {(series ?? []).every((p) => p.income_cents === 0 && p.expense_cents === 0) ? (
-            <EmptyState
-              icon="bar-chart-outline"
-              title="Pas encore d'historique"
-              subtitle="Le graphique se remplira au fil de vos opérations"
-            />
-          ) : (
-            <>
-              <BarChart
-                groups={(series ?? []).map((point) => ({
-                  label: shortMonthLabel(point.month),
-                  bars: [
-                    { value: point.income_cents, color: theme.colors.income },
-                    { value: point.expense_cents, color: theme.colors.expense },
-                  ],
-                }))}
-              />
-              <View style={styles.chartLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.colors.income }]} />
-                  <Caption>Revenus</Caption>
+        <SectionHeader
+          title="Mes enveloppes"
+          actionLabel="Nouvelle"
+          onAction={() => router.push('/enveloppe')}
+        />
+        {(envelopes ?? []).map((envelope) => {
+          const left = envelope.weekly_cents - envelope.spent_cents;
+          const ratio = envelope.weekly_cents > 0 ? envelope.spent_cents / envelope.weekly_cents : 0;
+          return (
+            <Card
+              key={envelope.id}
+              style={{ gap: spacing.md }}
+              onPress={() => router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })}
+            >
+              <View style={styles.envelopeRow}>
+                <CategoryIcon icon={envelope.icon} color={envelope.color} size={42} />
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Body weight="semibold" size={15.5}>
+                    {envelope.name}
+                  </Body>
+                  <Caption>
+                    {envelope.weekly_cents === 0
+                      ? 'Touchez pour fixer le montant'
+                      : `Dépensé ${formatCents(envelope.spent_cents)} sur ${formatCents(envelope.weekly_cents)}`}
+                  </Caption>
                 </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: theme.colors.expense }]} />
-                  <Caption>Dépenses</Caption>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Money cents={left} size={20} weight="bold" tone={left < 0 ? 'danger' : 'text'} />
+                  <Caption>{left < 0 ? 'de dépassement' : 'restant'}</Caption>
                 </View>
               </View>
-            </>
-          )}
-        </Card>
-
-        <SectionHeader title="Budgets" actionLabel="Tout voir" onAction={() => router.push('/budgets')} />
-        {topBudgets.length === 0 ? (
-          <Card>
-            <EmptyState
-              icon="wallet-outline"
-              title="Aucun budget défini"
-              subtitle="Créez un budget par catégorie pour suivre vos dépenses"
-            />
-          </Card>
-        ) : (
-          topBudgets.map((budget) => {
-            const ratio = budget.amount_cents > 0 ? budget.spent_cents / budget.amount_cents : 0;
-            const over = ratio > 1;
-            const barColor = over
-              ? theme.colors.danger
-              : ratio > 0.9
-                ? theme.colors.warning
-                : budget.category_color;
-            return (
-              <Card key={budget.id} style={styles.budgetCard}>
-                <View style={styles.budgetRow}>
-                  <CategoryIcon icon={budget.category_icon} color={budget.category_color} size={36} />
-                  <View style={styles.budgetInfo}>
-                    <Body weight="semibold">{budget.category_name}</Body>
-                    <Caption tone={over ? 'danger' : 'muted'}>
-                      {over
-                        ? `Dépassé de ${formatCents(budget.spent_cents - budget.amount_cents)}`
-                        : `Reste ${formatCents(budget.amount_cents - budget.spent_cents)} sur ${formatCents(budget.amount_cents)}`}
-                    </Caption>
-                  </View>
-                  <Body weight="semibold" size={13} tone={over ? 'danger' : 'muted'}>
-                    {Math.round(ratio * 100)}%
-                  </Body>
-                </View>
-                <ProgressBar ratio={ratio} color={barColor} markerRatio={monthPaceRatio(month)} />
-              </Card>
-            );
-          })
-        )}
-
-        <SectionHeader title="Factures à venir" actionLabel="Tout voir" onAction={() => router.push('/factures')} />
-        {upcomingBills.length === 0 ? (
-          <Card>
-            <Body tone="muted" style={{ textAlign: 'center' }}>
-              {billsSummary && billsSummary.total_cents > 0
-                ? 'Toutes les factures du mois sont réglées ✓'
-                : 'Aucune facture enregistrée'}
-            </Body>
-          </Card>
-        ) : (
-          <Card style={{ gap: spacing.md }}>
-            {upcomingBills.map((bill) => (
-              <View key={bill.id} style={styles.billRow}>
-                <View style={[styles.billDay, { backgroundColor: theme.colors.cardMuted }]}>
-                  <Body weight="bold" size={14}>
-                    {bill.due_day}
-                  </Body>
-                </View>
-                <Body weight="medium" numberOfLines={1} style={{ flex: 1 }}>
-                  {bill.name}
+              {envelope.weekly_cents > 0 ? (
+                <ProgressBar
+                  ratio={ratio}
+                  color={ratio > 1 ? theme.colors.danger : ratio > 0.9 ? theme.colors.warning : envelope.color}
+                  markerRatio={weekPaceRatio(week)}
+                />
+              ) : null}
+              <Pressable
+                onPress={() =>
+                  router.push({ pathname: '/depense', params: { week, envelopeId: String(envelope.id) } })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Ajouter une dépense ${envelope.name}`}
+                style={[styles.addRow, { borderColor: theme.colors.border }]}
+              >
+                <Ionicons name="add" size={17} color={theme.colors.text} />
+                <Body weight="semibold" size={13.5}>
+                  Dépense {envelope.name}
                 </Body>
-                <Money cents={bill.amount_cents} size={15} />
-              </View>
-            ))}
-          </Card>
-        )}
-
-        <SectionHeader title="Épargne" actionLabel="Tout voir" onAction={() => router.push('/epargne')} />
-        <Card style={styles.savingsCard}>
-          <View style={[styles.savingsIcon, { backgroundColor: theme.colors.successSoft }]}>
-            <Ionicons name="trending-up" size={20} color={theme.colors.success} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Money cents={savings?.total_real_cents ?? 0} size={22} weight="bold" />
-            <Caption>épargnés au total sur vos comptes</Caption>
-          </View>
-        </Card>
-
-        {recentTransactions.length > 0 ? (
-          <>
-            <SectionHeader
-              title="Dernières opérations"
-              actionLabel="Tout voir"
-              onAction={() => router.push('/operations')}
-            />
-            <Card style={{ gap: spacing.md }}>
-              {recentTransactions.map((t) => (
-                <View key={t.id} style={styles.txRow}>
-                  <CategoryIcon
-                    icon={t.category_icon ?? 'pricetag-outline'}
-                    color={t.category_color ?? theme.colors.textMuted}
-                    size={36}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Body weight="medium" numberOfLines={1}>
-                      {t.label}
-                    </Body>
-                    <Caption>
-                      {shortDayLabel(t.date)}
-                      {t.cleared === 0 ? ' · à venir' : ''}
-                    </Caption>
-                  </View>
-                  {t.cleared === 0 ? (
-                    <Ionicons
-                      name="hourglass-outline"
-                      size={13}
-                      color={theme.colors.warning}
-                      style={{ marginRight: spacing.xs }}
-                    />
-                  ) : null}
-                  <Money
-                    cents={t.type === 'income' ? t.amount_cents : -t.amount_cents}
-                    size={15}
-                    signed
-                    tone={t.type === 'income' ? 'income' : 'text'}
-                  />
-                </View>
-              ))}
+              </Pressable>
             </Card>
-          </>
+          );
+        })}
+
+        <SectionHeader title="Dépenses de la semaine" />
+        {days.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon="receipt-outline"
+              title="Aucune dépense"
+              subtitle="Note chaque achat dès que tu le fais : ton reste jusqu’à dimanche se met à jour."
+            />
+          </Card>
+        ) : (
+          <Card style={{ paddingVertical: spacing.sm }}>
+            {days.map(({ day, items }, dayIndex) => (
+              <View key={day}>
+                <Eyebrow style={{ marginTop: dayIndex === 0 ? spacing.xs : spacing.md, marginBottom: spacing.xs }}>
+                  {longDayLabel(day)}
+                </Eyebrow>
+                {items.map((expense) => (
+                  <Pressable
+                    key={expense.id}
+                    onPress={() => router.push({ pathname: '/depense', params: { id: String(expense.id) } })}
+                    onLongPress={() => confirmDelete(expense)}
+                    style={({ pressed }) => [styles.expenseRow, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <CategoryIcon icon={expense.envelope_icon} color={expense.envelope_color} size={34} />
+                    <View style={{ flex: 1 }}>
+                      <Body weight="medium" numberOfLines={1}>
+                        {expense.label}
+                      </Body>
+                      <Caption>{expense.envelope_name}</Caption>
+                    </View>
+                    <Money cents={-expense.amount_cents} size={15} />
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </Card>
+        )}
+        {days.length > 0 ? (
+          <Caption style={{ textAlign: 'center' }}>
+            Touchez une dépense pour la modifier · appui long pour la supprimer
+          </Caption>
         ) : null}
       </Screen>
-      <FAB onPress={() => router.push('/nouvelle-transaction')} />
+      <FAB onPress={() => router.push({ pathname: '/depense', params: { week } })} />
     </View>
   );
 }
@@ -476,142 +270,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  gearButton: {
+  roundButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
-  hero: {
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xs,
-  },
-  heroRows: {
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  heroRow: {
+  envelopeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  heroRowDivider: {
-    height: 1,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  quickAction: {
-    flex: 1,
+  addRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md + 2,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  rtvRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rtvCol: {
-    flex: 1,
-    gap: 3,
-  },
-  rtvDivider: {
-    width: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: spacing.lg,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  compareBox: {
-    borderTopWidth: 1,
-    paddingTop: spacing.md,
     gap: spacing.xs,
-  },
-  donutCard: {
-    paddingVertical: spacing.xl,
-  },
-  donutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
-  legend: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  chartLegend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.xl,
-  },
-  legendDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  legendPct: {
-    width: 38,
-    textAlign: 'right',
-    fontVariant: ['tabular-nums'],
-  },
-  budgetCard: {
-    gap: spacing.md,
-  },
-  budgetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  budgetInfo: {
-    flex: 1,
-    gap: 1,
-  },
-  billRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  billDay: {
-    width: 38,
-    height: 38,
+    paddingVertical: spacing.sm,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
   },
-  savingsCard: {
+  buttonsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  expenseRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  savingsIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  txRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });

@@ -1,302 +1,218 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { migrateLegacyToV9 } from './legacy';
 
-
-const MIGRATION_V1 = `
-CREATE TABLE IF NOT EXISTS categories (
+/**
+ * Modèle « Budgetiz » (V10), volontairement simple. Trois axes indépendants,
+ * aucun lien croisé à maintenir :
+ *
+ * 1. `fixed_items` + `fixed_checks` — revenus et charges fixes planifiés
+ *    (mensuels, trimestriels, annuels ou ponctuels), cochés « reçu / prélevé »
+ *    mois par mois.
+ * 2. `envelopes` + `expenses` — budget variable en enveloppes **hebdomadaires**
+ *    (Courses, Autres…) ; chaque dépense est rangée dans la semaine de son
+ *    lundi (`week`), et une semaine appartient au mois de son lundi.
+ * 3. `savings_pots` + `savings_moves` — poches d'épargne (« Urgence & avenir »,
+ *    « Projets & pépins »…) ; solde = valeur de départ + Σ mouvements.
+ *
+ * Montants en centimes partout. Pour changer le schéma : ajouter une
+ * migration `current < 11`, ne jamais modifier `SCHEMA_V10`.
+ */
+const SCHEMA_V10 = `
+CREATE TABLE envelopes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   icon TEXT NOT NULL,
   color TEXT NOT NULL,
-  sort_order INTEGER NOT NULL DEFAULT 0
-);
-
-CREATE TABLE IF NOT EXISTS transactions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-  label TEXT NOT NULL,
-  amount_cents INTEGER NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('expense', 'income')),
-  date TEXT NOT NULL,             -- 'yyyy-MM-dd'
-  month TEXT NOT NULL,            -- 'yyyy-MM' (dénormalisé pour les agrégats)
-  note TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_transactions_month ON transactions(month);
-CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);
-
-CREATE TABLE IF NOT EXISTS budgets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-  month TEXT NOT NULL,            -- 'yyyy-MM'
-  amount_cents INTEGER NOT NULL,
-  UNIQUE (category_id, month)
-);
-CREATE INDEX IF NOT EXISTS idx_budgets_month ON budgets(month);
-
-CREATE TABLE IF NOT EXISTS savings_goals (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  icon TEXT NOT NULL DEFAULT 'flag-outline',
-  color TEXT NOT NULL DEFAULT '#6C5CE7',
-  target_cents INTEGER NOT NULL,
-  monthly_cents INTEGER,          -- versement mensuel prévu (plan d'épargne), optionnel
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS savings_entries (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  goal_id INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
-  amount_cents INTEGER NOT NULL,
-  date TEXT NOT NULL,
-  note TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_savings_entries_goal ON savings_entries(goal_id);
-
-CREATE TABLE IF NOT EXISTS bills (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  amount_cents INTEGER NOT NULL,
-  due_day INTEGER NOT NULL CHECK (due_day BETWEEN 1 AND 31),
-  category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-  active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS bill_payments (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  bill_id INTEGER NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
-  month TEXT NOT NULL,            -- 'yyyy-MM'
-  paid_at TEXT NOT NULL,
-  UNIQUE (bill_id, month)
-);
-`;
-
-// Couleurs issues de `categoryPalette` (src/theme) — palette validée
-// contraste/daltonisme sur fond clair et sombre.
-const DEFAULT_CATEGORIES: Array<[string, string, string]> = [
-  ['Alimentation', 'cart-outline', '#4FA173'],
-  ['Logement', 'home-outline', '#837DC1'],
-  ['Transport', 'car-outline', '#5E97D1'],
-  ['Restaurants', 'restaurant-outline', '#C97558'],
-  ['Loisirs', 'game-controller-outline', '#C372A8'],
-  ['Santé', 'heart-outline', '#CB778D'],
-  ['Abonnements', 'tv-outline', '#9E72BE'],
-  ['Vêtements', 'shirt-outline', '#2AA0B0'],
-  ['Épargne', 'trending-up-outline', '#B8892F'],
-  ['Autre', 'ellipsis-horizontal-outline', '#BD7745'],
-];
-
-// V2 : le pointage d'une facture crée la dépense correspondante ; on garde
-// le lien pour pouvoir la retirer si on dé-pointe la facture.
-const MIGRATION_V2 = `
-ALTER TABLE bill_payments ADD COLUMN transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL;
-`;
-
-// V3 : les dépenses issues du pointage d'une facture portent bill_id, pour
-// être exclues du suivi des budgets (qui ne concernent que les dépenses libres).
-const MIGRATION_V3 = `
-ALTER TABLE transactions ADD COLUMN bill_id INTEGER REFERENCES bills(id) ON DELETE SET NULL;
-UPDATE transactions SET bill_id = (
-  SELECT bp.bill_id FROM bill_payments bp WHERE bp.transaction_id = transactions.id
-)
-WHERE id IN (SELECT transaction_id FROM bill_payments WHERE transaction_id IS NOT NULL);
-`;
-
-// V4 : l'épargne passe d'« objectifs » à de vrais « comptes » (Livret A, LDDS…)
-// avec une valeur de départ (épargne déjà cumulée), et les versements deviennent
-// des virements datés, rattachés à un compte, marquables « effectués » (coche).
-const MIGRATION_V4 = `
-CREATE TABLE savings_accounts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  icon TEXT NOT NULL DEFAULT 'wallet-outline',
-  color TEXT NOT NULL DEFAULT '#6C5CE7',
-  initial_cents INTEGER NOT NULL DEFAULT 0,   -- valeur de départ (épargne déjà cumulée)
-  target_cents INTEGER,                       -- objectif optionnel
-  monthly_cents INTEGER,                      -- virement mensuel prévu (prévisionnel)
+  weekly_cents INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
-INSERT INTO savings_accounts (id, name, icon, color, initial_cents, target_cents, monthly_cents, sort_order, created_at)
-  SELECT id, name, icon, color, 0, target_cents, monthly_cents, id, created_at FROM savings_goals;
-
-CREATE TABLE savings_transfers (
+CREATE TABLE expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  account_id INTEGER NOT NULL REFERENCES savings_accounts(id) ON DELETE CASCADE,
+  envelope_id INTEGER NOT NULL REFERENCES envelopes(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
   amount_cents INTEGER NOT NULL,
-  month TEXT NOT NULL,       -- 'yyyy-MM'
-  date TEXT NOT NULL,        -- 'yyyy-MM-dd'
-  done INTEGER NOT NULL DEFAULT 1,   -- 0 = prévu, 1 = effectué (coché)
-  note TEXT
+  date TEXT NOT NULL,             -- 'yyyy-MM-dd'
+  week TEXT NOT NULL              -- lundi de la semaine, 'yyyy-MM-dd' (dénormalisé)
 );
-CREATE INDEX idx_savings_transfers_account ON savings_transfers(account_id);
-CREATE INDEX idx_savings_transfers_month ON savings_transfers(month);
+CREATE INDEX idx_expenses_week ON expenses(week);
 
-INSERT INTO savings_transfers (account_id, amount_cents, month, date, done, note)
-  SELECT goal_id, amount_cents, substr(date, 1, 7), date, 1, note FROM savings_entries;
-
-DROP TABLE savings_entries;
-DROP TABLE savings_goals;
-`;
-
-// V5 : pointage des opérations. `cleared` = 0 (à venir / en attente sur le
-// compte) ou 1 (passée / pointée). On saisit une dépense dès qu'on la fait,
-// puis on la pointe quand elle apparaît sur le relevé. Le solde « réel » ne
-// compte que les opérations pointées ; le « prévisionnel » compte tout.
-// Défaut 1 : l'historique et les dépenses de factures (déjà réglées) comptent
-// comme passées.
-const MIGRATION_V5 = `
-ALTER TABLE transactions ADD COLUMN cleared INTEGER NOT NULL DEFAULT 1;
-CREATE INDEX IF NOT EXISTS idx_transactions_cleared ON transactions(cleared);
-`;
-
-// V6 : reteinte des catégories et comptes vers la palette sourde (accordée au
-// thème « précision tranquille »). On ne touche qu'aux lignes portant encore
-// une couleur par défaut historique — les couleurs choisies à la main autres
-// que ces hex sont conservées.
-const COLOR_REMAP: Array<[string, string]> = [
-  ['#10B981', '#5F9070'],
-  ['#6C5CE7', '#6E6FA6'],
-  ['#3B82F6', '#5580A6'],
-  ['#F97316', '#C56A4E'],
-  ['#EC4899', '#9A6494'],
-  ['#EF4444', '#C57487'],
-  ['#8B5CF6', '#7A6E9C'],
-  ['#14B8A6', '#3F9195'],
-  ['#F59E0B', '#C79A3E'],
-  ['#64748B', '#857F76'],
-];
-
-// V7 : palette adoucie (validée contraste/daltonisme). Reteinte les couleurs
-// par défaut des générations précédentes (sourde V6 et validée vive) vers
-// leurs équivalents doux — les couleurs choisies à la main sont conservées.
-const COLOR_REMAP_V7: Array<[string, string]> = [
-  // génération « sourde » (V6)
-  ['#5F9070', '#4FA173'],
-  ['#6E6FA6', '#837DC1'],
-  ['#5580A6', '#5E97D1'],
-  ['#C56A4E', '#C97558'],
-  ['#9A6494', '#C372A8'],
-  ['#C57487', '#CB778D'],
-  ['#7A6E9C', '#9E72BE'],
-  ['#3F9195', '#2AA0B0'],
-  ['#C79A3E', '#B8892F'],
-  ['#857F76', '#BD7745'],
-  ['#8B9150', '#89A048'],
-  ['#B5695A', '#BD7745'],
-  // génération « validée vive »
-  ['#C25E3F', '#C97558'],
-  ['#0E9BAA', '#2AA0B0'],
-  ['#B8841F', '#B8892F'],
-  ['#6B65B5', '#837DC1'],
-  ['#7E9A3F', '#89A048'],
-  ['#B85497', '#C372A8'],
-  ['#3F8F63', '#4FA173'],
-  ['#4F8FCB', '#5E97D1'],
-  ['#B0632F', '#BD7745'],
-  ['#8A5FA8', '#9E72BE'],
-  ['#5D8A2E', '#789F4C'],
-  ['#C05A75', '#CB778D'],
-];
-
-// V8 : « budget type » (inspiré du glow-up budget). Chaque catégorie
-// appartient à un poste — « besoins », « envies » ou « epargne » — et la
-// table budget_templates porte le mois idéal (le modèle que l'on recopie
-// dans les mois réels). Les montants sont en centimes, comme partout.
-const MIGRATION_V8 = `
-ALTER TABLE categories ADD COLUMN bucket TEXT NOT NULL DEFAULT 'envies';
-CREATE TABLE IF NOT EXISTS budget_templates (
+CREATE TABLE fixed_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  category_id INTEGER NOT NULL UNIQUE REFERENCES categories(id) ON DELETE CASCADE,
-  amount_cents INTEGER NOT NULL
+  kind TEXT NOT NULL CHECK (kind IN ('income', 'charge')),
+  name TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  day INTEGER NOT NULL CHECK (day BETWEEN 1 AND 31),
+  frequency TEXT NOT NULL CHECK (frequency IN ('monthly', 'quarterly', 'yearly', 'once')),
+  start_month TEXT NOT NULL,      -- 'yyyy-MM' : premier mois concerné
+  end_month TEXT,                 -- dernier mois concerné (NULL = toujours)
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE fixed_checks (
+  item_id INTEGER NOT NULL REFERENCES fixed_items(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (item_id, month)
+);
+
+CREATE TABLE savings_pots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  icon TEXT NOT NULL,
+  color TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('securite', 'projet')),
+  initial_cents INTEGER NOT NULL DEFAULT 0,
+  target_cents INTEGER,
+  monthly_cents INTEGER,          -- versement mensuel programmé (optionnel)
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE savings_moves (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pot_id INTEGER NOT NULL REFERENCES savings_pots(id) ON DELETE CASCADE,
+  amount_cents INTEGER NOT NULL,  -- > 0 dépôt, < 0 retrait
+  date TEXT NOT NULL,
+  note TEXT,
+  plan_month TEXT,                -- versement programmé de ce mois (coche)
+  week TEXT                       -- reste de cette semaine mis de côté
+);
+CREATE INDEX idx_savings_moves_pot ON savings_moves(pot_id);
+CREATE UNIQUE INDEX idx_savings_moves_plan ON savings_moves(pot_id, plan_month) WHERE plan_month IS NOT NULL;
+
+-- Semaines « soldées » : le reste a été mis de côté ou volontairement laissé.
+CREATE TABLE week_closures (
+  week TEXT PRIMARY KEY,
+  closed_at TEXT NOT NULL
 );
 `;
 
-// Postes par défaut des catégories connues (les autres restent « envies »).
-const BUCKET_DEFAULTS: Array<[string, string]> = [
-  ['besoins', 'Alimentation'],
-  ['besoins', 'Logement'],
-  ['besoins', 'Transport'],
-  ['besoins', 'Santé'],
-  ['besoins', 'Abonnements'],
-  ['epargne', 'Épargne'],
-];
+const DEFAULT_ENVELOPES = `
+INSERT INTO envelopes (name, icon, color, weekly_cents, sort_order, created_at) VALUES
+  ('Courses', 'cart-outline', '#4FA173', 0, 0, datetime('now')),
+  ('Autres', 'bag-handle-outline', '#C97558', 0, 1, datetime('now'));
+`;
 
-// V9 : une facture pointée est datée du jour du pointage (date à laquelle on
-// constate le prélèvement) et non plus du jour d'échéance présumé. On réaligne
-// les dépenses déjà créées sur la date de leur pointage, sauf si celui-ci a eu
-// lieu hors du mois de la facture (on garderait alors une date incohérente avec
-// la colonne `month`, qui porte tous les agrégats).
-const MIGRATION_V9 = `
-UPDATE transactions
-SET date = (SELECT date(bp.paid_at) FROM bill_payments bp WHERE bp.transaction_id = transactions.id)
-WHERE EXISTS (
-  SELECT 1 FROM bill_payments bp
-  WHERE bp.transaction_id = transactions.id
-    AND substr(bp.paid_at, 1, 7) = transactions.month
-);
+const DEFAULT_POTS = `
+INSERT INTO savings_pots (name, icon, color, kind, sort_order, created_at) VALUES
+  ('Urgence & avenir', 'shield-checkmark-outline', '#5E97D1', 'securite', 0, datetime('now')),
+  ('Projets & pépins', 'airplane-outline', '#B8892F', 'projet', 1, datetime('now'));
+`;
+
+/** Lundi de la semaine d'une date ISO, en SQL. */
+const MONDAY_OF = (col: string) =>
+  `date(${col}, '-' || ((CAST(strftime('%w', ${col}) AS INTEGER) + 6) % 7) || ' days')`;
+
+/**
+ * Conversion de l'ancien modèle (V9) vers V10 :
+ * - budgets par catégorie → deux enveloppes hebdomadaires (Courses = budget
+ *   « Alimentation », Autres = le reste), montants mensuels × 12 / 52 ;
+ * - dépenses libres → dépenses d'enveloppe ; les dépenses de factures
+ *   disparaissent (une charge fixe cochée suffit) ;
+ * - revenus → revenus ponctuels du mois, cochés « reçus » s'ils étaient pointés ;
+ * - factures → charges fixes mensuelles, avec leurs coches ;
+ * - comptes d'épargne → poches, virements effectués → mouvements.
+ */
+const CONVERT_V9 = `
+CREATE TEMP TABLE _courses_cats AS
+  SELECT id FROM categories WHERE lower(name) IN ('alimentation', 'courses', 'supermarché', 'nourriture');
+
+INSERT INTO envelopes (name, icon, color, weekly_cents, sort_order, created_at)
+  SELECT 'Courses', 'cart-outline', '#4FA173',
+    CAST(ROUND(COALESCE((SELECT SUM(amount_cents) FROM budgets
+      WHERE month = (SELECT MAX(month) FROM budgets)
+        AND category_id IN (SELECT id FROM _courses_cats)), 0) * 12.0 / 52) AS INTEGER),
+    0, datetime('now');
+INSERT INTO envelopes (name, icon, color, weekly_cents, sort_order, created_at)
+  SELECT 'Autres', 'bag-handle-outline', '#C97558',
+    CAST(ROUND(COALESCE((SELECT SUM(amount_cents) FROM budgets
+      WHERE month = (SELECT MAX(month) FROM budgets)
+        AND category_id NOT IN (SELECT id FROM _courses_cats)), 0) * 12.0 / 52) AS INTEGER),
+    1, datetime('now');
+
+INSERT INTO expenses (envelope_id, label, amount_cents, date, week)
+  SELECT
+    CASE WHEN t.category_id IN (SELECT id FROM _courses_cats)
+      THEN (SELECT id FROM envelopes WHERE name = 'Courses')
+      ELSE (SELECT id FROM envelopes WHERE name = 'Autres') END,
+    t.label, t.amount_cents, t.date, ${MONDAY_OF('t.date')}
+  FROM transactions t
+  WHERE t.type = 'expense' AND t.bill_id IS NULL
+  ORDER BY t.date, t.id;
+
+INSERT INTO fixed_items (kind, name, amount_cents, day, frequency, start_month, end_month, created_at)
+  SELECT 'income', label, amount_cents, CAST(substr(date, 9, 2) AS INTEGER), 'once', month, month,
+    'legacy-income:' || id
+  FROM transactions WHERE type = 'income';
+INSERT INTO fixed_checks (item_id, month, checked_at)
+  SELECT f.id, f.start_month, datetime('now')
+  FROM fixed_items f JOIN transactions t ON f.created_at = 'legacy-income:' || t.id
+  WHERE t.cleared = 1;
+
+INSERT INTO fixed_items (kind, name, amount_cents, day, frequency, start_month, end_month, created_at)
+  SELECT 'charge', b.name, b.amount_cents, b.due_day, 'monthly',
+    MIN(substr(b.created_at, 1, 7), COALESCE((SELECT MIN(month) FROM bill_payments WHERE bill_id = b.id), '9999')),
+    CASE WHEN b.active = 1 THEN NULL
+      ELSE COALESCE((SELECT MAX(month) FROM bill_payments WHERE bill_id = b.id), substr(b.created_at, 1, 7)) END,
+    'legacy-bill:' || b.id
+  FROM bills b;
+INSERT INTO fixed_checks (item_id, month, checked_at)
+  SELECT f.id, bp.month, bp.paid_at
+  FROM bill_payments bp JOIN fixed_items f ON f.created_at = 'legacy-bill:' || bp.bill_id;
+
+UPDATE fixed_items SET created_at = datetime('now') WHERE created_at LIKE 'legacy-%';
+
+INSERT INTO savings_pots (id, name, icon, color, kind, initial_cents, target_cents, monthly_cents, sort_order, created_at)
+  SELECT id, name, icon, color,
+    CASE WHEN lower(name) LIKE '%livret a%' OR lower(name) LIKE '%ldds%' OR lower(name) LIKE '%urgence%'
+      OR lower(name) LIKE '%précaution%' OR lower(name) LIKE '%securite%' OR lower(name) LIKE '%sécurité%'
+      THEN 'securite' ELSE 'projet' END,
+    initial_cents, target_cents, monthly_cents, sort_order, created_at
+  FROM savings_accounts;
+INSERT INTO savings_moves (pot_id, amount_cents, date, note)
+  SELECT account_id, amount_cents, date, note FROM savings_transfers WHERE done = 1;
+
+DROP TABLE _courses_cats;
+DROP TABLE bill_payments;
+DROP TABLE budget_templates;
+DROP TABLE budgets;
+DROP TABLE transactions;
+DROP TABLE bills;
+DROP TABLE categories;
+DROP TABLE savings_transfers;
+DROP TABLE savings_accounts;
 `;
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const current = row?.user_version ?? 0;
 
-  if (current < 1) {
-    await db.execAsync(MIGRATION_V1);
-    await seedDefaultCategories(db);
-    await db.execAsync('PRAGMA user_version = 1');
+  if (current === 0) {
+    // Installation neuve : directement le modèle simplifié.
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(SCHEMA_V10);
+      await seedDefaults(db);
+    });
+    await db.execAsync('PRAGMA user_version = 10');
+    return;
   }
-  if (current < 2) {
-    await db.execAsync(MIGRATION_V2);
-    await db.execAsync('PRAGMA user_version = 2');
-  }
-  if (current < 3) {
-    await db.execAsync(MIGRATION_V3);
-    await db.execAsync('PRAGMA user_version = 3');
-  }
-  if (current < 4) {
-    await db.execAsync(MIGRATION_V4);
-    await db.execAsync('PRAGMA user_version = 4');
-  }
-  if (current < 5) {
-    await db.execAsync(MIGRATION_V5);
-    await db.execAsync('PRAGMA user_version = 5');
-  }
-  if (current < 6) {
-    for (const [from, to] of COLOR_REMAP) {
-      await db.runAsync('UPDATE categories SET color = ? WHERE color = ?', [to, from]);
-      await db.runAsync('UPDATE savings_accounts SET color = ? WHERE color = ?', [to, from]);
-    }
-    await db.execAsync('PRAGMA user_version = 6');
-  }
-  if (current < 7) {
-    for (const [from, to] of COLOR_REMAP_V7) {
-      await db.runAsync('UPDATE categories SET color = ? WHERE color = ?', [to, from]);
-      await db.runAsync('UPDATE savings_accounts SET color = ? WHERE color = ?', [to, from]);
-    }
-    await db.execAsync('PRAGMA user_version = 7');
-  }
-  if (current < 8) {
-    await db.execAsync(MIGRATION_V8);
-    for (const [bucket, name] of BUCKET_DEFAULTS) {
-      await db.runAsync('UPDATE categories SET bucket = ? WHERE name = ?', [bucket, name]);
-    }
-    await db.execAsync('PRAGMA user_version = 8');
-  }
-  if (current < 9) {
-    await db.execAsync(MIGRATION_V9);
-    await db.execAsync('PRAGMA user_version = 9');
+
+  if (current < 10) {
+    // Base existante : on termine l'ancienne chaîne, puis on convertit en une
+    // seule transaction (tout ou rien — l'ancienne base reste intacte en cas d'échec).
+    await migrateLegacyToV9(db, current);
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(SCHEMA_V10);
+      await db.execAsync(CONVERT_V9);
+    });
+    await db.execAsync('PRAGMA user_version = 10');
   }
 }
 
-async function seedDefaultCategories(db: SQLiteDatabase): Promise<void> {
-  const count = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM categories');
-  if ((count?.n ?? 0) > 0) return;
-  for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
-    const [name, icon, color] = DEFAULT_CATEGORIES[i];
-    await db.runAsync(
-      'INSERT INTO categories (name, icon, color, sort_order) VALUES (?, ?, ?, ?)',
-      [name, icon, color, i],
-    );
-  }
+/** Enveloppes Courses / Autres et les deux poches d'épargne de la méthode. */
+export async function seedDefaults(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync(DEFAULT_ENVELOPES);
+  await db.execAsync(DEFAULT_POTS);
 }

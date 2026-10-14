@@ -1,4 +1,4 @@
-import { addMonths, format, getDay, getDaysInMonth, parse, setDate } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, format, getDay, getDaysInMonth, parse, setDate } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 /** Clé de mois au format 'YYYY-MM', utilisée partout en base. */
@@ -38,12 +38,6 @@ export function shortDayLabel(isoDay: string): string {
   return format(date, 'd MMMM', { locale: fr });
 }
 
-/** "juil." — libellé court du mois pour les axes de graphique. */
-export function shortMonthLabel(month: MonthKey): string {
-  const date = parse(month, 'yyyy-MM', new Date());
-  return format(date, 'MMM', { locale: fr });
-}
-
 /** Date ISO du jour `day` dans le mois donné, bornée à la fin du mois (le 31 → le 28 en février). */
 export function isoDayInMonth(month: MonthKey, day: number): string {
   const start = parse(month, 'yyyy-MM', new Date());
@@ -51,66 +45,92 @@ export function isoDayInMonth(month: MonthKey, day: number): string {
   return format(setDate(start, Math.min(Math.max(1, day), lastDay)), 'yyyy-MM-dd');
 }
 
-/** Le mois ('yyyy-MM') et le quantième d'une date ISO 'yyyy-MM-dd'. */
-export function monthOfIsoDay(isoDay: string): MonthKey {
-  return isoDay.slice(0, 7);
+/* ─── Semaines (lundi → dimanche), comme la méthode Budgetiz ─── */
+
+/** Clé de semaine : date ISO 'yyyy-MM-dd' de son lundi. */
+export type WeekKey = string;
+
+function parseIso(isoDay: string): Date {
+  return parse(isoDay, 'yyyy-MM-dd', new Date());
 }
 
-export function dayOfIsoDay(isoDay: string): number {
-  return Number(isoDay.slice(8, 10));
+/** Lundi de la semaine contenant ce jour. */
+export function weekKeyOf(isoDay: string): WeekKey {
+  const date = parseIso(isoDay);
+  return toIsoDay(addDays(date, -((getDay(date) + 6) % 7)));
 }
 
-/** Nombre de jours du mois. */
-export function daysInMonth(month: MonthKey): number {
-  return getDaysInMonth(parse(month, 'yyyy-MM', new Date()));
+export function currentWeekKey(): WeekKey {
+  return weekKeyOf(todayIso());
 }
 
-/**
- * Grille de calendrier du mois, semaine commençant le lundi : des cases vides
- * (`null`) jusqu'au 1er, puis les quantièmes. Sert au choix d'un jour.
- */
-export function monthDayGrid(month: MonthKey): Array<number | null> {
-  const start = parse(month, 'yyyy-MM', new Date());
-  const leading = (getDay(start) + 6) % 7; // getDay : 0 = dimanche
-  return [
-    ...Array.from({ length: leading }, () => null),
-    ...Array.from({ length: getDaysInMonth(start) }, (_, i) => i + 1),
-  ];
+export function shiftWeekKey(week: WeekKey, offset: number): WeekKey {
+  return toIsoDay(addDays(parseIso(week), offset * 7));
 }
 
-/**
- * Date du jour ramenée dans le mois donné : aujourd'hui si c'est le mois
- * courant, sinon le même quantième dans ce mois (borné à sa fin). Sert à dater
- * une saisie/un pointage du jour sans jamais sortir du mois affiché (la colonne
- * `month` des transactions porte les agrégats).
- */
-export function todayInMonth(month: MonthKey): string {
-  if (month === currentMonthKey()) return todayIso();
-  return isoDayInMonth(month, new Date().getDate());
+/** Les 7 jours ISO de la semaine, du lundi au dimanche. */
+export function weekDays(week: WeekKey): string[] {
+  const start = parseIso(week);
+  return Array.from({ length: 7 }, (_, i) => toIsoDay(addDays(start, i)));
 }
 
-/** "mars 2027" — le mois situé à `offset` mois d'aujourd'hui. */
-export function monthLabelFromNow(offset: number): string {
-  return format(addMonths(new Date(), offset), 'MMMM yyyy', { locale: fr });
+/** Dimanche de la semaine. */
+export function weekEnd(week: WeekKey): string {
+  return toIsoDay(addDays(parseIso(week), 6));
 }
 
-/**
- * Fraction du mois écoulée (0..1) pour le mois courant — sert de repère de
- * rythme sur les jauges de budget. `undefined` pour tout autre mois (pas de
- * rythme pertinent sur un mois passé ou futur).
- */
-export function monthPaceRatio(month: MonthKey): number | undefined {
-  if (month !== currentMonthKey()) return undefined;
-  const now = new Date();
-  return now.getDate() / getDaysInMonth(now);
+/** "13 – 19 oct." ou "29 sept. – 5 oct." */
+export function weekLabel(week: WeekKey): string {
+  const start = parseIso(week);
+  const end = addDays(start, 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  return sameMonth
+    ? `${format(start, 'd')} – ${format(end, 'd MMM', { locale: fr })}`
+    : `${format(start, 'd MMM', { locale: fr })} – ${format(end, 'd MMM', { locale: fr })}`;
 }
 
-/** Les n derniers mois (mois courant inclus), du plus ancien au plus récent. */
-export function lastMonthKeys(n: number): MonthKey[] {
-  const current = currentMonthKey();
-  const keys: MonthKey[] = [];
-  for (let i = n - 1; i >= 0; i--) {
-    keys.push(shiftMonthKey(current, -i));
+/** Une semaine appartient au mois de son lundi : un mois compte 4 ou 5 semaines. */
+export function monthOfWeek(week: WeekKey): MonthKey {
+  return week.slice(0, 7);
+}
+
+/** Les semaines (lundis) d'un mois. */
+export function weeksOfMonth(month: MonthKey): WeekKey[] {
+  const weeks: WeekKey[] = [];
+  let week = weekKeyOf(`${month}-01`);
+  if (monthOfWeek(week) !== month) week = shiftWeekKey(week, 1);
+  while (monthOfWeek(week) === month) {
+    weeks.push(week);
+    week = shiftWeekKey(week, 1);
   }
-  return keys;
+  return weeks;
+}
+
+/** Jours restants jusqu'à dimanche inclus (7 le lundi, 1 le dimanche) ; 0 pour une semaine passée. */
+export function daysLeftInWeek(week: WeekKey): number {
+  const left = differenceInCalendarDays(parseIso(weekEnd(week)), new Date()) + 1;
+  return Math.max(0, Math.min(7, left));
+}
+
+/** Fraction de la semaine écoulée (repère de rythme), `undefined` hors semaine courante. */
+export function weekPaceRatio(week: WeekKey): number | undefined {
+  if (week !== currentWeekKey()) return undefined;
+  return (7 - daysLeftInWeek(week) + 1) / 7;
+}
+
+/** "lun. 13" */
+export function weekdayLabel(isoDay: string): string {
+  return format(parseIso(isoDay), 'EEE d', { locale: fr });
+}
+
+/** "lundi 13 octobre" */
+export function longDayLabel(isoDay: string): string {
+  return format(parseIso(isoDay), 'EEEE d MMMM', { locale: fr });
+}
+
+/** Nombre de mois entre deux clés (b − a). */
+export function monthsBetween(a: MonthKey, b: MonthKey): number {
+  const [ya, ma] = a.split('-').map(Number);
+  const [yb, mb] = b.split('-').map(Number);
+  return (yb - ya) * 12 + (mb - ma);
 }

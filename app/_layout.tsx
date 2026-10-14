@@ -20,7 +20,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BiometricGate } from '@/src/components/BiometricGate';
 import { Skeleton } from '@/src/components/ui/Skeleton';
 import { DATABASE_NAME, onDatabaseInit } from '@/src/db';
-import { useBudgetMethod } from '@/src/store/budgetMethod';
 import { useThemePref } from '@/src/store/themePref';
 import { spacing, useTheme } from '@/src/theme';
 
@@ -53,10 +52,9 @@ function DatabaseLoading() {
 export default function RootLayout() {
   const theme = useTheme();
 
-  // Relit les préférences persistées (apparence, méthode de budget) dès le lancement.
+  // Relit les préférences persistées (apparence) dès le lancement.
   useEffect(() => {
     void useThemePref.getState().hydrate();
-    void useBudgetMethod.getState().hydrate();
   }, []);
 
   const [fontsLoaded] = useFonts({
@@ -88,17 +86,12 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="nouvelle-transaction" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="date-operation" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="nouveau-budget" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="budget-type" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="annee" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="budget-detail" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="nouveau-compte" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="virement" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="nouvelle-facture" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="nouvelle-categorie" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="categories" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="depense" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="enveloppe" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="fixe" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="poche" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="poche-detail" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="mouvement" options={{ presentation: 'modal' }} />
               <Stack.Screen name="reglages" options={{ presentation: 'modal' }} />
             </Stack>
           </SQLiteProvider>

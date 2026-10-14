@@ -2,186 +2,167 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { invalidateQueries } from '@/src/store/invalidation';
 import type { MonthKey } from '@/src/utils/dates';
 
-export type SavingsAccount = {
+/**
+ * Poches d'épargne (méthode Budgetiz) : « Urgence & avenir » (sécurité, on
+ * n'y touche pas) et « Projets & pépins » (vacances, réparations, cadeaux…).
+ * Solde = valeur de départ + Σ mouvements (dépôts positifs, retraits négatifs).
+ */
+
+export type PotKind = 'securite' | 'projet';
+
+export const POT_KIND_LABELS: Record<PotKind, string> = {
+  securite: 'Urgence & avenir',
+  projet: 'Projets & pépins',
+};
+
+export type Pot = {
   id: number;
   name: string;
   icon: string;
   color: string;
+  kind: PotKind;
   initial_cents: number;
   target_cents: number | null;
   monthly_cents: number | null;
   sort_order: number;
-  created_at: string;
 };
 
-export type SavingsAccountWithBalance = SavingsAccount & {
-  /** Solde réel = valeur de départ + virements effectués (cochés). */
-  real_cents: number;
-  /** Solde prévisionnel = valeur de départ + tous les virements (prévus + effectués). */
-  planned_cents: number;
+export type PotWithBalance = Pot & {
+  balance_cents: number;
+  /** Versement programmé du mois demandé déjà fait ? */
+  plan_done: number;
 };
 
-export type SavingsTransfer = {
+export type SavingsMove = {
   id: number;
-  account_id: number;
+  pot_id: number;
   amount_cents: number;
-  month: MonthKey;
   date: string;
-  done: number;
   note: string | null;
+  plan_month: MonthKey | null;
+  week: string | null;
 };
 
-// ---------- Comptes ----------
+export async function listPots(db: SQLiteDatabase, month: MonthKey): Promise<PotWithBalance[]> {
+  return db.getAllAsync<PotWithBalance>(
+    `SELECT p.*,
+       p.initial_cents + COALESCE((SELECT SUM(m.amount_cents) FROM savings_moves m WHERE m.pot_id = p.id), 0) AS balance_cents,
+       EXISTS (SELECT 1 FROM savings_moves m WHERE m.pot_id = p.id AND m.plan_month = ?) AS plan_done
+     FROM savings_pots p
+     ORDER BY CASE p.kind WHEN 'securite' THEN 0 ELSE 1 END, p.sort_order, p.id`,
+    [month],
+  );
+}
 
-export async function createAccount(
+export async function getPot(db: SQLiteDatabase, id: number): Promise<PotWithBalance | null> {
+  return db.getFirstAsync<PotWithBalance>(
+    `SELECT p.*,
+       p.initial_cents + COALESCE((SELECT SUM(m.amount_cents) FROM savings_moves m WHERE m.pot_id = p.id), 0) AS balance_cents,
+       0 AS plan_done
+     FROM savings_pots p WHERE p.id = ?`,
+    [id],
+  );
+}
+
+export async function savePot(
   db: SQLiteDatabase,
   input: {
+    id?: number;
     name: string;
     icon: string;
     color: string;
+    kind: PotKind;
     initialCents: number;
-    targetCents?: number | null;
-    monthlyCents?: number | null;
+    targetCents: number | null;
+    monthlyCents: number | null;
   },
 ): Promise<void> {
-  const max = await db.getFirstAsync<{ m: number }>('SELECT COALESCE(MAX(sort_order), 0) AS m FROM savings_accounts');
-  await db.runAsync(
-    `INSERT INTO savings_accounts (name, icon, color, initial_cents, target_cents, monthly_cents, sort_order, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-    [
-      input.name,
-      input.icon,
-      input.color,
-      input.initialCents,
-      input.targetCents ?? null,
-      input.monthlyCents ?? null,
-      (max?.m ?? 0) + 1,
-    ],
-  );
+  const values = [
+    input.name,
+    input.icon,
+    input.color,
+    input.kind,
+    input.initialCents,
+    input.targetCents,
+    input.monthlyCents,
+  ];
+  if (input.id) {
+    await db.runAsync(
+      `UPDATE savings_pots SET name = ?, icon = ?, color = ?, kind = ?, initial_cents = ?, target_cents = ?, monthly_cents = ?
+       WHERE id = ?`,
+      [...values, input.id],
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO savings_pots (name, icon, color, kind, initial_cents, target_cents, monthly_cents, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM savings_pots), datetime('now'))`,
+      values,
+    );
+  }
   invalidateQueries();
 }
 
-export async function updateAccount(
+export async function deletePot(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM savings_pots WHERE id = ?', [id]);
+  invalidateQueries();
+}
+
+// ---------- Mouvements ----------
+
+export async function listMoves(db: SQLiteDatabase, potId: number): Promise<SavingsMove[]> {
+  return db.getAllAsync<SavingsMove>(
+    'SELECT * FROM savings_moves WHERE pot_id = ? ORDER BY date DESC, id DESC',
+    [potId],
+  );
+}
+
+export async function addMove(
   db: SQLiteDatabase,
-  input: {
-    id: number;
-    name: string;
-    icon: string;
-    color: string;
-    initialCents: number;
-    targetCents?: number | null;
-    monthlyCents?: number | null;
-  },
+  input: { potId: number; amountCents: number; date: string; note: string | null },
 ): Promise<void> {
-  await db.runAsync(
-    `UPDATE savings_accounts
-     SET name = ?, icon = ?, color = ?, initial_cents = ?, target_cents = ?, monthly_cents = ?
-     WHERE id = ?`,
-    [
-      input.name,
-      input.icon,
-      input.color,
-      input.initialCents,
-      input.targetCents ?? null,
-      input.monthlyCents ?? null,
-      input.id,
-    ],
-  );
+  await db.runAsync('INSERT INTO savings_moves (pot_id, amount_cents, date, note) VALUES (?, ?, ?, ?)', [
+    input.potId,
+    input.amountCents,
+    input.date,
+    input.note,
+  ]);
   invalidateQueries();
 }
 
-export async function deleteAccount(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM savings_accounts WHERE id = ?', [id]);
+/** Supprime un mouvement ; s'il venait d'un reste de semaine, la semaine redevient « à solder ». */
+export async function deleteMove(db: SQLiteDatabase, move: SavingsMove): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM savings_moves WHERE id = ?', [move.id]);
+    if (move.week) await db.runAsync('DELETE FROM week_closures WHERE week = ?', [move.week]);
+  });
   invalidateQueries();
 }
 
-export async function listAccountsWithBalance(db: SQLiteDatabase): Promise<SavingsAccountWithBalance[]> {
-  return db.getAllAsync<SavingsAccountWithBalance>(
-    `SELECT a.*,
-       a.initial_cents + COALESCE((
-         SELECT SUM(t.amount_cents) FROM savings_transfers t WHERE t.account_id = a.id AND t.done = 1
-       ), 0) AS real_cents,
-       a.initial_cents + COALESCE((
-         SELECT SUM(t.amount_cents) FROM savings_transfers t WHERE t.account_id = a.id
-       ), 0) AS planned_cents
-     FROM savings_accounts a
-     ORDER BY a.sort_order, a.name`,
-  );
-}
-
-// ---------- Virements ----------
-
-export async function addTransfer(
+/** Coche / décoche le versement programmé du mois (crée ou retire le dépôt correspondant). */
+export async function setPlanDone(
   db: SQLiteDatabase,
-  input: { accountId: number; amountCents: number; month: MonthKey; date: string; done: boolean; note?: string },
+  pot: Pot,
+  month: MonthKey,
+  done: boolean,
+  date: string,
 ): Promise<void> {
-  await db.runAsync(
-    `INSERT INTO savings_transfers (account_id, amount_cents, month, date, done, note)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [input.accountId, input.amountCents, input.month, input.date, input.done ? 1 : 0, input.note ?? null],
-  );
+  if (done) {
+    if (!pot.monthly_cents) return;
+    await db.runAsync(
+      'INSERT OR IGNORE INTO savings_moves (pot_id, amount_cents, date, note, plan_month) VALUES (?, ?, ?, ?, ?)',
+      [pot.id, pot.monthly_cents, date, 'Versement programmé', month],
+    );
+  } else {
+    await db.runAsync('DELETE FROM savings_moves WHERE pot_id = ? AND plan_month = ?', [pot.id, month]);
+  }
   invalidateQueries();
 }
 
-export async function setTransferDone(db: SQLiteDatabase, id: number, done: boolean): Promise<void> {
-  await db.runAsync('UPDATE savings_transfers SET done = ? WHERE id = ?', [done ? 1 : 0, id]);
-  invalidateQueries();
-}
-
-export async function deleteTransfer(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM savings_transfers WHERE id = ?', [id]);
-  invalidateQueries();
-}
-
-export async function listTransfersForMonth(db: SQLiteDatabase, month: MonthKey): Promise<SavingsTransfer[]> {
-  return db.getAllAsync<SavingsTransfer>(
-    'SELECT * FROM savings_transfers WHERE month = ? ORDER BY date, id',
+/** Épargne mise de côté pendant le mois (dépôts − retraits datés de ce mois). */
+export async function getMonthSaved(db: SQLiteDatabase, month: MonthKey): Promise<number> {
+  const row = await db.getFirstAsync<{ total: number }>(
+    "SELECT COALESCE(SUM(amount_cents), 0) AS total FROM savings_moves WHERE substr(date, 1, 7) = ?",
     [month],
   );
-}
-
-// ---------- Agrégats ----------
-
-export type SavingsOverview = {
-  /** Épargne totale réelle (valeurs de départ + tous les virements effectués). */
-  total_real_cents: number;
-  /** Somme des valeurs de départ + tous les virements (prévu inclus). */
-  total_planned_cents: number;
-};
-
-export async function getSavingsOverview(db: SQLiteDatabase): Promise<SavingsOverview> {
-  const row = await db.getFirstAsync<SavingsOverview>(
-    `SELECT
-       COALESCE((SELECT SUM(initial_cents) FROM savings_accounts), 0)
-         + COALESCE((SELECT SUM(amount_cents) FROM savings_transfers WHERE done = 1), 0) AS total_real_cents,
-       COALESCE((SELECT SUM(initial_cents) FROM savings_accounts), 0)
-         + COALESCE((SELECT SUM(amount_cents) FROM savings_transfers), 0) AS total_planned_cents`,
-  );
-  return row ?? { total_real_cents: 0, total_planned_cents: 0 };
-}
-
-/** Objectif d'épargne mensuel type : Σ des virements mensuels prévus des comptes. */
-export async function getMonthlySavingsTarget(db: SQLiteDatabase): Promise<number> {
-  const row = await db.getFirstAsync<{ s: number }>(
-    'SELECT COALESCE(SUM(monthly_cents), 0) AS s FROM savings_accounts',
-  );
-  return row?.s ?? 0;
-}
-
-/** Épargne prévue pour le mois (tous les virements du mois, cochés ou non) — pour le reste à vivre prévisionnel. */
-export async function getPlannedSavingsForMonth(db: SQLiteDatabase, month: MonthKey): Promise<number> {
-  const row = await db.getFirstAsync<{ s: number }>(
-    'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM savings_transfers WHERE month = ?',
-    [month],
-  );
-  return row?.s ?? 0;
-}
-
-/** Épargne réellement virée sur le mois (virements cochés « effectué ») — pour le reste à vivre réel. */
-export async function getRealSavingsForMonth(db: SQLiteDatabase, month: MonthKey): Promise<number> {
-  const row = await db.getFirstAsync<{ s: number }>(
-    'SELECT COALESCE(SUM(amount_cents), 0) AS s FROM savings_transfers WHERE month = ? AND done = 1',
-    [month],
-  );
-  return row?.s ?? 0;
+  return row?.total ?? 0;
 }
