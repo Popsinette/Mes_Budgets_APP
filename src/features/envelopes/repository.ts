@@ -5,7 +5,7 @@ import { weekKeyOf, weeksOfMonth, type MonthKey, type WeekKey } from '@/src/util
 /**
  * Enveloppes (méthode Budgetiz) :
  * - période « week » : budget variable (Courses, Autres…), montant par semaine,
- *   du lundi au dimanche ; une semaine appartient au mois de son lundi. Le
+ *   du lundi au dimanche ; une semaine appartient au mois de son jeudi (celui qui en a le plus de jours). Le
  *   reste d'une semaine terminée peut être mis de côté (voir `closeWeek`).
  * - période « month » : poste suivi avec les Fixes (Essence, Garderie…),
  *   montant par mois civil.
