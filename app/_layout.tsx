@@ -89,6 +89,7 @@ export default function RootLayout() {
               <Stack.Screen name="ajouter" options={{ presentation: 'modal' }} />
               <Stack.Screen name="depense" options={{ presentation: 'modal' }} />
               <Stack.Screen name="enveloppe-detail" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="enveloppes" options={{ presentation: 'modal' }} />
               <Stack.Screen name="sante" options={{ presentation: 'modal' }} />
               <Stack.Screen name="virements" options={{ presentation: 'modal' }} />
               <Stack.Screen name="enveloppe" options={{ presentation: 'modal' }} />

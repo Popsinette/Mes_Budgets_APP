@@ -30,6 +30,7 @@ export function ProgressRing({ ratio, color, size = 52, strokeWidth = 4.5, child
             strokeWidth={strokeWidth}
             fill="none"
           />
+          {progress > 0 ? (
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -40,6 +41,7 @@ export function ProgressRing({ ratio, color, size = 52, strokeWidth = 4.5, child
             fill="none"
             strokeDasharray={`${progress} ${circumference - progress}`}
           />
+          ) : null}
         </G>
       </Svg>
       <View style={styles.center}>{children}</View>

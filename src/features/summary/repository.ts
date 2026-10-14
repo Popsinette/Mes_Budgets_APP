@@ -43,6 +43,18 @@ export type MonthSummary = {
   savings_done_cents: number;
   pots_total_cents: number;
   pots_count: number;
+  /**
+   * Plan du mois (montants prévus) : revenus − charges fixes − postes du mois
+   * − enveloppes variables (montant × semaines) − épargne programmée.
+   */
+  plan_left_cents: number;
+  /** Dépassements des enveloppes : Σ max(0, dépensé − budget). */
+  overrun_cents: number;
+  /**
+   * Reste prévisionnel = plan − dépassements − santé (reste à charge). Négatif =
+   * « dans le rouge » : les dépenses prévues ou faites dépassent les revenus.
+   */
+  forecast_left_cents: number;
 };
 
 export async function getMonthSummary(db: SQLiteDatabase, month: MonthKey): Promise<MonthSummary> {
@@ -70,6 +82,14 @@ export async function getMonthSummary(db: SQLiteDatabase, month: MonthKey): Prom
     sante: Math.max(0, healthAdvanced - healthRefund),
   };
   const expense = spending.fixes + spending.variables + spending.postes + spending.sante;
+  const savingsPlanned = sum(pots, (p) => p.monthly_cents ?? 0);
+  const planLeft =
+    income -
+    spending.fixes -
+    sum(monthly, (e) => e.budget_cents) -
+    sum(weekly, (e) => e.budget_cents) -
+    savingsPlanned;
+  const overrun = sum(envelopes, (e) => Math.max(0, e.spent_cents - e.budget_cents));
 
   return {
     income_cents: income,
@@ -85,10 +105,13 @@ export async function getMonthSummary(db: SQLiteDatabase, month: MonthKey): Prom
     spending,
     expense_cents: expense,
     balance_cents: income - expense,
-    savings_planned_cents: sum(pots, (p) => p.monthly_cents ?? 0),
+    savings_planned_cents: savingsPlanned,
     savings_done_cents: saved,
     pots_total_cents: sum(pots, (p) => p.balance_cents),
     pots_count: pots.length,
+    plan_left_cents: planLeft,
+    overrun_cents: overrun,
+    forecast_left_cents: planLeft - overrun - spending.sante,
   };
 }
 

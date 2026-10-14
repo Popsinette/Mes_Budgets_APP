@@ -65,6 +65,11 @@ export default function EnvelopeDetail() {
         </View>
       </View>
       <ProgressBar ratio={ratio} color={ratio > 1 ? theme.colors.danger : envelope.color} height={10} />
+      <Button
+        label={`Modifier le montant (${formatCents(envelope.weekly_cents)} par ${isWeek ? 'semaine' : 'mois'})`}
+        variant="secondary"
+        onPress={() => router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })}
+      />
 
       {isWeek ? (
         <>
@@ -101,11 +106,7 @@ export default function EnvelopeDetail() {
         onPress={() => router.push({ pathname: '/depense', params: { envelopeId: String(envelope.id), month } })}
       />
 
-      <SectionHeader
-        title="Dépenses"
-        actionLabel="Modifier l’enveloppe"
-        onAction={() => router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })}
-      />
+      <SectionHeader title="Dépenses" />
       <ExpenseList expenses={expenses ?? []} empty="Aucune dépense ce mois-ci." onDelete={confirmDelete} />
     </Screen>
   );

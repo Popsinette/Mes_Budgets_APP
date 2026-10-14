@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, Switch, View } from 'react-native';
 import { confirmAction, notify } from '@/src/utils/dialogs';
@@ -144,6 +145,14 @@ export default function SettingsScreen() {
         </View>
       </Card>
       ) : null}
+
+      <Card style={{ gap: spacing.md }}>
+        <Heading>Mes enveloppes</Heading>
+        <Body tone="muted" size={13.5}>
+          Montants de tes enveloppes variables (par semaine) et de tes postes du mois.
+        </Body>
+        <Button label="Gérer mes enveloppes" variant="secondary" onPress={() => router.push('/enveloppes')} />
+      </Card>
 
       <Card style={{ gap: spacing.md }}>
         <Heading>Exporter mes données</Heading>
