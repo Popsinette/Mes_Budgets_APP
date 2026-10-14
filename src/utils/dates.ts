@@ -144,3 +144,8 @@ export function monthGrid(month: MonthKey): Array<string | null> {
     ...Array.from({ length: getDaysInMonth(start) }, (_, i) => isoDayInMonth(month, i + 1)),
   ];
 }
+
+/** Nombre de jours du mois. */
+export function daysInMonthOf(month: MonthKey): number {
+  return getDaysInMonth(parse(month, 'yyyy-MM', new Date()));
+}
