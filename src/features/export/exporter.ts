@@ -51,6 +51,7 @@ const TABLES = [
   'savings_pots',
   'savings_moves',
   'week_closures',
+  'health_expenses',
 ] as const;
 
 /** Sauvegarde complète : toutes les tables, au format JSON. */

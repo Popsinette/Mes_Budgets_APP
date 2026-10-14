@@ -38,6 +38,12 @@ export function shortDayLabel(isoDay: string): string {
   return format(date, 'd MMMM', { locale: fr });
 }
 
+/** "sept." — libellé court du mois pour les axes de graphique. */
+export function shortMonthLabel(month: MonthKey): string {
+  const date = parse(month, 'yyyy-MM', new Date());
+  return format(date, 'MMM', { locale: fr });
+}
+
 /** Date ISO du jour `day` dans le mois donné, bornée à la fin du mois (le 31 → le 28 en février). */
 export function isoDayInMonth(month: MonthKey, day: number): string {
   const start = parse(month, 'yyyy-MM', new Date());
@@ -66,17 +72,6 @@ export function currentWeekKey(): WeekKey {
 
 export function shiftWeekKey(week: WeekKey, offset: number): WeekKey {
   return toIsoDay(addDays(parseIso(week), offset * 7));
-}
-
-/** Les 7 jours ISO de la semaine, du lundi au dimanche. */
-export function weekDays(week: WeekKey): string[] {
-  const start = parseIso(week);
-  return Array.from({ length: 7 }, (_, i) => toIsoDay(addDays(start, i)));
-}
-
-/** Dimanche de la semaine. */
-export function weekEnd(week: WeekKey): string {
-  return toIsoDay(addDays(parseIso(week), 6));
 }
 
 /** "13 – 19 oct." ou "29 sept. – 5 oct." */
@@ -108,7 +103,7 @@ export function weeksOfMonth(month: MonthKey): WeekKey[] {
 
 /** Jours restants jusqu'à dimanche inclus (7 le lundi, 1 le dimanche) ; 0 pour une semaine passée. */
 export function daysLeftInWeek(week: WeekKey): number {
-  const left = differenceInCalendarDays(parseIso(weekEnd(week)), new Date()) + 1;
+  const left = differenceInCalendarDays(addDays(parseIso(week), 6), new Date()) + 1;
   return Math.max(0, Math.min(7, left));
 }
 
@@ -118,19 +113,34 @@ export function weekPaceRatio(week: WeekKey): number | undefined {
   return (7 - daysLeftInWeek(week) + 1) / 7;
 }
 
-/** "lun. 13" */
-export function weekdayLabel(isoDay: string): string {
-  return format(parseIso(isoDay), 'EEE d', { locale: fr });
-}
-
-/** "lundi 13 octobre" */
-export function longDayLabel(isoDay: string): string {
-  return format(parseIso(isoDay), 'EEEE d MMMM', { locale: fr });
-}
-
 /** Nombre de mois entre deux clés (b − a). */
 export function monthsBetween(a: MonthKey, b: MonthKey): number {
   const [ya, ma] = a.split('-').map(Number);
   const [yb, mb] = b.split('-').map(Number);
   return (yb - ya) * 12 + (mb - ma);
+}
+
+/** "16/09/2026" */
+export function numericDate(isoDay: string): string {
+  return format(parseIso(isoDay), 'dd/MM/yyyy');
+}
+
+/** « Semaine 3/4 » pour le mois courant, « 4 semaines » sinon. */
+export function weekProgressLabel(month: MonthKey): string {
+  const weeks = weeksOfMonth(month);
+  const index = weeks.indexOf(currentWeekKey());
+  return index >= 0 ? `Semaine ${index + 1}/${weeks.length}` : `${weeks.length} semaines`;
+}
+
+/**
+ * Grille de calendrier du mois, semaine commençant le lundi : des cases vides
+ * (`null`) jusqu'au 1er, puis les dates ISO du mois.
+ */
+export function monthGrid(month: MonthKey): Array<string | null> {
+  const start = parse(month, 'yyyy-MM', new Date());
+  const leading = (getDay(start) + 6) % 7;
+  return [
+    ...Array.from({ length: leading }, () => null),
+    ...Array.from({ length: getDaysInMonth(start) }, (_, i) => isoDayInMonth(month, i + 1)),
+  ];
 }

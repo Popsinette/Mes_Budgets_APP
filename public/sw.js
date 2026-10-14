@@ -5,7 +5,7 @@
 
 // Incrémenter à chaque changement d'icônes ou de ressources statiques : les
 // anciens caches sont purgés à l'activation.
-const CACHE_NAME = 'mes-budgets-v2';
+const CACHE_NAME = 'mes-budgets-v3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

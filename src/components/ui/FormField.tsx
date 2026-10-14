@@ -76,12 +76,14 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     fontFamily: fonts.body,
     fontSize: 16,
     paddingVertical: spacing.md + 2,
   },
   inputDisplay: {
     flex: 1,
+    minWidth: 0,
     fontFamily: fonts.displaySemibold,
     fontSize: 24,
     letterSpacing: -0.4,

@@ -1,83 +1,65 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { fonts, radius, spacing, useTheme } from '@/src/theme';
-import { monthKeyLabel, shiftMonthKey, shiftWeekKey, weekLabel, type MonthKey, type WeekKey } from '@/src/utils/dates';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { spacing, useTheme } from '@/src/theme';
+import { monthKeyLabel, shiftMonthKey, type MonthKey } from '@/src/utils/dates';
+import { Caption, Heading } from './Text';
 
 type MonthSwitcherProps = {
   month: MonthKey;
   onChange: (month: MonthKey) => void;
+  /** Ligne sous le mois (ex. « Semaine 3/4 »). */
+  subtitle?: string;
 };
 
-/** Navigation ‹ juillet 2026 › entre les mois. */
-export function MonthSwitcher({ month, onChange }: MonthSwitcherProps) {
+/** Navigation ← Septembre 2026 → entre les mois. */
+export function MonthSwitcher({ month, onChange, subtitle }: MonthSwitcherProps) {
+  const theme = useTheme();
   const label = monthKeyLabel(month);
   return (
-    <PeriodSwitcher
-      label={label.charAt(0).toUpperCase() + label.slice(1)}
-      onPrev={() => onChange(shiftMonthKey(month, -1))}
-      onNext={() => onChange(shiftMonthKey(month, 1))}
-    />
-  );
-}
-
-/** Navigation ‹ 13 – 19 oct. › entre les semaines (lundi → dimanche). */
-export function WeekSwitcher({ week, onChange }: { week: WeekKey; onChange: (week: WeekKey) => void }) {
-  return (
-    <PeriodSwitcher
-      label={`Semaine du ${weekLabel(week)}`}
-      onPrev={() => onChange(shiftWeekKey(week, -1))}
-      onNext={() => onChange(shiftWeekKey(week, 1))}
-    />
-  );
-}
-
-function PeriodSwitcher({ label, onPrev, onNext }: { label: string; onPrev: () => void; onNext: () => void }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.row, { borderColor: theme.colors.border }]}>
-      <Pressable
-        hitSlop={10}
-        onPress={onPrev}
-        accessibilityRole="button"
-        accessibilityLabel="Précédent"
-        style={[styles.arrow, { backgroundColor: theme.colors.cardMuted }]}
-      >
-        <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
-      </Pressable>
-      <Text style={[styles.label, { color: theme.colors.text }]}>{label}</Text>
-      <Pressable
-        hitSlop={10}
-        onPress={onNext}
-        accessibilityRole="button"
-        accessibilityLabel="Suivant"
-        style={[styles.arrow, { backgroundColor: theme.colors.cardMuted }]}
-      >
-        <Ionicons name="chevron-forward" size={18} color={theme.colors.text} />
-      </Pressable>
+    <View style={styles.wrap}>
+      <View style={styles.row}>
+        <Pressable
+          hitSlop={12}
+          onPress={() => onChange(shiftMonthKey(month, -1))}
+          accessibilityRole="button"
+          accessibilityLabel="Mois précédent"
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </Pressable>
+        <Heading style={styles.label}>{label.charAt(0).toUpperCase() + label.slice(1)}</Heading>
+        <Pressable
+          hitSlop={12}
+          onPress={() => onChange(shiftMonthKey(month, 1))}
+          accessibilityRole="button"
+          accessibilityLabel="Mois suivant"
+        >
+          <Ionicons name="arrow-forward" size={24} color={theme.colors.text} />
+        </Pressable>
+      </View>
+      {subtitle ? <Caption style={styles.subtitle}>{subtitle}</Caption> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    alignItems: 'center',
+    gap: 2,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
-    borderWidth: 1,
-  },
-  arrow: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.xl,
   },
   label: {
-    fontFamily: fonts.displaySemibold,
-    fontSize: 16,
-    letterSpacing: -0.2,
+    fontSize: 21,
+    letterSpacing: 0.8,
+    minWidth: 190,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontStyle: 'italic',
+    fontSize: 13.5,
   },
 });

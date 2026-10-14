@@ -2,6 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable } from 'react-native';
 import { Button } from '@/src/components/ui/Button';
 import { Chip } from '@/src/components/ui/Chip';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
@@ -20,25 +22,52 @@ import {
   type Frequency,
 } from '@/src/features/fixed/repository';
 import { useSelectedMonth } from '@/src/store/month';
-import { spacing } from '@/src/theme';
+import { spacing, useTheme } from '@/src/theme';
 import { monthKeyLabel, type MonthKey } from '@/src/utils/dates';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { centsToInput, parseAmountToCents } from '@/src/utils/money';
 
 const FREQUENCIES: Frequency[] = ['monthly', 'quarterly', 'yearly', 'once'];
 
+const ICONS: Array<keyof typeof Ionicons.glyphMap> = [
+  'home-outline',
+  'flash-outline',
+  'water-outline',
+  'call-outline',
+  'wifi-outline',
+  'tv-outline',
+  'musical-notes-outline',
+  'car-outline',
+  'shield-checkmark-outline',
+  'school-outline',
+  'barbell-outline',
+  'receipt-outline',
+  'cash-outline',
+  'briefcase-outline',
+  'people-outline',
+  'gift-outline',
+];
+
 export default function FixedModal() {
-  const params = useLocalSearchParams<{ id?: string; month?: string }>();
+  const params = useLocalSearchParams<{ id?: string; month?: string; kind?: string }>();
   const globalMonth = useSelectedMonth((s) => s.month);
   const id = params.id ? Number(params.id) : null;
   const { data: item } = useLiveQuery(async (db) => (id ? getFixedItem(db, id) : null), [id]);
   if (id && !item) return <Screen />;
-  return <FixedForm item={item ?? null} month={params.month ?? globalMonth} />;
+  return (
+    <FixedForm
+      item={item ?? null}
+      month={params.month ?? globalMonth}
+      kind={params.kind === 'income' ? 'income' : 'charge'}
+    />
+  );
 }
 
-function FixedForm({ item, month }: { item: FixedItem | null; month: MonthKey }) {
+function FixedForm({ item, month, kind: initialKind }: { item: FixedItem | null; month: MonthKey; kind: FixedKind }) {
+  const theme = useTheme();
   const db = useSQLiteContext();
-  const [kind, setKind] = useState<FixedKind>(item?.kind ?? 'charge');
+  const [kind, setKind] = useState<FixedKind>(item?.kind ?? initialKind);
+  const [icon, setIcon] = useState<string | null>(item?.icon ?? null);
   const [name, setName] = useState(item?.name ?? '');
   const [amount, setAmount] = useState(centsToInput(item?.amount_cents));
   const [day, setDay] = useState(item ? String(item.day) : '1');
@@ -70,6 +99,7 @@ function FixedForm({ item, month }: { item: FixedItem | null; month: MonthKey })
       day: dayNumber,
       frequency,
       startMonth,
+      icon,
     });
     router.back();
   };
@@ -144,6 +174,30 @@ function FixedForm({ item, month }: { item: FixedItem | null; month: MonthKey })
         ) : null}
       </View>
 
+      <View style={{ gap: spacing.sm }}>
+        <Eyebrow>Icône</Eyebrow>
+        <View style={styles.chips}>
+          {ICONS.map((value) => {
+            const selected = icon === value;
+            return (
+              <Pressable
+                key={value}
+                onPress={() => setIcon(selected ? null : value)}
+                accessibilityRole="button"
+                accessibilityLabel={value}
+                accessibilityState={{ selected }}
+                style={[
+                  styles.icon,
+                  { backgroundColor: selected ? theme.colors.secondary : theme.colors.card, borderColor: theme.colors.border },
+                ]}
+              >
+                <Ionicons name={value} size={20} color={selected ? theme.colors.onAccent : theme.colors.textMuted} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
       <Button label={item ? 'Enregistrer' : 'Ajouter'} onPress={() => void save()} loading={saving} />
       {item ? (
         <Button
@@ -161,5 +215,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  icon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

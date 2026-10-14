@@ -15,7 +15,7 @@ import { migrateLegacyToV9 } from './legacy';
  *    « Projets & pépins »…) ; solde = valeur de départ + Σ mouvements.
  *
  * Montants en centimes partout. Pour changer le schéma : ajouter une
- * migration `current < 11`, ne jamais modifier `SCHEMA_V10`.
+ * migration `current < N`, ne jamais modifier `SCHEMA_V10` ni les migrations déjà livrées.
  */
 const SCHEMA_V10 = `
 CREATE TABLE envelopes (
@@ -87,6 +87,31 @@ CREATE TABLE week_closures (
   week TEXT PRIMARY KEY,
   closed_at TEXT NOT NULL
 );
+`;
+
+/**
+ * V11 — écrans façon Budgetiz :
+ * - `envelopes.period` : 'week' (Variables : Courses, Autres…, montant par
+ *   semaine) ou 'month' (postes suivis avec les Fixes : Essence, Garderie,
+ *   Cantine…, montant par mois). `weekly_cents` porte le montant de la période.
+ * - `fixed_items.icon` : pastille de la ligne (optionnelle).
+ * - `savings_pots.deadline` : date limite d'une cagnotte ('yyyy-MM-dd').
+ * - `health_expenses` : frais de santé avancés et leur remboursement attendu ;
+ *   `settled` = remboursement reçu (« Terminé »).
+ */
+const MIGRATION_V11 = `
+ALTER TABLE envelopes ADD COLUMN period TEXT NOT NULL DEFAULT 'week';
+ALTER TABLE fixed_items ADD COLUMN icon TEXT;
+ALTER TABLE savings_pots ADD COLUMN deadline TEXT;
+CREATE TABLE health_expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  date TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  refund_cents INTEGER NOT NULL DEFAULT 0,
+  settled INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_health_date ON health_expenses(date);
 `;
 
 const DEFAULT_ENVELOPES = `
@@ -196,10 +221,7 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await seedDefaults(db);
     });
     await db.execAsync('PRAGMA user_version = 10');
-    return;
-  }
-
-  if (current < 10) {
+  } else if (current < 10) {
     // Base existante : on termine l'ancienne chaîne, puis on convertit en une
     // seule transaction (tout ou rien — l'ancienne base reste intacte en cas d'échec).
     await migrateLegacyToV9(db, current);
@@ -208,6 +230,13 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.execAsync(CONVERT_V9);
     });
     await db.execAsync('PRAGMA user_version = 10');
+  }
+
+  if (current < 11) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V11);
+    });
+    await db.execAsync('PRAGMA user_version = 11');
   }
 }
 

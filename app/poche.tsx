@@ -25,6 +25,20 @@ import { currentMonthKey } from '@/src/utils/dates';
 import { confirmAction, notify } from '@/src/utils/dialogs';
 import { centsToInput, parseAmountToCents } from '@/src/utils/money';
 
+/** "31/01/2027" → "2027-01-31" (null si invalide). */
+function frToIso(input: string): string | null {
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(input);
+  if (!match) return null;
+  const [, d, m, y] = match;
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  if (date.getMonth() !== Number(m) - 1 || date.getDate() !== Number(d)) return null;
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
+function isoToFr(iso: string): string {
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+}
+
 const ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   'shield-checkmark-outline',
   'wallet-outline',
@@ -38,26 +52,31 @@ const ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   'paw-outline',
   'trending-up-outline',
   'diamond-outline',
+  'water-outline',
+  'happy-outline',
+  'medkit-outline',
+  'bicycle-outline',
 ];
 
 export default function PotModal() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; kind?: string }>();
   const id = params.id ? Number(params.id) : null;
   const { data: pot } = useLiveQuery(async (db) => (id ? getPot(db, id) : null), [id]);
   const { data: all } = useLiveQuery((db) => listPots(db, currentMonthKey()));
   if (!all || (id && !pot)) return <Screen />;
-  return <PotForm pot={pot ?? null} count={all.length} />;
+  return <PotForm pot={pot ?? null} count={all.length} kind={params.kind === 'securite' ? 'securite' : 'projet'} />;
 }
 
-function PotForm({ pot, count }: { pot: Pot | null; count: number }) {
+function PotForm({ pot, count, kind: initialKind }: { pot: Pot | null; count: number; kind: PotKind }) {
   const db = useSQLiteContext();
   const [name, setName] = useState(pot?.name ?? '');
-  const [kind, setKind] = useState<PotKind>(pot?.kind ?? 'projet');
+  const [kind, setKind] = useState<PotKind>(pot?.kind ?? initialKind);
   const [initial, setInitial] = useState(centsToInput(pot?.initial_cents));
   const [monthly, setMonthly] = useState(centsToInput(pot?.monthly_cents));
   const [target, setTarget] = useState(centsToInput(pot?.target_cents));
   const [icon, setIcon] = useState(pot?.icon ?? 'wallet-outline');
   const [color, setColor] = useState<string>(pot?.color ?? categoryPalette[(count + 7) % categoryPalette.length]);
+  const [deadline, setDeadline] = useState(pot?.deadline ? isoToFr(pot.deadline) : '');
   const [saving, setSaving] = useState(false);
 
   const optional = (input: string) => (input.trim() ? parseAmountToCents(input) : 0);
@@ -74,8 +93,14 @@ function PotForm({ pot, count }: { pot: Pot | null; count: number }) {
       notify('Montant invalide', 'Vérifie les montants saisis (ex : 1500).');
       return;
     }
+    const deadlineIso = deadline.trim() ? frToIso(deadline.trim()) : null;
+    if (deadline.trim() && !deadlineIso) {
+      notify('Date limite invalide', 'Saisis une date au format jj/mm/aaaa, par exemple 31/01/2027.');
+      return;
+    }
     setSaving(true);
     await savePot(db, {
+      deadline: deadlineIso,
       id: pot?.id,
       name: name.trim(),
       kind,
@@ -119,6 +144,13 @@ function PotForm({ pot, count }: { pot: Pot | null; count: number }) {
       <AmountField label="Déjà épargné" value={initial} onChangeText={setInitial} placeholder="0" />
       <AmountField label="Versement mensuel programmé (optionnel)" value={monthly} onChangeText={setMonthly} placeholder="50" />
       <AmountField label="Objectif (optionnel)" value={target} onChangeText={setTarget} placeholder="3 000" />
+      <FormField
+        label="Date limite (optionnel)"
+        value={deadline}
+        onChangeText={setDeadline}
+        placeholder="31/01/2027"
+        keyboardType="numbers-and-punctuation"
+      />
       <AppearancePicker icons={ICONS} icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
       <Button label={pot ? 'Enregistrer' : 'Créer la poche'} onPress={() => void save()} loading={saving} />
       {pot ? <Button label="Supprimer la poche" variant="danger" onPress={remove} /> : null}
