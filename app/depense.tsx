@@ -14,6 +14,7 @@ import { getMonthSummary } from '@/src/features/summary/repository';
 import {
   deleteExpense,
   getExpense,
+  isEnvelopeActive,
   listEnvelopes,
   listEnvelopesForMonth,
   saveExpense,
@@ -63,7 +64,10 @@ function ExpenseForm({
   const [amount, setAmount] = useState(expense ? centsToInput(expense.amount_cents) : '');
   const [label, setLabel] = useState(expense?.label ?? '');
   const [selectedEnvelope, setSelectedEnvelope] = useState<number | null>(
-    expense?.envelope_id ?? envelopeId ?? envelopes[0]?.id ?? null,
+    expense?.envelope_id ??
+      envelopeId ??
+      envelopes.find((e) => isEnvelopeActive(e, monthOfExpense(e.period, defaultDate)))?.id ??
+      null,
   );
   const [date, setDate] = useState(expense?.date ?? defaultDate);
   const [saving, setSaving] = useState(false);
@@ -115,7 +119,10 @@ function ExpenseForm({
       <View style={{ gap: spacing.sm }}>
         <Eyebrow>Enveloppe</Eyebrow>
         <View style={styles.grid}>
-          {envelopes.map((envelope) => {
+          {envelopes
+            // Seules les enveloppes qui existent le mois de la dépense (ex. « Anniversaire » en novembre).
+            .filter((e) => isEnvelopeActive(e, monthOfExpense(e.period, date)) || e.id === selectedEnvelope)
+            .map((envelope) => {
             const selected = envelope.id === selectedEnvelope;
             return (
               <Pressable
