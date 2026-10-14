@@ -68,7 +68,7 @@ export default function EnvelopeDetail() {
       <Button
         label={`Modifier le montant (${formatCents(envelope.weekly_cents)} par ${isWeek ? 'semaine' : 'mois'})`}
         variant="secondary"
-        onPress={() => router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })}
+        onPress={() => router.push({ pathname: '/enveloppe', params: { id: String(envelope.id), month } })}
       />
 
       {isWeek ? (

@@ -135,6 +135,25 @@ ALTER TABLE health_expenses ADD COLUMN settled_at TEXT;
 ALTER TABLE savings_moves ADD COLUMN created_at TEXT;
 `;
 
+/**
+ * V13 — enveloppes propres à chaque mois :
+ * - `envelopes.start_month` / `end_month` : mois de validité (NULL = sans
+ *   limite). Une enveloppe ponctuelle (« Anniversaire » en novembre) a
+ *   start = end = ce mois. Arrêter une enveloppe récurrente = poser end_month.
+ * - `envelope_months` : montant propre à un mois (remplace `weekly_cents` pour
+ *   ce mois-là seulement).
+ */
+const MIGRATION_V13 = `
+ALTER TABLE envelopes ADD COLUMN start_month TEXT;
+ALTER TABLE envelopes ADD COLUMN end_month TEXT;
+CREATE TABLE envelope_months (
+  envelope_id INTEGER NOT NULL REFERENCES envelopes(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  PRIMARY KEY (envelope_id, month)
+);
+`;
+
 const DEFAULT_ENVELOPES = `
 INSERT INTO envelopes (name, icon, color, weekly_cents, sort_order, created_at) VALUES
   ('Courses', 'cart-outline', '#4FA173', 0, 0, datetime('now')),
@@ -265,6 +284,13 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.execAsync(MIGRATION_V12);
     });
     await db.execAsync('PRAGMA user_version = 12');
+  }
+
+  if (current < 13) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V13);
+    });
+    await db.execAsync('PRAGMA user_version = 13');
   }
 }
 

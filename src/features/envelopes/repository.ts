@@ -1,6 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { invalidateQueries } from '@/src/store/invalidation';
-import { weekKeyOf, weeksOfMonth, type MonthKey, type WeekKey } from '@/src/utils/dates';
+import { monthOfWeek, shiftMonthKey, weekKeyOf, weeksOfMonth, type MonthKey, type WeekKey } from '@/src/utils/dates';
 
 /**
  * Enveloppes (méthode Budgetiz) :
@@ -9,7 +9,10 @@ import { weekKeyOf, weeksOfMonth, type MonthKey, type WeekKey } from '@/src/util
  *   reste d'une semaine terminée peut être mis de côté (voir `closeWeek`).
  * - période « month » : poste suivi avec les Fixes (Essence, Garderie…),
  *   montant par mois civil.
- * `weekly_cents` porte le montant de la période, quelle qu'elle soit.
+ * `weekly_cents` porte le montant de la période, quelle qu'elle soit (montant
+ * par défaut). Chaque enveloppe est propre aux mois : `start_month` /
+ * `end_month` bornent sa validité (ponctuelle = un seul mois) et
+ * `envelope_months` porte un montant propre à un mois donné.
  */
 
 export type EnvelopePeriod = 'week' | 'month';
@@ -22,11 +25,27 @@ export type Envelope = {
   weekly_cents: number;
   period: EnvelopePeriod;
   sort_order: number;
+  start_month: MonthKey | null;
+  end_month: MonthKey | null;
 };
+
+/** L'enveloppe existe-t-elle ce mois-ci ? */
+export function isEnvelopeActive(e: Pick<Envelope, 'start_month' | 'end_month'>, month: MonthKey): boolean {
+  return (!e.start_month || e.start_month <= month) && (!e.end_month || e.end_month >= month);
+}
+
+/** Ponctuelle = valable un seul mois. */
+export function isOneOff(e: Pick<Envelope, 'start_month' | 'end_month'>): boolean {
+  return Boolean(e.start_month && e.start_month === e.end_month);
+}
 
 export type EnvelopeWithSpending = Envelope & { spent_cents: number };
 
 export type EnvelopeForMonth = Envelope & {
+  /** Montant par défaut (tous les mois) ; `weekly_cents` = montant de CE mois. */
+  default_cents: number;
+  /** Montant propre à ce mois (sinon montant par défaut). */
+  has_override: boolean;
   /** Budget du mois : montant × nb de semaines (week) ou montant (month). */
   budget_cents: number;
   spent_cents: number;
@@ -67,56 +86,122 @@ export async function listEnvelopesForMonth(
   currentWeek: WeekKey,
 ): Promise<EnvelopeForMonth[]> {
   const weeks = weeksOfMonth(month);
-  const rows = await db.getAllAsync<Envelope & { spent_week_based: number; spent_month_based: number; week_spent_cents: number }>(
+  const rows = await db.getAllAsync<
+    Envelope & { override_cents: number | null; spent_week_based: number; spent_month_based: number; week_spent_cents: number }
+  >(
     `SELECT e.*,
+       (SELECT amount_cents FROM envelope_months m WHERE m.envelope_id = e.id AND m.month = ?) AS override_cents,
        COALESCE((SELECT SUM(amount_cents) FROM expenses x WHERE x.envelope_id = e.id AND x.week >= ? AND x.week <= ?), 0) AS spent_week_based,
        COALESCE((SELECT SUM(amount_cents) FROM expenses x WHERE x.envelope_id = e.id AND substr(x.date, 1, 7) = ?), 0) AS spent_month_based,
        COALESCE((SELECT SUM(amount_cents) FROM expenses x WHERE x.envelope_id = e.id AND x.week = ?), 0) AS week_spent_cents
      FROM envelopes e
      ORDER BY e.sort_order, e.id`,
-    [weeks[0], weeks[weeks.length - 1], month, currentWeek],
+    [month, weeks[0], weeks[weeks.length - 1], month, currentWeek],
   );
-  return rows.map(({ spent_week_based, spent_month_based, ...e }) => ({
-    ...e,
-    budget_cents: e.period === 'week' ? e.weekly_cents * weeks.length : e.weekly_cents,
-    spent_cents: e.period === 'week' ? spent_week_based : spent_month_based,
-  }));
+  return rows
+    .map(({ override_cents, spent_week_based, spent_month_based, ...e }) => {
+      const amount = override_cents ?? e.weekly_cents;
+      return {
+        ...e,
+        default_cents: e.weekly_cents,
+        weekly_cents: amount,
+        has_override: override_cents !== null,
+        budget_cents: e.period === 'week' ? amount * weeks.length : amount,
+        spent_cents: e.period === 'week' ? spent_week_based : spent_month_based,
+      };
+    })
+    // Hors de sa période, une enveloppe n'apparaît que si elle porte des dépenses ce mois-là.
+    .filter((e) => isEnvelopeActive(e, month) || e.spent_cents > 0);
 }
 
+/** Enveloppes hebdomadaires d'une semaine (montant du mois de la semaine) et leur dépensé. */
 export async function listEnvelopesForWeek(db: SQLiteDatabase, week: WeekKey): Promise<EnvelopeWithSpending[]> {
-  return db.getAllAsync<EnvelopeWithSpending>(
-    `SELECT e.*, COALESCE(SUM(x.amount_cents), 0) AS spent_cents
-     FROM envelopes e
-     LEFT JOIN expenses x ON x.envelope_id = e.id AND x.week = ?
-     WHERE e.period = 'week'
-     GROUP BY e.id
-     ORDER BY e.sort_order, e.id`,
-    [week],
-  );
+  const list = await listEnvelopesForMonth(db, monthOfWeek(week), week);
+  return list
+    .filter((e) => e.period === 'week')
+    .map(({ default_cents: _d, has_override: _h, budget_cents: _b, spent_cents: _s, week_spent_cents, ...e }) => ({
+      ...e,
+      spent_cents: week_spent_cents,
+    }));
 }
 
+/**
+ * Crée ou modifie une enveloppe, du point de vue du mois `month` :
+ * - création : `scope` 'all' = à partir de ce mois, tous les mois ; 'only' =
+ *   ponctuelle, ce mois seulement ;
+ * - modification d'une récurrente : 'all' change le montant par défaut (et
+ *   retire le montant propre à ce mois), 'only' pose un montant propre à ce mois.
+ */
 export async function saveEnvelope(
   db: SQLiteDatabase,
-  input: { id?: number; name: string; icon: string; color: string; weeklyCents: number; period: EnvelopePeriod },
+  input: {
+    id?: number;
+    name: string;
+    icon: string;
+    color: string;
+    amountCents: number;
+    period: EnvelopePeriod;
+    month: MonthKey;
+    scope: 'all' | 'only';
+  },
 ): Promise<void> {
-  if (input.id) {
-    await db.runAsync(
-      'UPDATE envelopes SET name = ?, icon = ?, color = ?, weekly_cents = ?, period = ? WHERE id = ?',
-      [input.name, input.icon, input.color, input.weeklyCents, input.period, input.id],
-    );
-  } else {
-    await db.runAsync(
-      `INSERT INTO envelopes (name, icon, color, weekly_cents, period, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM envelopes), datetime('now'))`,
-      [input.name, input.icon, input.color, input.weeklyCents, input.period],
-    );
-  }
+  await db.withTransactionAsync(async () => {
+    if (!input.id) {
+      const start = input.month;
+      const end = input.scope === 'only' ? input.month : null;
+      await db.runAsync(
+        `INSERT INTO envelopes (name, icon, color, weekly_cents, period, start_month, end_month, sort_order, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM envelopes), datetime('now'))`,
+        [input.name, input.icon, input.color, input.amountCents, input.period, start, end],
+      );
+      return;
+    }
+    const current = await db.getFirstAsync<Envelope>('SELECT * FROM envelopes WHERE id = ?', [input.id]);
+    if (!current) return;
+    await db.runAsync('UPDATE envelopes SET name = ?, icon = ?, color = ?, period = ? WHERE id = ?', [
+      input.name,
+      input.icon,
+      input.color,
+      input.period,
+      input.id,
+    ]);
+    if (isOneOff(current) || input.scope === 'all') {
+      await db.runAsync('UPDATE envelopes SET weekly_cents = ? WHERE id = ?', [input.amountCents, input.id]);
+      await db.runAsync('DELETE FROM envelope_months WHERE envelope_id = ? AND month = ?', [input.id, input.month]);
+    } else {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO envelope_months (envelope_id, month, amount_cents) VALUES (?, ?, ?)',
+        [input.id, input.month, input.amountCents],
+      );
+    }
+  });
   invalidateQueries();
 }
 
 /** Supprime l'enveloppe et toutes ses dépenses. */
 export async function deleteEnvelope(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM envelopes WHERE id = ?', [id]);
+  invalidateQueries();
+}
+
+/**
+ * Arrête une enveloppe récurrente à partir de `month` : les mois précédents
+ * gardent leur budget et leurs dépenses. Sans historique avant ce mois, elle
+ * est simplement supprimée.
+ */
+export async function stopEnvelope(db: SQLiteDatabase, envelope: Envelope, month: MonthKey): Promise<void> {
+  const before = await db.getFirstAsync<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM expenses WHERE envelope_id = ? AND substr(date, 1, 7) < ?',
+    [envelope.id, month],
+  );
+  if ((envelope.start_month && envelope.start_month >= month) || (before?.n ?? 0) === 0) {
+    await db.runAsync('DELETE FROM envelopes WHERE id = ?', [envelope.id]);
+  } else {
+    await db.withTransactionAsync(async () => {
+      await db.runAsync('UPDATE envelopes SET end_month = ? WHERE id = ?', [shiftMonthKey(month, -1), envelope.id]);
+      await db.runAsync('DELETE FROM envelope_months WHERE envelope_id = ? AND month >= ?', [envelope.id, month]);
+    });
+  }
   invalidateQueries();
 }
 
