@@ -25,6 +25,7 @@ import {
 import { listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/src/features/fixed/repository';
 import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
 import { ExpenseList } from '@/src/components/ExpenseList';
+import { ForecastPill } from '@/src/components/ForecastPill';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, currentWeekKey, numericDate, weekProgressLabel } from '@/src/utils/dates';
@@ -51,6 +52,7 @@ export default function BudgetScreen() {
     <Screen bottomInset={90}>
       <AppHeader title="Mon budget" />
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
+      <ForecastPill month={month} />
       <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />
       {tab === 'variables' ? <VariablesTab month={month} /> : null}
       {tab === 'fixes' ? <FixedTab month={month} kind="charge" /> : null}
@@ -84,7 +86,7 @@ function VariablesTab({ month }: { month: string }) {
         {weekly.map((envelope) => (
           <EnvelopeCard key={envelope.id} envelope={envelope} month={month} />
         ))}
-        <AddTile label="Enveloppe" onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'week' } })} />
+        <AddTile icon="options-outline" label="Gérer mes enveloppes" onPress={() => router.push('/enveloppes')} />
       </View>
 
       <Heading style={styles.sectionTitle}>Dernières dépenses</Heading>
@@ -103,10 +105,16 @@ function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: 
   const ratio = envelope.budget_cents > 0 ? envelope.spent_cents / envelope.budget_cents : 0;
   const isCurrent = month === currentMonthKey();
   const weekLeft = envelope.weekly_cents - envelope.week_spent_cents;
+  // Montant pas encore fixé : la carte mène directement à sa modification.
+  const unset = envelope.weekly_cents === 0;
   return (
     <Card
       style={styles.envelopeCard}
-      onPress={() => router.push({ pathname: '/enveloppe-detail', params: { id: String(envelope.id), month } })}
+      onPress={() =>
+        unset
+          ? router.push({ pathname: '/enveloppe', params: { id: String(envelope.id) } })
+          : router.push({ pathname: '/enveloppe-detail', params: { id: String(envelope.id), month } })
+      }
     >
       <Body weight="semibold" size={16} numberOfLines={1}>
         {envelope.name}
@@ -130,9 +138,15 @@ function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: 
         <Ionicons name="chevron-forward" size={18} color={theme.colors.text} style={styles.chevron} />
       </View>
       <View style={[styles.envelopeFooter, { borderTopColor: theme.colors.hairline }]}>
-        <Body size={14} weight="semibold" style={{ fontStyle: 'italic' }} tone={left < 0 ? 'danger' : 'text'}>
-          {left < 0 ? 'Dépassé' : 'Reste'} : {formatCents(Math.abs(left))}
-        </Body>
+        {unset ? (
+          <Body size={13.5} weight="semibold" color={theme.colors.primary} style={{ textAlign: 'center' }}>
+            Touche pour fixer ton budget
+          </Body>
+        ) : (
+          <Body size={14} weight="semibold" style={{ fontStyle: 'italic' }} tone={left < 0 ? 'danger' : 'text'}>
+            {left < 0 ? 'Dépassé' : 'Reste'} : {formatCents(Math.abs(left))}
+          </Body>
+        )}
         {isCurrent && envelope.weekly_cents > 0 ? (
           <Caption tone={weekLeft < 0 ? 'danger' : 'muted'}>
             Cette semaine : {formatCents(weekLeft)}
@@ -143,17 +157,27 @@ function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: 
   );
 }
 
-function AddTile({ label, onPress }: { label: string; onPress: () => void }) {
+function AddTile({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
   const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Nouvelle ${label.toLowerCase()}`}
+      accessibilityLabel={label}
       style={[styles.addTile, { borderColor: theme.colors.border }]}
     >
-      <Ionicons name="add" size={18} color={theme.colors.textMuted} />
-      <Caption>{label}</Caption>
+      <Ionicons name={icon} size={18} color={theme.colors.text} />
+      <Body size={14} weight="semibold">
+        {label}
+      </Body>
     </Pressable>
   );
 }
@@ -423,7 +447,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderStyle: 'dashed',
   },
   sectionTitle: {
     marginTop: spacing.sm,
