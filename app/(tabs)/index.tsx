@@ -101,13 +101,33 @@ function VariablesTab({ month }: { month: string }) {
         <AddTile icon="options-outline" label="Gérer mes enveloppes" onPress={() => router.push('/enveloppes')} />
       </View>
 
-      <Heading style={styles.sectionTitle}>Dernières dépenses</Heading>
+      <View style={styles.sectionRow}>
+        <Heading style={[styles.sectionTitle, { flex: 1 }]}>Dernières dépenses</Heading>
+        <SearchLink />
+      </View>
       <ExpenseList
         expenses={expenses ?? []}
         empty="Note chaque achat dès que tu le fais : ton reste se met à jour."
         onDelete={confirmDelete}
       />
     </>
+  );
+}
+
+/** Lien « Rechercher » vers toutes les dépenses (« Mes dépenses »). */
+function SearchLink() {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={() => router.push('/depenses')}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel="Rechercher dans mes dépenses"
+      style={({ pressed }) => [styles.searchLink, { opacity: pressed ? 0.6 : 1 }]}
+    >
+      <Ionicons name="search" size={16} color={theme.colors.primary} />
+      <Caption tone="primary">Tout voir · rechercher</Caption>
+    </Pressable>
   );
 }
 
@@ -422,6 +442,7 @@ function SectionTitle({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
 }
 
 const styles = StyleSheet.create({
+  searchLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

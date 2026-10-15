@@ -86,7 +86,7 @@ export default function ClosureModal() {
         <>
           {pots.length > 0 ? (
             <View style={{ gap: spacing.sm }}>
-              <Eyebrow>Cagnotte utilisée</Eyebrow>
+              <Eyebrow>Cagnotte pour mettre de côté ou couvrir</Eyebrow>
               <View style={styles.chips}>
                 {pots.map((p) => (
                   <Chip key={p.id} label={p.name} selected={p.id === pot?.id} onPress={() => setPotId(p.id)} color={p.color} />
@@ -173,7 +173,7 @@ function ClosureCard({
           {pot ? (
             <View style={{ flex: 1 }}>
               <Button
-                label={over ? `Prendre dans ${pot.name}` : `Mettre dans ${pot.name}`}
+                label={over ? 'Couvrir par l’épargne' : 'Mettre de côté'}
                 variant="secondary"
                 onPress={() => void onAct(line, over ? 'cover' : 'save')}
               />

@@ -329,6 +329,41 @@ const EXPENSE_SELECT = `
     e.period AS envelope_period, e.month AS envelope_month
   FROM expenses x JOIN envelopes e ON e.id = x.envelope_id`;
 
+/** Minuscules, sans accents ni espaces superflus : « Café » ≈ « cafe ». */
+export function normalizeSearch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Recherche dans les dépenses : sur un mois (`month`, celui des enveloppes —
+ * une semaine compte dans le mois de son jeudi) ou sur tous les mois (`null`).
+ * Chaque mot de la recherche doit se retrouver dans le libellé, le nom de
+ * l'enveloppe ou le montant (« 23 » trouve 23,40 €).
+ */
+export async function searchExpenses(
+  db: SQLiteDatabase,
+  input: { month: MonthKey | null; query: string },
+): Promise<Expense[]> {
+  const rows = await db.getAllAsync<Expense>(
+    input.month
+      ? `${EXPENSE_SELECT} WHERE e.month = ? ORDER BY x.date DESC, x.id DESC`
+      : `${EXPENSE_SELECT} ORDER BY x.date DESC, x.id DESC`,
+    input.month ? [input.month] : [],
+  );
+  const words = normalizeSearch(input.query).split(' ').filter(Boolean);
+  if (words.length === 0) return rows;
+  return rows.filter((x) => {
+    const amount = (x.amount_cents / 100).toFixed(2).replace('.', ',');
+    const haystack = normalizeSearch(`${x.label} ${x.envelope_name} ${amount} ${amount.replace(/,00$/, '')}`);
+    return words.every((w) => haystack.includes(w.replace('.', ',').replace(/€$/, '')));
+  });
+}
+
 /** Dépenses du mois, d'une période d'enveloppe donnée (Variables = week, postes des Fixes = month). */
 export async function listExpensesForMonth(
   db: SQLiteDatabase,
