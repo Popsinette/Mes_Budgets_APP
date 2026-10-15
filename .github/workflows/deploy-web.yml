@@ -25,11 +25,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Installer les dépendances
         run: npm ci
+
+      - name: Vérifier les types et les calculs
+        run: |
+          npm run typecheck
+          npm test
 
       - name: Servir l'app sous /<nom-du-depot>/ (GitHub Pages)
         run: |

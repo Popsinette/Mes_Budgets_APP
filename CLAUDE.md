@@ -10,12 +10,15 @@ App de suivi budgétaire **100 % locale et chiffrée**, calquée sur **Budgetiz*
 
 ```bash
 npm run typecheck                 # tsc --noEmit — à lancer après toute modification
+npm test                          # vitest : calculs (plan, compte, enveloppes, semaines…) sur SQLite en mémoire
 npx expo export --platform web    # build web (dist/) — vérifie aussi que le bundle passe
 npx expo start                    # serveur de dev (web ou dev build natif)
 npx expo prebuild                 # génère ios/ et android/ (non versionnés)
 ```
 
-Il n'y a pas de tests ni de linter configurés. La vérification = typecheck + export (web et/ou android) sans erreur.
+La vérification = typecheck + `npm test` + export (web et/ou android) sans erreur ; la CI (`deploy-web.yml`, Node 22) lance typecheck et tests avant l'export. Pas de linter.
+
+**Tests** (`tests/`, Vitest, Node ≥ 22) : les repositories tournent sur une vraie base SQLite en mémoire (`node:sqlite`) via `tests/helpers/db.ts` (`emptyDb()` = base migrée et vidée), scénario type dans `tests/helpers/scenario.ts`. Les repositories et `src/utils` ne doivent pas importer `react-native` (sinon ils ne sont plus testables) — la palette vit dans `src/theme/palette.ts` pour cette raison. Toute modification d'une formule (plan, prévisionnel, compte) DOIT garder les tests verts, et toute nouvelle règle de calcul DOIT avoir son test (invariants : une action prévue par le plan ne change ni la fin de mois ni le début de mois déduit).
 
 **Expo Go ne fonctionne pas** : SQLCipher est natif, il faut un development build (`expo run:android` / `run:ios`).
 

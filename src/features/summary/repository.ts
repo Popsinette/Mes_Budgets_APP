@@ -3,7 +3,7 @@ import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { listFixedForMonth } from '@/src/features/fixed/repository';
 import { listHealthForMonth } from '@/src/features/health/repository';
 import { getMonthSaved, listPots, plannedFor } from '@/src/features/savings/repository';
-import { categoryPalette } from '@/src/theme';
+import { categoryPalette } from '@/src/theme/palette';
 import { currentWeekKey, shiftMonthKey, type MonthKey } from '@/src/utils/dates';
 
 /**
