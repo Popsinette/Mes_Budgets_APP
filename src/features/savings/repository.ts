@@ -32,6 +32,8 @@ export type PotWithBalance = Pot & {
   balance_cents: number;
   /** Versement programmé du mois demandé déjà fait ? */
   plan_done: number;
+  /** Versement programmé sauté ce mois-ci (« Pas ce mois-ci ») ? */
+  plan_skipped: number;
 };
 
 export type SavingsMove = {
@@ -48,10 +50,11 @@ export async function listPots(db: SQLiteDatabase, month: MonthKey): Promise<Pot
   return db.getAllAsync<PotWithBalance>(
     `SELECT p.*,
        p.initial_cents + COALESCE((SELECT SUM(m.amount_cents) FROM savings_moves m WHERE m.pot_id = p.id), 0) AS balance_cents,
-       EXISTS (SELECT 1 FROM savings_moves m WHERE m.pot_id = p.id AND m.plan_month = ?) AS plan_done
+       EXISTS (SELECT 1 FROM savings_moves m WHERE m.pot_id = p.id AND m.plan_month = ?) AS plan_done,
+       EXISTS (SELECT 1 FROM savings_skips k WHERE k.pot_id = p.id AND k.month = ?) AS plan_skipped
      FROM savings_pots p
      ORDER BY CASE p.kind WHEN 'securite' THEN 0 ELSE 1 END, p.sort_order, p.id`,
-    [month],
+    [month, month],
   );
 }
 
@@ -59,7 +62,7 @@ export async function getPot(db: SQLiteDatabase, id: number): Promise<PotWithBal
   return db.getFirstAsync<PotWithBalance>(
     `SELECT p.*,
        p.initial_cents + COALESCE((SELECT SUM(m.amount_cents) FROM savings_moves m WHERE m.pot_id = p.id), 0) AS balance_cents,
-       0 AS plan_done
+       0 AS plan_done, 0 AS plan_skipped
      FROM savings_pots p WHERE p.id = ?`,
     [id],
   );
@@ -152,14 +155,40 @@ export async function setPlanDone(
 ): Promise<void> {
   if (done) {
     if (!pot.monthly_cents) return;
-    await db.runAsync(
-      "INSERT OR IGNORE INTO savings_moves (pot_id, amount_cents, date, note, plan_month, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
-      [pot.id, pot.monthly_cents, date, 'Versement programmé', month],
-    );
+    await db.withTransactionAsync(async () => {
+      // Verser ce mois-ci annule un éventuel « Pas ce mois-ci ».
+      await db.runAsync('DELETE FROM savings_skips WHERE pot_id = ? AND month = ?', [pot.id, month]);
+      await db.runAsync(
+        "INSERT OR IGNORE INTO savings_moves (pot_id, amount_cents, date, note, plan_month, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
+        [pot.id, pot.monthly_cents, date, 'Versement programmé', month],
+      );
+    });
   } else {
     await db.runAsync('DELETE FROM savings_moves WHERE pot_id = ? AND plan_month = ?', [pot.id, month]);
   }
   invalidateQueries();
+}
+
+/**
+ * « Pas ce mois-ci » : saute (ou reprend) le versement programmé d'un mois.
+ * Sauter retire le versement du mois s'il était déjà coché ; le montant
+ * mensuel de la cagnotte ne change pas pour les autres mois.
+ */
+export async function setPlanSkipped(db: SQLiteDatabase, potId: number, month: MonthKey, skipped: boolean): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    if (skipped) {
+      await db.runAsync('DELETE FROM savings_moves WHERE pot_id = ? AND plan_month = ?', [potId, month]);
+      await db.runAsync('INSERT OR IGNORE INTO savings_skips (pot_id, month) VALUES (?, ?)', [potId, month]);
+    } else {
+      await db.runAsync('DELETE FROM savings_skips WHERE pot_id = ? AND month = ?', [potId, month]);
+    }
+  });
+  invalidateQueries();
+}
+
+/** Versement programmé attendu pour le mois (0 si la cagnotte saute ce mois). */
+export function plannedFor(pot: PotWithBalance): number {
+  return pot.plan_skipped === 1 ? 0 : pot.monthly_cents ?? 0;
 }
 
 /** Épargne mise de côté pendant le mois (dépôts − retraits datés de ce mois). */

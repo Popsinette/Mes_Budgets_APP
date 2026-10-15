@@ -2,7 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { listFixedForMonth } from '@/src/features/fixed/repository';
 import { listHealthForMonth } from '@/src/features/health/repository';
-import { getMonthSaved, listPots } from '@/src/features/savings/repository';
+import { getMonthSaved, listPots, plannedFor } from '@/src/features/savings/repository';
 import { categoryPalette } from '@/src/theme';
 import { currentWeekKey, shiftMonthKey, type MonthKey } from '@/src/utils/dates';
 
@@ -82,7 +82,7 @@ export async function getMonthSummary(db: SQLiteDatabase, month: MonthKey): Prom
     sante: Math.max(0, healthAdvanced - healthRefund),
   };
   const expense = spending.fixes + spending.variables + spending.postes + spending.sante;
-  const savingsPlanned = sum(pots, (p) => p.monthly_cents ?? 0);
+  const savingsPlanned = sum(pots, plannedFor);
   const planLeft =
     income -
     spending.fixes -

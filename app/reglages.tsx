@@ -78,6 +78,7 @@ export default function SettingsScreen() {
               DELETE FROM account;
               DELETE FROM health_expenses;
               DELETE FROM week_closures;
+              DELETE FROM savings_skips;
               DELETE FROM savings_moves;
               DELETE FROM savings_pots;
               DELETE FROM fixed_checks;

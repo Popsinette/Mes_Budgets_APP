@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { listFixedForMonth } from '@/src/features/fixed/repository';
-import { listPots } from '@/src/features/savings/repository';
+import { listPots, plannedFor } from '@/src/features/savings/repository';
 import { getMonthSummary } from '@/src/features/summary/repository';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { currentMonthKey, currentWeekKey, weeksOfMonth, type MonthKey } from '@/src/utils/dates';
@@ -136,7 +136,7 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
     0,
     envelopes.reduce((s, e) => s + Math.max(0, e.budget_cents - e.spent_cents), 0) - weeksSaved,
   );
-  const savingsLeft = pots.filter((p) => p.plan_done !== 1).reduce((s, p) => s + (p.monthly_cents ?? 0), 0);
+  const savingsLeft = pots.filter((p) => p.plan_done !== 1).reduce((s, p) => s + plannedFor(p), 0);
   const pendingRefunds = pending?.total ?? 0;
   const endOfMonth = balance + upcomingIncomes - upcomingCharges - envelopesLeft - savingsLeft + pendingRefunds;
   const extraSavings = monthMoves?.extra ?? 0;

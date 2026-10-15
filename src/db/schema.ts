@@ -300,7 +300,26 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     });
     await db.execAsync('PRAGMA user_version = 14');
   }
+
+  if (current < 15) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V15);
+    });
+    await db.execAsync('PRAGMA user_version = 15');
+  }
 }
+
+/**
+ * V15 — « Pas ce mois-ci » : une cagnotte peut sauter son versement programmé
+ * pour un mois donné (le montant mensuel reste le même pour les autres mois).
+ */
+const MIGRATION_V15 = `
+CREATE TABLE IF NOT EXISTS savings_skips (
+  pot_id INTEGER NOT NULL REFERENCES savings_pots(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  PRIMARY KEY (pot_id, month)
+);
+`;
 
 /**
  * V14 — chaque mois a SES enveloppes, sans lien avec les autres mois.

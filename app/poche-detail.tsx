@@ -13,13 +13,16 @@ import { Body, Caption, Eyebrow, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deleteMove,
-  getPot,
   listMoves,
+  listPots,
+  setPlanDone,
+  setPlanSkipped,
   POT_KIND_LABELS,
   type SavingsMove,
 } from '@/src/features/savings/repository';
 import { spacing, useTheme } from '@/src/theme';
-import { shortDayLabel } from '@/src/utils/dates';
+import { useSelectedMonth } from '@/src/store/month';
+import { currentMonthKey, isoDayInMonth, monthKeyLabel, shortDayLabel, todayIso } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
@@ -28,7 +31,8 @@ export default function PotDetailModal() {
   const db = useSQLiteContext();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number(params.id);
-  const { data: pot } = useLiveQuery((db) => getPot(db, id), [id]);
+  const month = useSelectedMonth((s) => s.month);
+  const { data: pot } = useLiveQuery(async (db) => (await listPots(db, month)).find((p) => p.id === id) ?? null, [id, month]);
   const { data: moves } = useLiveQuery((db) => listMoves(db, id), [id]);
 
   if (!pot) return <Screen />;
@@ -68,6 +72,50 @@ export default function PotDetailModal() {
               : `${Math.round(ratio * 100)} % · encore ${formatCents(pot.target_cents - pot.balance_cents)} pour atteindre ${formatCents(pot.target_cents)}`}
           </Caption>
         </View>
+      ) : null}
+
+      {pot.monthly_cents ? (
+        <Card style={{ gap: spacing.sm }}>
+          <View style={styles.hero}>
+            <View style={{ flex: 1 }}>
+              <Eyebrow>Versement de {monthKeyLabel(month)}</Eyebrow>
+              <Caption>
+                {pot.plan_skipped === 1
+                  ? 'Pas ce mois-ci : rien à mettre de côté ce mois-là.'
+                  : pot.plan_done === 1
+                    ? 'Versé ✓'
+                    : 'À verser'}
+              </Caption>
+            </View>
+            <Money cents={pot.plan_skipped === 1 ? 0 : pot.monthly_cents} size={20} weight="bold" />
+          </View>
+          <View style={styles.buttons}>
+            {pot.plan_skipped === 1 ? null : (
+              <View style={{ flex: 1 }}>
+                <Button
+                  label={pot.plan_done === 1 ? 'Annuler le versement' : 'Marquer versé'}
+                  variant={pot.plan_done === 1 ? 'secondary' : 'primary'}
+                  onPress={() =>
+                    void setPlanDone(
+                      db,
+                      pot,
+                      month,
+                      pot.plan_done !== 1,
+                      month === currentMonthKey() ? todayIso() : isoDayInMonth(month, 1),
+                    )
+                  }
+                />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Button
+                label={pot.plan_skipped === 1 ? 'Reprendre ce mois-ci' : 'Pas ce mois-ci'}
+                variant="secondary"
+                onPress={() => void setPlanSkipped(db, pot.id, month, pot.plan_skipped !== 1)}
+              />
+            </View>
+          </View>
+        </Card>
       ) : null}
 
       <View style={styles.buttons}>
