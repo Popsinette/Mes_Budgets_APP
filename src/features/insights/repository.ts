@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { getBackupStatus } from '@/src/features/backup/repository';
 import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { listFixedForMonth } from '@/src/features/fixed/repository';
 import { listPots } from '@/src/features/savings/repository';
@@ -28,12 +29,13 @@ const pct = (part: number, total: number) => (total > 0 ? Math.round((part / tot
 
 export async function getInsights(db: SQLiteDatabase, month: MonthKey): Promise<Insight[]> {
   const isCurrent = month === currentMonthKey();
-  const [summary, envelopes, fixed, pots, history] = await Promise.all([
+  const [summary, envelopes, fixed, pots, history, backup] = await Promise.all([
     getMonthSummary(db, month),
     listEnvelopesForMonth(db, month, currentWeekKey()),
     listFixedForMonth(db, month),
     listPots(db, month),
     getBalanceHistory(db, month),
+    getBackupStatus(db),
   ]);
   const insights: Insight[] = [];
 
@@ -193,6 +195,17 @@ export async function getInsights(db: SQLiteDatabase, month: MonthKey): Promise<
       icon: 'pie-chart-outline',
       title: `${SPENDING_GROUPS[top].label} : ${pct(cents, summary.expense_cents)} % de tes dépenses`,
       detail: `${formatCents(cents)} sur ${formatCents(summary.expense_cents)} ce mois-ci.`,
+    });
+  }
+
+  // 8. Sauvegarde trop ancienne (mois en cours) : les données ne sont que sur l'appareil.
+  if (isCurrent && backup.due) {
+    insights.push({
+      key: 'backup',
+      tone: 'warning',
+      icon: 'cloud-upload-outline',
+      title: backup.days === null ? 'Tu n’as jamais sauvegardé tes données' : `Dernière sauvegarde il y a ${backup.days} jours`,
+      detail: 'Tout est sur cet appareil seulement : Réglages → Sauvegarder tout, puis garde le fichier dans Fichiers ou iCloud.',
     });
   }
 

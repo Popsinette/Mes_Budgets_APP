@@ -22,7 +22,7 @@ import {
 } from '@/src/features/envelopes/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { spacing, useTheme } from '@/src/theme';
-import { currentWeekKey, monthKeyLabel, weeksOfMonth, type MonthKey } from '@/src/utils/dates';
+import { currentMonthKey, currentWeekKey, monthKeyLabel, weeksOfMonth, type MonthKey } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
@@ -89,6 +89,13 @@ export default function EnvelopesModal() {
         onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month', month } })}
       />
       {data?.ready ? <Button label={`Repartir de ma base pour ${short}`} variant="secondary" onPress={resetFromBase} /> : null}
+      {data?.ready && month <= currentMonthKey() ? (
+        <Button
+          label={`Clôturer ${short}`}
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/cloture', params: { month } })}
+        />
+      ) : null}
 
       <SectionHeader title="Ma base" />
       <Caption>

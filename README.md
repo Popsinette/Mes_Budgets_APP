@@ -17,10 +17,12 @@ Calquée sur **Budgetiz** (méthode Deux Sœurs Un Agenda) : simple, sans connex
 - **Mon plan du mois** (Synthèse) — revenus − charges − postes − enveloppes − épargne programmée = reste à répartir, puis le reste prévisionnel avec les dépassements. Une **pastille** sur l'écran Budget passe au rouge dès que le mois l'est, et le formulaire de dépense prévient avant d'enregistrer.
 - **Mon compte** — tu saisis le solde de ton compte courant une fois ; l'app le tient à jour avec ce que tu notes et coches, prévoit le solde de fin de mois et te montre l'écart avec ta banque.
 - **Mes enveloppes** — chaque mois a ses propres enveloppes, sans lien avec les autres mois. **Ma base** (Courses, Essence, Plaisir…) est copiée dans chaque nouveau mois, puis tu ajustes librement (« Anniversaire » en novembre seulement, Courses plus haut en décembre…).
+- **Clôturer le mois** — le mois fini, chaque enveloppe range son reste (dans une cagnotte ou sur le mois suivant) ou son dépassement (reporté sur le mois suivant ou repris d'une cagnotte). Un rappel apparaît sur l'écran Budget.
+- **Mes dépenses** — toutes les dépenses du mois ou de tous les mois, avec recherche par libellé, enveloppe ou montant (« carrefour », « 23 »).
 - **Les prochains mois** (Synthèse) — le plan de chaque mois à venir (revenus − charges − enveloppes − épargne), sans tenir compte du solde actuel.
 - **Synthèse** — revenus, dépenses, solde, poste le plus dépensé, taux d'épargne, total des avoirs, répartition des dépenses.
 - **Bouton +** — dépense, charge fixe, revenu, frais de santé ou virement d'épargne en un geste.
-- **Export** JSON / CSV, **verrouillage biométrique**, thème clair / sombre, interface en français.
+- **Sauvegarde** JSON à garder dans Fichiers / iCloud, **restauration** d'une sauvegarde (changement de téléphone, données du navigateur effacées), rappel au-delà de 30 jours ; export CSV des dépenses ; **verrouillage biométrique**, thème clair / sombre, interface en français.
 
 ## 🔒 Sécurité et confidentialité
 
@@ -86,6 +88,7 @@ npx expo run:android              # ou : npx expo run:ios (sur macOS)
 
 # Vérification des types
 npm run typecheck
+npm test                  # tests des calculs (Vitest, Node 22)
 ```
 
 > ⚠️ **Important** : le chiffrement SQLCipher nécessite un *development build*

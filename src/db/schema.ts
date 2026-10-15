@@ -307,7 +307,40 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     });
     await db.execAsync('PRAGMA user_version = 15');
   }
+
+  if (current < 16) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V16);
+    });
+    await db.execAsync('PRAGMA user_version = 16');
+  }
 }
+
+/**
+ * V16 — sauvegarde & clôture du mois.
+ * - `app_meta` : petites valeurs de l'app (date de la dernière sauvegarde,
+ *   mois clôturés). Jamais exportée.
+ * - `envelopes.adjust_cents` : ajustement du budget du mois (signé) posé par
+ *   la clôture — reste mis de côté ou reporté (−), dépassement reporté ou
+ *   couvert (+), report reçu du mois précédent (±).
+ * - `month_closures` : la décision de clôture de chaque enveloppe (pour
+ *   l'afficher et pouvoir l'annuler).
+ */
+const MIGRATION_V16 = `
+CREATE TABLE IF NOT EXISTS app_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+ALTER TABLE envelopes ADD COLUMN adjust_cents INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS month_closures (
+  envelope_id INTEGER PRIMARY KEY REFERENCES envelopes(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('save', 'carry', 'cover')),
+  amount_cents INTEGER NOT NULL,
+  move_id INTEGER REFERENCES savings_moves(id) ON DELETE SET NULL,
+  target_envelope_id INTEGER REFERENCES envelopes(id) ON DELETE SET NULL,
+  closed_at TEXT NOT NULL
+);
+`;
 
 /**
  * V15 — « Pas ce mois-ci » : une cagnotte peut sauter son versement programmé

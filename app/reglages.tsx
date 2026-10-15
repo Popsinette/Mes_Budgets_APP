@@ -13,7 +13,11 @@ import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Heading } from '@/src/components/ui/Text';
 import { seedPots } from '@/src/db/schema';
 import { seedBase } from '@/src/features/envelopes/repository';
+import { backupStats, getBackupStatus, parseBackup, restoreBackup } from '@/src/features/backup/repository';
+import { pickJsonFileText } from '@/src/features/backup/pickFile';
 import { exportAllDataAsJson, exportExpensesAsCsv } from '@/src/features/export/exporter';
+import { useLiveQuery } from '@/src/db/useLiveQuery';
+import { numericDate } from '@/src/utils/dates';
 import { invalidateQueries } from '@/src/store/invalidation';
 import { isBiometricAvailable, useSecurity } from '@/src/store/security';
 import { useThemePref, type ThemePref } from '@/src/store/themePref';
@@ -33,6 +37,38 @@ export default function SettingsScreen() {
   const setThemePref = useThemePref((s) => s.setPref);
   const [exportingJson, setExportingJson] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const { data: backup } = useLiveQuery((db) => getBackupStatus(db), []);
+
+  const restore = async () => {
+    setRestoring(true);
+    try {
+      const text = await pickJsonFileText();
+      if (text === null) return;
+      const parsed = parseBackup(text);
+      const stats = backupStats(parsed);
+      confirmAction({
+        title: 'Restaurer cette sauvegarde ?',
+        message: `Sauvegarde du ${numericDate(stats.exportedAt.slice(0, 10))} : ${stats.expenses} dépense(s), ${stats.fixed} revenu(s) et charge(s), ${stats.pots} cagnotte(s).\n\nToutes les données actuelles de cet appareil seront remplacées.`,
+        confirmLabel: 'Restaurer',
+        destructive: true,
+        onConfirm: () => {
+          void (async () => {
+            try {
+              await restoreBackup(db, parsed);
+              notify('Sauvegarde restaurée', 'Tes données ont été remplacées par celles de la sauvegarde.');
+            } catch (error) {
+              notify('Restauration impossible', error instanceof Error ? error.message : String(error));
+            }
+          })();
+        },
+      });
+    } catch (error) {
+      notify('Restauration impossible', error instanceof Error ? error.message : String(error));
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const toggleBiometric = async (next: boolean) => {
     if (next) {
@@ -78,6 +114,7 @@ export default function SettingsScreen() {
               DELETE FROM account;
               DELETE FROM health_expenses;
               DELETE FROM week_closures;
+              DELETE FROM month_closures;
               DELETE FROM savings_skips;
               DELETE FROM savings_moves;
               DELETE FROM savings_pots;
@@ -161,16 +198,26 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={{ gap: spacing.md }}>
-        <Heading>Exporter mes données</Heading>
+        <Heading>Sauvegarde</Heading>
         <Body tone="muted" size={13.5}>
-          Sauvegarde complète (JSON) ou dépenses seules (CSV, pour Excel/Numbers), via la feuille de
-          partage : AirDrop, Fichiers, mail…
+          Tes données ne sont que sur cet appareil. Garde une sauvegarde (JSON) ailleurs — Fichiers, iCloud Drive,
+          mail… — pour la restaurer si tu changes de téléphone ou si le navigateur efface ses données.
         </Body>
+        {backup ? (
+          <Body size={13.5} tone={backup.due ? 'danger' : 'muted'} weight={backup.due ? 'semibold' : 'regular'}>
+            {backup.last_at
+              ? `Dernière sauvegarde : le ${numericDate(backup.last_at.slice(0, 10))}${
+                  backup.days === 0 ? ' (aujourd’hui)' : backup.days === 1 ? ' (hier)' : ` (il y a ${backup.days} jours)`
+                }`
+              : 'Aucune sauvegarde pour l’instant.'}
+          </Body>
+        ) : null}
         <Button
-          label="Exporter tout (JSON)"
+          label="Sauvegarder tout (JSON)"
           onPress={() => void runExport(() => exportAllDataAsJson(db), setExportingJson)}
           loading={exportingJson}
         />
+        <Button label="Restaurer une sauvegarde" variant="secondary" onPress={() => void restore()} loading={restoring} />
         <Button
           label="Exporter les dépenses (CSV)"
           variant="secondary"

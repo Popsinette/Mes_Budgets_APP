@@ -32,6 +32,8 @@ export type Envelope = {
   sort_order: number;
   month: MonthKey;
   template_id: number | null;
+  /** Ajustement du budget du mois posé par la clôture (reste sorti −, dépassement couvert +, report reçu ±). */
+  adjust_cents: number;
 };
 
 export type EnvelopeTemplate = {
@@ -163,8 +165,11 @@ export async function resolveEnvelopeId(db: SQLiteDatabase, envelope: EnvelopeFo
 /** Remet un mois sur la base : ses enveloppes sans dépense sont remplacées par celles de la base. */
 export async function resetMonthFromBase(db: SQLiteDatabase, month: MonthKey): Promise<void> {
   await db.withTransactionAsync(async () => {
+    // Gardées : celles qui ont des dépenses ou qui portent une clôture / un report.
     await db.runAsync(
-      'DELETE FROM envelopes WHERE month = ? AND NOT EXISTS (SELECT 1 FROM expenses x WHERE x.envelope_id = envelopes.id)',
+      `DELETE FROM envelopes WHERE month = ? AND adjust_cents = 0
+         AND NOT EXISTS (SELECT 1 FROM expenses x WHERE x.envelope_id = envelopes.id)
+         AND NOT EXISTS (SELECT 1 FROM month_closures c WHERE c.envelope_id = envelopes.id OR c.target_envelope_id = envelopes.id)`,
       [month],
     );
     const kept = await db.getAllAsync<{ template_id: number | null }>(
@@ -201,7 +206,8 @@ export async function listEnvelopesForMonth(
   currentWeek: WeekKey,
 ): Promise<EnvelopeForMonth[]> {
   const weeks = weeksOfMonth(month);
-  const budgetOf = (period: EnvelopePeriod, amount: number) => (period === 'week' ? amount * weeks.length : amount);
+  const budgetOf = (period: EnvelopePeriod, amount: number, adjust = 0) =>
+    (period === 'week' ? amount * weeks.length : amount) + adjust;
 
   if (!(await isMonthReady(db, month))) {
     const templates = await listTemplates(db);
@@ -215,6 +221,7 @@ export async function listEnvelopesForMonth(
       sort_order: t.sort_order,
       month,
       template_id: t.id,
+      adjust_cents: 0,
       virtual: true,
       budget_cents: budgetOf(t.period, t.amount_cents),
       spent_cents: 0,
@@ -231,7 +238,7 @@ export async function listEnvelopesForMonth(
      ORDER BY e.sort_order, e.id`,
     [currentWeek, month],
   );
-  return rows.map((e) => ({ ...e, virtual: false, budget_cents: budgetOf(e.period, e.weekly_cents) }));
+  return rows.map((e) => ({ ...e, virtual: false, budget_cents: budgetOf(e.period, e.weekly_cents, e.adjust_cents) }));
 }
 
 /** Enveloppes hebdomadaires d'une semaine (celles du mois de la semaine) et leur dépensé. */
@@ -283,8 +290,36 @@ export async function saveEnvelope(
 
 /** Supprime l'enveloppe de son mois (et ses dépenses). Les autres mois ne changent pas. */
 export async function deleteEnvelope(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM envelopes WHERE id = ?', [id]);
+  await db.withTransactionAsync(async () => {
+    // Une clôture qui part de cette enveloppe ou y reporte est d'abord annulée.
+    const closures = await db.getAllAsync<ClosureRow>(
+      'SELECT * FROM month_closures WHERE envelope_id = ? OR target_envelope_id = ?',
+      [id, id],
+    );
+    for (const c of closures) await undoClosureRow(db, c);
+    await db.runAsync('DELETE FROM envelopes WHERE id = ?', [id]);
+  });
   invalidateQueries();
+}
+
+export type ClosureRow = {
+  envelope_id: number;
+  action: 'save' | 'carry' | 'cover';
+  /** Reste (+) ou dépassement (−) clôturé. */
+  amount_cents: number;
+  move_id: number | null;
+  target_envelope_id: number | null;
+  closed_at: string;
+};
+
+/** Défait une clôture (à appeler dans une transaction) : budgets rétablis, virement retiré. */
+export async function undoClosureRow(db: SQLiteDatabase, c: ClosureRow): Promise<void> {
+  await db.runAsync('UPDATE envelopes SET adjust_cents = adjust_cents + ? WHERE id = ?', [c.amount_cents, c.envelope_id]);
+  if (c.target_envelope_id) {
+    await db.runAsync('UPDATE envelopes SET adjust_cents = adjust_cents - ? WHERE id = ?', [c.amount_cents, c.target_envelope_id]);
+  }
+  if (c.move_id) await db.runAsync('DELETE FROM savings_moves WHERE id = ?', [c.move_id]);
+  await db.runAsync('DELETE FROM month_closures WHERE envelope_id = ?', [c.envelope_id]);
 }
 
 // ---------- Dépenses ----------
@@ -293,6 +328,41 @@ const EXPENSE_SELECT = `
   SELECT x.*, e.name AS envelope_name, e.icon AS envelope_icon, e.color AS envelope_color,
     e.period AS envelope_period, e.month AS envelope_month
   FROM expenses x JOIN envelopes e ON e.id = x.envelope_id`;
+
+/** Minuscules, sans accents ni espaces superflus : « Café » ≈ « cafe ». */
+export function normalizeSearch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Recherche dans les dépenses : sur un mois (`month`, celui des enveloppes —
+ * une semaine compte dans le mois de son jeudi) ou sur tous les mois (`null`).
+ * Chaque mot de la recherche doit se retrouver dans le libellé, le nom de
+ * l'enveloppe ou le montant (« 23 » trouve 23,40 €).
+ */
+export async function searchExpenses(
+  db: SQLiteDatabase,
+  input: { month: MonthKey | null; query: string },
+): Promise<Expense[]> {
+  const rows = await db.getAllAsync<Expense>(
+    input.month
+      ? `${EXPENSE_SELECT} WHERE e.month = ? ORDER BY x.date DESC, x.id DESC`
+      : `${EXPENSE_SELECT} ORDER BY x.date DESC, x.id DESC`,
+    input.month ? [input.month] : [],
+  );
+  const words = normalizeSearch(input.query).split(' ').filter(Boolean);
+  if (words.length === 0) return rows;
+  return rows.filter((x) => {
+    const amount = (x.amount_cents / 100).toFixed(2).replace('.', ',');
+    const haystack = normalizeSearch(`${x.label} ${x.envelope_name} ${amount} ${amount.replace(/,00$/, '')}`);
+    return words.every((w) => haystack.includes(w.replace('.', ',').replace(/€$/, '')));
+  });
+}
 
 /** Dépenses du mois, d'une période d'enveloppe donnée (Variables = week, postes des Fixes = month). */
 export async function listExpensesForMonth(

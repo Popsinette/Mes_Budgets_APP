@@ -11,6 +11,7 @@ import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
+import { getCarryInto } from '@/src/features/closure/repository';
 import {
   deleteExpense,
   listEnvelopesForMonth,
@@ -34,6 +35,7 @@ export default function EnvelopeDetail() {
   const thisWeek = currentWeekKey();
   const { data: envelopes } = useLiveQuery((db) => listEnvelopesForMonth(db, month, thisWeek), [month, thisWeek]);
   const { data: expenses } = useLiveQuery((db) => listExpensesForEnvelope(db, id), [id]);
+  const { data: carry } = useLiveQuery((db) => getCarryInto(db, id), [id]);
   const envelope = envelopes?.find((e) => e.id === id);
   if (!envelope) return <Screen />;
 
@@ -65,6 +67,15 @@ export default function EnvelopeDetail() {
         </View>
       </View>
       <ProgressBar ratio={ratio} color={ratio > 1 ? theme.colors.danger : envelope.color} height={10} />
+      {envelope.adjust_cents !== 0 ? (
+        <Caption>
+          {carry && carry.amount_cents === envelope.adjust_cents
+            ? `Budget ${carry.amount_cents < 0 ? 'réduit' : 'augmenté'} de ${formatCents(Math.abs(carry.amount_cents))} : ${
+                carry.amount_cents < 0 ? 'dépassement' : 'reste'
+              } reporté de ${monthKeyLabel(carry.from_month).split(' ')[0]}.`
+            : `Budget ajusté de ${formatCents(envelope.adjust_cents, { signed: true })} par la clôture du mois et les reports.`}
+        </Caption>
+      ) : null}
       <Button
         label={`Modifier le montant (${formatCents(envelope.weekly_cents)} par ${isWeek ? 'semaine' : 'mois'})`}
         variant="secondary"
