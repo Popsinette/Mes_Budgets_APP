@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
+import { buildBackup, markBackupDone } from '@/src/features/backup/repository';
 import { todayIso } from '@/src/utils/dates';
 
 /**
@@ -13,17 +14,18 @@ import { todayIso } from '@/src/utils/dates';
  * elle accepte les fichiers (Safari iOS), sinon par un téléchargement direct.
  */
 
-async function shareFile(fileName: string, content: string, mimeType: string): Promise<void> {
+/** Partage le fichier ; renvoie false si l'utilisateur a annulé. */
+async function shareFile(fileName: string, content: string, mimeType: string): Promise<boolean> {
   if (Platform.OS === 'web') {
     const blob = new Blob([content], { type: mimeType });
     const webFile = new globalThis.File([blob], fileName, { type: mimeType });
     if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [webFile] })) {
       try {
         await navigator.share({ files: [webFile], title: fileName });
-        return;
+        return true;
       } catch (error) {
         // Partage annulé par l'utilisateur : ne pas déclencher le téléchargement.
-        if (error instanceof Error && error.name === 'AbortError') return;
+        if (error instanceof Error && error.name === 'AbortError') return false;
       }
     }
     const url = URL.createObjectURL(blob);
@@ -34,44 +36,21 @@ async function shareFile(fileName: string, content: string, mimeType: string): P
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
-    return;
+    return true;
   }
 
   const file = new File(Paths.cache, fileName);
   if (file.exists) file.delete();
   file.write(content);
   await Sharing.shareAsync(file.uri, { mimeType, dialogTitle: 'Exporter mes données' });
+  return true;
 }
 
-const TABLES = [
-  'envelope_templates',
-  'envelope_months_ready',
-  'envelopes',
-  'expenses',
-  'fixed_items',
-  'fixed_checks',
-  'savings_pots',
-  'savings_moves',
-  'week_closures',
-  'health_expenses',
-  'account',
-] as const;
-
-/** Sauvegarde complète : toutes les tables, au format JSON. */
+/** Sauvegarde complète : toutes les tables, au format JSON (relisible par « Restaurer »). */
 export async function exportAllDataAsJson(db: SQLiteDatabase): Promise<void> {
-  const rows = await Promise.all(TABLES.map((table) => db.getAllAsync(`SELECT * FROM ${table}`)));
-  const payload = {
-    app: 'Mes Budgets',
-    format: 2,
-    exported_at: new Date().toISOString(),
-    data: Object.fromEntries(TABLES.map((table, i) => [table, rows[i]])),
-  };
-
-  await shareFile(
-    `mes-budgets-${todayIso()}.json`,
-    JSON.stringify(payload, null, 2),
-    'application/json',
-  );
+  const backup = await buildBackup(db);
+  const shared = await shareFile(`mes-budgets-${todayIso()}.json`, JSON.stringify(backup, null, 2), 'application/json');
+  if (shared) await markBackupDone(db, backup.exported_at);
 }
 
 function csvEscape(value: unknown): string {
