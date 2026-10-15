@@ -12,7 +12,7 @@ Calquée sur **Budgetiz** (méthode Deux Sœurs Un Agenda) : simple, sans connex
   - **Fixes** : total · réglé · à débiter, postes mensuels (Essence, Garderie, Cantine…), charges à cocher (badge « en retard ») ;
   - **Revenus** : total · crédité · à créditer, revenus à cocher ;
   - **Santé** : avancé · remboursé · reste à charge, « Solder » quand le remboursement arrive.
-- **Cagnottes** — « Projets & pépins » et « Urgence & avenir », objectif, date limite, versement mensuel à cocher, prévisions du mois en % des revenus, historique des virements.
+- **Cagnottes** — « Projets & pépins » et « Urgence & avenir », objectif, date limite, versement mensuel à cocher — ou « Pas ce mois-ci » pour sauter un mois sans changer le montant —, prévisions du mois en % des revenus, historique des virements.
 - **Analyse** — constats clés du mois (enveloppe dépassée, rythme trop rapide, cagnotte en retard, dépenses vs ta moyenne…), rythme du mois, semaine bouclée à mettre de côté, courbe d'épargne cumulée avec projection à 6 mois, moyennes, répartition par cagnotte.
 - **Mon plan du mois** (Synthèse) — revenus − charges − postes − enveloppes − épargne programmée = reste à répartir, puis le reste prévisionnel avec les dépassements. Une **pastille** sur l'écran Budget passe au rouge dès que le mois l'est, et le formulaire de dépense prévient avant d'enregistrer.
 - **Mon compte** — tu saisis le solde de ton compte courant une fois ; l'app le tient à jour avec ce que tu notes et coches, prévoit le solde de fin de mois et te montre l'écart avec ta banque.

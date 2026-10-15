@@ -9,10 +9,18 @@ import { Card } from '@/src/components/ui/Card';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { Body, Caption, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
-import { listPots, POT_KIND_LABELS, setPlanDone, type PotKind, type PotWithBalance } from '@/src/features/savings/repository';
+import {
+  listPots,
+  POT_KIND_LABELS,
+  setPlanDone,
+  setPlanSkipped,
+  type PotKind,
+  type PotWithBalance,
+} from '@/src/features/savings/repository';
 import { getMonthSummary } from '@/src/features/summary/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
@@ -31,6 +39,8 @@ export default function PotsScreen() {
   const list = (pots ?? []).filter((p) => p.kind === kind);
   const total = list.reduce((s, p) => s + p.balance_cents, 0);
   const monthName = monthKeyLabel(month).split(' ')[0];
+  const scheduled = (pots ?? []).filter((p) => (p.monthly_cents ?? 0) > 0);
+  const skipped = scheduled.filter((p) => p.plan_skipped === 1);
 
   return (
     <Screen bottomInset={90}>
@@ -48,6 +58,11 @@ export default function PotsScreen() {
           <Caption style={{ fontStyle: 'italic', textAlign: 'center' }}>
             {income > 0 ? `soit ${((planned / income) * 100).toFixed(1).replace('.', ',')} % de tes revenus` : 'versements programmés'}
           </Caption>
+          {skipped.length > 0 ? (
+            <Caption style={{ textAlign: 'center', fontSize: 11.5 }}>
+              {skipped.length === 1 ? '1 cagnotte en pause' : `${skipped.length} cagnottes en pause`} ce mois-ci
+            </Caption>
+          ) : null}
         </Card>
         <View style={styles.actions}>
           <PillButton
@@ -101,6 +116,20 @@ export default function PotsScreen() {
           ))}
         </View>
       )}
+
+      {scheduled.length > 0 ? (
+        <>
+          <SectionHeader title={`Versements de ${monthName}`} />
+          <Card style={{ paddingVertical: spacing.xs }}>
+            {scheduled.map((pot, i) => (
+              <PlanRow key={pot.id} pot={pot} month={month} last={i === scheduled.length - 1} />
+            ))}
+          </Card>
+          <Caption style={{ textAlign: 'center' }}>
+            « Pas ce mois-ci » : rien à mettre de côté ce mois-là, le montant reste prévu pour les mois suivants.
+          </Caption>
+        </>
+      ) : null}
     </Screen>
   );
 }
@@ -110,11 +139,15 @@ function PotCard({ pot, month }: { pot: PotWithBalance; month: string }) {
   const db = useSQLiteContext();
   const ratio = pot.target_cents ? pot.balance_cents / pot.target_cents : 0;
   const done = pot.plan_done === 1;
+  const skipped = pot.plan_skipped === 1;
 
   const togglePlan = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const date = month === currentMonthKey() ? todayIso() : isoDayInMonth(month, 1);
-    void setPlanDone(db, pot, month, !done, date);
+    if (skipped) {
+      void setPlanSkipped(db, pot.id, month, false);
+      return;
+    }
+    void setPlanDone(db, pot, month, !done, planDate(month));
   };
 
   return (
@@ -134,11 +167,15 @@ function PotCard({ pot, month }: { pot: PotWithBalance; month: string }) {
             onPress={togglePlan}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: done }}
-            accessibilityLabel={`Versement du mois de ${formatCents(pot.monthly_cents)} pour ${pot.name}`}
+            accessibilityLabel={
+              skipped
+                ? `${pot.name} : pas de versement ce mois-ci. Reprendre`
+                : `Versement du mois de ${formatCents(pot.monthly_cents)} pour ${pot.name}`
+            }
             style={[styles.planCheck, { backgroundColor: theme.colors.card }]}
           >
             <Ionicons
-              name={done ? 'checkmark-circle' : 'ellipse-outline'}
+              name={skipped ? 'pause-circle-outline' : done ? 'checkmark-circle' : 'ellipse-outline'}
               size={22}
               color={done ? theme.colors.secondary : theme.colors.textMuted}
             />
@@ -166,6 +203,86 @@ function PotCard({ pot, month }: { pot: PotWithBalance; month: string }) {
         </View>
       ) : null}
     </Card>
+  );
+}
+
+const planDate = (month: string) => (month === currentMonthKey() ? todayIso() : isoDayInMonth(month, 1));
+
+/** Versement programmé du mois : coche « versé », ou « Pas ce mois-ci » (réversible). */
+function PlanRow({ pot, month, last }: { pot: PotWithBalance; month: string; last: boolean }) {
+  const theme = useTheme();
+  const db = useSQLiteContext();
+  const done = pot.plan_done === 1;
+  const skipped = pot.plan_skipped === 1;
+  const cents = pot.monthly_cents ?? 0;
+
+  const toggleDone = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void setPlanDone(db, pot, month, !done, planDate(month));
+  };
+  const toggleSkip = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void setPlanSkipped(db, pot.id, month, !skipped);
+  };
+
+  return (
+    <View style={[styles.planRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline }]}>
+      <View style={[styles.planIcon, { backgroundColor: pot.color, opacity: skipped ? 0.45 : 1 }]}>
+        <Ionicons
+          name={(pot.icon in Ionicons.glyphMap ? pot.icon : 'wallet-outline') as keyof typeof Ionicons.glyphMap}
+          size={17}
+          color={theme.colors.onAccent}
+        />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Body weight="medium" numberOfLines={1} color={skipped ? theme.colors.textMuted : undefined}>
+          {pot.name}
+        </Body>
+        <Caption>{skipped ? 'Pas ce mois-ci' : done ? 'Versé' : 'À verser'}</Caption>
+      </View>
+      <Money
+        cents={cents}
+        size={15}
+        weight="semibold"
+        tone={skipped ? 'muted' : 'text'}
+        style={skipped ? { textDecorationLine: 'line-through' } : undefined}
+      />
+      <Pressable
+        hitSlop={6}
+        onPress={toggleSkip}
+        accessibilityRole="button"
+        accessibilityLabel={skipped ? `Reprendre le versement de ${pot.name} ce mois-ci` : `Pas de versement pour ${pot.name} ce mois-ci`}
+        style={({ pressed }) => [
+          styles.skipChip,
+          {
+            borderColor: skipped ? theme.colors.primary : theme.colors.border,
+            backgroundColor: skipped ? `${theme.colors.primary}18` : 'transparent',
+            opacity: pressed ? 0.6 : 1,
+          },
+        ]}
+      >
+        <Caption style={{ fontSize: 11.5 }} color={skipped ? theme.colors.primary : undefined}>
+          {skipped ? 'Reprendre' : 'Pas ce mois-ci'}
+        </Caption>
+      </Pressable>
+      {skipped ? (
+        <View style={{ width: 26 }} />
+      ) : (
+        <Pressable
+          hitSlop={10}
+          onPress={toggleDone}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: done }}
+          accessibilityLabel={`${pot.name} : ${done ? 'versé' : 'à verser'}`}
+        >
+          <Ionicons
+            name={done ? 'checkmark-circle' : 'ellipse-outline'}
+            size={26}
+            color={done ? theme.colors.secondary : theme.colors.textMuted}
+          />
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -260,6 +377,25 @@ const styles = StyleSheet.create({
   },
   potName: {
     letterSpacing: 0.4,
+  },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+  },
+  planIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipChip: {
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
   },
   progressRow: {
     alignSelf: 'stretch',
