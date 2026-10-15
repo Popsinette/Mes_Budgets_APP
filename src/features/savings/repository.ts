@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { undoClosureRow, type ClosureRow } from '@/src/features/envelopes/repository';
 import { invalidateQueries } from '@/src/store/invalidation';
 import type { MonthKey } from '@/src/utils/dates';
 
@@ -136,9 +137,15 @@ export async function addMove(
   invalidateQueries();
 }
 
-/** Supprime un mouvement ; s'il venait d'un reste de semaine, la semaine redevient « à solder ». */
+/**
+ * Supprime un mouvement ; s'il venait d'un reste de semaine, la semaine
+ * redevient « à solder » ; s'il venait d'une clôture de mois, l'enveloppe
+ * redevient « à clôturer » (son budget est rétabli).
+ */
 export async function deleteMove(db: SQLiteDatabase, move: SavingsMove): Promise<void> {
   await db.withTransactionAsync(async () => {
+    const closure = await db.getFirstAsync<ClosureRow>('SELECT * FROM month_closures WHERE move_id = ?', [move.id]);
+    if (closure) await undoClosureRow(db, closure);
     await db.runAsync('DELETE FROM savings_moves WHERE id = ?', [move.id]);
     if (move.week) await db.runAsync('DELETE FROM week_closures WHERE week = ?', [move.week]);
   });

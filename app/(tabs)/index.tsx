@@ -27,10 +27,11 @@ import { listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/sr
 import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
 import { AccountCard } from '@/src/components/AccountCard';
 import { ExpenseList } from '@/src/components/ExpenseList';
+import { ClosurePrompt } from '@/src/components/ClosurePrompt';
 import { ForecastPill } from '@/src/components/ForecastPill';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, currentWeekKey, numericDate, weekProgressLabel } from '@/src/utils/dates';
+import { currentMonthKey, currentWeekKey, numericDate, shiftMonthKey, weekProgressLabel } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
@@ -55,6 +56,7 @@ export default function BudgetScreen() {
       <AppHeader title="Mon budget" />
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
       <ForecastPill month={month} />
+      {month >= shiftMonthKey(currentMonthKey(), -1) && month <= currentMonthKey() ? <ClosurePrompt /> : null}
       {month === currentMonthKey() ? (
         <AccountCard />
       ) : month > currentMonthKey() ? (
