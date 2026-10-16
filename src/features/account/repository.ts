@@ -34,6 +34,9 @@ export type AccountStatus = {
   upcoming_incomes_cents: number;
   upcoming_charges_cents: number;
   envelopes_left_cents: number;
+  /** Dépenses notées mais pas encore pointées (débitées) : à retirer du compte. */
+  uncleared_cents: number;
+  uncleared_count: number;
   savings_left_cents: number;
   pending_refunds_cents: number;
   /** Solde prévu en fin de mois. */
@@ -56,15 +59,24 @@ export async function getAccount(db: SQLiteDatabase): Promise<Account | null> {
 
 /**
  * Saisit (ou remplace) le solde bancaire. `alreadyPassed` : revenus / charges
- * du mois déjà passés sur le compte mais pas encore cochés — ils sont cochés
- * juste AVANT l'instant de saisie, pour ne pas être comptés deux fois.
+ * du mois déjà passés sur le compte mais pas encore cochés ; `alreadyCleared` :
+ * dépenses déjà débitées mais pas encore pointées. Les uns et les autres sont
+ * cochés / pointés juste AVANT l'instant de saisie, pour ne pas être comptés
+ * deux fois.
  */
 export async function setAccountBalance(
   db: SQLiteDatabase,
   cents: number,
   alreadyPassed: Array<{ itemId: number; month: MonthKey }> = [],
+  alreadyCleared: number[] = [],
 ): Promise<void> {
   await db.withTransactionAsync(async () => {
+    for (const id of alreadyCleared) {
+      await db.runAsync(
+        "UPDATE expenses SET cleared_at = datetime('now', '-1 second') WHERE id = ? AND cleared_at IS NULL",
+        [id],
+      );
+    }
     for (const { itemId, month } of alreadyPassed) {
       await db.runAsync(
         "INSERT OR IGNORE INTO fixed_checks (item_id, month, checked_at) VALUES (?, ?, datetime('now', '-1 second'))",
@@ -94,13 +106,17 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
       health: number;
       refunds: number;
       savings: number;
+      uncleared: number;
+      uncleared_count: number;
     }>(
       `SELECT
          COALESCE((SELECT SUM(f.amount_cents) FROM fixed_checks c JOIN fixed_items f ON f.id = c.item_id
                    WHERE f.kind = 'income' AND c.checked_at > ?), 0) AS incomes,
          COALESCE((SELECT SUM(f.amount_cents) FROM fixed_checks c JOIN fixed_items f ON f.id = c.item_id
                    WHERE f.kind = 'charge' AND c.checked_at > ?), 0) AS charges,
-         COALESCE((SELECT SUM(amount_cents) FROM expenses WHERE created_at > ?), 0) AS expenses,
+         COALESCE((SELECT SUM(amount_cents) FROM expenses WHERE cleared_at > ?), 0) AS expenses,
+         COALESCE((SELECT SUM(amount_cents) FROM expenses WHERE cleared_at IS NULL), 0) AS uncleared,
+         (SELECT COUNT(*) FROM expenses WHERE cleared_at IS NULL) AS uncleared_count,
          COALESCE((SELECT SUM(amount_cents) FROM health_expenses WHERE created_at > ?), 0) AS health,
          COALESCE((SELECT SUM(refund_cents) FROM health_expenses WHERE settled = 1 AND settled_at > ?), 0) AS refunds,
          COALESCE((SELECT SUM(amount_cents) FROM savings_moves WHERE created_at > ?), 0) AS savings`,
@@ -123,7 +139,7 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
     ),
   ]);
 
-  const m = moved ?? { incomes: 0, charges: 0, expenses: 0, health: 0, refunds: 0, savings: 0 };
+  const m = moved ?? { incomes: 0, charges: 0, expenses: 0, health: 0, refunds: 0, savings: 0, uncleared: 0, uncleared_count: 0 };
   const balance = account.start_cents + m.incomes - m.charges - m.expenses - m.health + m.refunds - m.savings;
 
   const upcomingIncomes = fixed.filter((f) => f.kind === 'income' && !f.checked).reduce((s, f) => s + f.amount_cents, 0);
@@ -138,7 +154,9 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
   );
   const savingsLeft = pots.filter((p) => p.plan_done !== 1).reduce((s, p) => s + plannedFor(p), 0);
   const pendingRefunds = pending?.total ?? 0;
-  const endOfMonth = balance + upcomingIncomes - upcomingCharges - envelopesLeft - savingsLeft + pendingRefunds;
+  // Dépenses à pointer : déjà déduites des enveloppes, pas encore du compte.
+  const endOfMonth =
+    balance + upcomingIncomes - upcomingCharges - m.uncleared - envelopesLeft - savingsLeft + pendingRefunds;
   const extraSavings = monthMoves?.extra ?? 0;
 
   return {
@@ -153,6 +171,8 @@ export async function getAccountStatus(db: SQLiteDatabase): Promise<AccountStatu
     upcoming_incomes_cents: upcomingIncomes,
     upcoming_charges_cents: upcomingCharges,
     envelopes_left_cents: envelopesLeft,
+    uncleared_cents: m.uncleared,
+    uncleared_count: m.uncleared_count,
     savings_left_cents: savingsLeft,
     pending_refunds_cents: pendingRefunds,
     end_of_month_cents: endOfMonth,

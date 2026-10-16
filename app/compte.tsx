@@ -17,9 +17,10 @@ import {
   startLabel,
   type AccountStatus,
 } from '@/src/features/account/repository';
+import { searchExpenses, type Expense } from '@/src/features/envelopes/repository';
 import { listFixedForMonth, type FixedItemForMonth } from '@/src/features/fixed/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, monthKeyLabel } from '@/src/utils/dates';
+import { currentMonthKey, monthKeyLabel, numericDate, todayIso } from '@/src/utils/dates';
 import { notify } from '@/src/utils/dialogs';
 import { formatCents, parseAmountToCents } from '@/src/utils/money';
 
@@ -51,6 +52,17 @@ function BalanceForm({ initial, onDone }: { initial: AccountStatus | null; onDon
   const [passed, setPassed] = useState<Set<number> | null>(null);
   const selected = passed ?? new Set(unchecked.filter((i) => i.day <= today).map((i) => i.id));
   const [saving, setSaving] = useState(false);
+  const { data: uncleared } = useLiveQuery((db) => searchExpenses(db, { month: null, query: '', unclearedOnly: true }));
+  const pendingExpenses = uncleared ?? [];
+  // Par défaut : une dépense d'avant aujourd'hui est sans doute déjà débitée.
+  const [debited, setDebited] = useState<Set<number> | null>(null);
+  const debitedIds = debited ?? new Set(pendingExpenses.filter((x) => x.date < todayIso()).map((x) => x.id));
+  const toggleExpense = (expense: Expense) => {
+    const next = new Set(debitedIds);
+    if (next.has(expense.id)) next.delete(expense.id);
+    else next.add(expense.id);
+    setDebited(next);
+  };
 
   const toggle = (item: FixedItemForMonth) => {
     const next = new Set(selected);
@@ -72,6 +84,7 @@ function BalanceForm({ initial, onDone }: { initial: AccountStatus | null; onDon
       db,
       negative ? -cents : cents,
       unchecked.filter((i) => selected.has(i.id)).map((i) => ({ itemId: i.id, month })),
+      pendingExpenses.filter((x) => debitedIds.has(x.id)).map((x) => x.id),
     );
     setSaving(false);
     onDone();
@@ -130,6 +143,47 @@ function BalanceForm({ initial, onDone }: { initial: AccountStatus | null; onDon
         </View>
       ) : null}
 
+      {pendingExpenses.length > 0 ? (
+        <View style={{ gap: spacing.sm }}>
+          <Eyebrow>Dépenses déjà débitées ?</Eyebrow>
+          <Caption>
+            Coche les dépenses notées qui apparaissent déjà sur ton compte : elles seront pointées. Les autres restent « à
+            pointer ».
+          </Caption>
+          <Card style={{ paddingVertical: spacing.xs }}>
+            {pendingExpenses.map((x, i) => {
+              const on = debitedIds.has(x.id);
+              return (
+                <Pressable
+                  key={x.id}
+                  onPress={() => toggleExpense(x)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  accessibilityLabel={`${x.label} déjà débitée`}
+                  style={[
+                    styles.row,
+                    i < pendingExpenses.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline },
+                  ]}
+                >
+                  <Ionicons
+                    name={on ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={24}
+                    color={on ? theme.colors.secondary : theme.colors.textMuted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Body weight="medium">{x.label}</Body>
+                    <Caption>
+                      {x.envelope_name} · {numericDate(x.date)}
+                    </Caption>
+                  </View>
+                  <Money cents={-x.amount_cents} signed size={14.5} tone="expense" />
+                </Pressable>
+              );
+            })}
+          </Card>
+        </View>
+      ) : null}
+
       <Button label="Enregistrer mon solde" onPress={() => void save()} loading={saving} />
       {initial ? <Button label="Annuler" variant="secondary" onPress={onDone} /> : null}
     </Screen>
@@ -146,7 +200,7 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
   const since: Array<[string, number]> = [
     ['Revenus crédités', status.incomes_cents],
     ['Charges réglées', -status.charges_cents],
-    ['Dépenses notées', -status.expenses_cents],
+    ['Dépenses pointées', -status.expenses_cents],
     ['Frais de santé avancés', -status.health_cents],
     ['Remboursements santé', status.refunds_cents],
     ['Virements vers les cagnottes', -status.savings_cents],
@@ -154,6 +208,10 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
   const upcoming: Array<[string, number]> = [
     ['Revenus à créditer', status.upcoming_incomes_cents],
     ['Charges à débiter', -status.upcoming_charges_cents],
+    [
+      status.uncleared_count === 1 ? 'Dépense à pointer (1)' : `Dépenses à pointer (${status.uncleared_count})`,
+      -status.uncleared_cents,
+    ],
     ['Reste des enveloppes', -status.envelopes_left_cents],
     ['Épargne programmée à verser', -status.savings_left_cents],
     ['Remboursements attendus', status.pending_refunds_cents],
@@ -190,6 +248,16 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
           <Money cents={end} size={18} weight="bold" tone={end < 0 ? 'danger' : 'text'} />
         </View>
         <Lines lines={upcoming} />
+        {status.uncleared_count > 0 ? (
+          <Pressable
+            onPress={() => router.push({ pathname: '/depenses', params: { pointer: '1' } })}
+            accessibilityRole="button"
+            accessibilityLabel="Pointer mes dépenses"
+            hitSlop={6}
+          >
+            <Caption tone="primary">Pointer mes dépenses débitées →</Caption>
+          </Pressable>
+        ) : null}
         <Caption tone={end < 0 ? 'danger' : 'muted'}>
           {end < 0
             ? 'Ton compte passerait à découvert d’ici la fin du mois : réduis une enveloppe ou décale un virement.'
@@ -230,9 +298,9 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
           <Money cents={end} size={14.5} weight="bold" tone={end < 0 ? 'danger' : 'text'} />
         </View>
         <Caption>
-          Si ce solde de début de mois ne te paraît pas juste, vérifie les charges et revenus cochés « déjà passés » à la
-          saisie, et les dépenses notées alors qu’elles n’étaient pas encore débitées. « Saisir un nouveau solde »
-          permet de tout reprendre.
+          Si ce solde de début de mois ne te paraît pas juste, vérifie les charges et revenus cochés « déjà passés » et
+          les dépenses pointées alors qu’elles n’étaient pas encore débitées. « Saisir un nouveau solde » permet de tout
+          reprendre.
         </Caption>
       </Card>
 
@@ -252,10 +320,17 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
               <Ionicons name="alert-circle" size={20} color={theme.colors.warning} />
               <Body size={14} style={{ flex: 1 }}>
                 {gap < 0
-                  ? `Ta banque affiche ${formatCents(-gap)} de moins : une dépense oubliée, ou une charge passée mais pas encore cochée ?`
-                  : `Ta banque affiche ${formatCents(gap)} de plus : une dépense pas encore débitée, ou un revenu reçu mais pas coché ?`}
+                  ? `Ta banque affiche ${formatCents(-gap)} de moins : une dépense débitée mais pas encore pointée (ou oubliée), ou une charge passée mais pas encore cochée ?`
+                  : `Ta banque affiche ${formatCents(gap)} de plus : une dépense pointée alors qu’elle n’est pas encore débitée, ou un revenu reçu mais pas coché ?`}
               </Body>
             </View>
+            {gap < 0 && status.uncleared_count > 0 ? (
+              <Button
+                label="Pointer mes dépenses débitées"
+                variant="secondary"
+                onPress={() => router.push({ pathname: '/depenses', params: { pointer: '1' } })}
+              />
+            ) : null}
             {gap < 0 ? (
               <Button label="Noter une dépense oubliée" variant="secondary" onPress={() => router.push('/depense')} />
             ) : null}
@@ -270,7 +345,8 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
               }}
             />
             <Caption>
-              Caler ton solde repart du montant de ta banque, maintenant. Tes dépenses et tes coches ne changent pas.
+              Caler ton solde repart du montant de ta banque, maintenant. Pointe d’abord les dépenses déjà débitées : celles
+              qui restent « à pointer » seront encore retirées de ton compte quand tu les pointeras.
             </Caption>
           </View>
         )

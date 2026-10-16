@@ -36,7 +36,7 @@ describe('Mon compte', () => {
 
   it('les actions prévues par le plan ne changent ni la fin de mois ni le début de mois déduit', async () => {
     const before = await status();
-    await spend(db, OCT, 'Courses', 3000, '2026-10-14');
+    await spend(db, OCT, 'Courses', 3000, '2026-10-14', true);
     const loyer = (await listFixedForMonth(db, OCT)).find((f) => f.name === 'Loyer');
     await setFixedChecked(db, loyer!.id, OCT, true);
     await setPlanDone(db, await vacances(db, OCT), OCT, true, '2026-10-15');
@@ -63,9 +63,9 @@ describe('Mon compte', () => {
     expect(after.implied_start_cents).toBe(before.implied_start_cents);
   });
 
-  it('ce qui est noté avant la saisie du solde ne compte pas deux fois', async () => {
-    await spend(db, OCT, 'Courses', 3000, '2026-10-14');
-    raw.exec("UPDATE expenses SET created_at = datetime('now', '-2 minutes')");
+  it('une dépense pointée avant la saisie du solde ne compte pas deux fois', async () => {
+    await spend(db, OCT, 'Courses', 3000, '2026-10-14', true);
+    raw.exec("UPDATE expenses SET created_at = datetime('now', '-2 minutes'), cleared_at = datetime('now', '-2 minutes')");
     const s = await status();
     expect(s.balance_cents).toBe(100000);
   });

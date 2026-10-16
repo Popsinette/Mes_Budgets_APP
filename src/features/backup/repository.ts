@@ -25,8 +25,11 @@ export const BACKUP_TABLES = [
 ] as const;
 
 export const BACKUP_APP = 'Mes Budgets';
-/** 3 : ajout de savings_skips (V15) et month_closures / adjust_cents (V16). */
-export const BACKUP_FORMAT = 3;
+/**
+ * 3 : ajout de savings_skips (V15) et month_closures / adjust_cents (V16).
+ * 4 : pointage des dépenses (expenses.cleared_at, V17).
+ */
+export const BACKUP_FORMAT = 4;
 
 export type Backup = {
   app: string;
@@ -108,6 +111,11 @@ export async function restoreBackup(db: SQLiteDatabase, backup: Backup): Promise
           keys.map((k) => toSqlValue(row[k])),
         );
       }
+    }
+    // Avant le pointage (format < 4), les dépenses comptaient sur le compte dès
+    // leur saisie : on les considère pointées, comme la migration V17.
+    if ((backup.format ?? 0) < 4) {
+      await db.runAsync("UPDATE expenses SET cleared_at = COALESCE(created_at, '1970-01-01 00:00:00') WHERE cleared_at IS NULL");
     }
     await setMeta(db, LAST_BACKUP_KEY, backup.exported_at);
   });

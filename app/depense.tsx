@@ -59,6 +59,8 @@ function ExpenseForm({
   const [amount, setAmount] = useState(expense ? centsToInput(expense.amount_cents) : '');
   const [label, setLabel] = useState(expense?.label ?? '');
   const [date, setDate] = useState(expense?.date ?? defaultDate);
+  // Pointée = déjà débitée sur le compte. Une nouvelle dépense est « à pointer ».
+  const [cleared, setCleared] = useState(Boolean(expense?.cleared_at));
   // Enveloppes proposées : celles du mois de la date (variables : mois de la
   // semaine ; postes : mois civil). Chaque mois a les siennes.
   const weekMonth = monthOfWeek(weekKeyOf(date));
@@ -113,6 +115,7 @@ function ExpenseForm({
       label: label.trim() || envelope.name,
       amountCents: cents,
       date,
+      cleared,
     });
     router.back();
   };
@@ -170,6 +173,28 @@ function ExpenseForm({
       </View>
 
       <FormField label="Libellé (optionnel)" value={label} onChangeText={setLabel} placeholder="Marché, coiffeur, cadeau…" />
+
+      <Pressable
+        onPress={() => setCleared(!cleared)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: cleared }}
+        accessibilityLabel="Déjà débitée sur mon compte (pointée)"
+        style={[styles.clearRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
+      >
+        <Ionicons
+          name={cleared ? 'checkmark-circle' : 'ellipse-outline'}
+          size={24}
+          color={cleared ? theme.colors.secondary : theme.colors.textMuted}
+        />
+        <View style={{ flex: 1 }}>
+          <Body weight="medium">Déjà débitée sur mon compte</Body>
+          <Caption>
+            {cleared
+              ? 'Pointée : comptée dans le solde de ton compte.'
+              : 'À pointer : comptée dans ton budget, et dans ton compte quand tu la pointeras.'}
+          </Caption>
+        </View>
+      </Pressable>
 
       {current ? (
         <ImpactPreview
@@ -258,6 +283,14 @@ function ImpactPreview({
 }
 
 const styles = StyleSheet.create({
+  clearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
   preview: {
     flexDirection: 'row',
     alignItems: 'center',

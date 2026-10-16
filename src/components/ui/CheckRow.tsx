@@ -15,6 +15,8 @@ type CheckRowProps = {
   onToggle?: () => void;
   onPress?: () => void;
   onLongPress?: () => void;
+  /** Libellés d'accessibilité de la coche [cochée, pas cochée]. */
+  checkLabels?: [string, string];
   /** Remplace la coche (ex. badge « Solder » / « Terminé »). */
   trailing?: React.ReactNode;
   last?: boolean;
@@ -34,6 +36,7 @@ export function CheckRow({
   onLongPress,
   trailing,
   last,
+  checkLabels = ['fait', 'à faire'],
 }: CheckRowProps) {
   const theme = useTheme();
   const name = (icon in Ionicons.glyphMap ? icon : 'ellipse-outline') as keyof typeof Ionicons.glyphMap;
@@ -71,7 +74,7 @@ export function CheckRow({
             onPress={onToggle}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: Boolean(checked) }}
-            accessibilityLabel={`${title} : ${checked ? 'fait' : 'à faire'}`}
+            accessibilityLabel={`${title} : ${checked ? checkLabels[0] : checkLabels[1]}`}
           >
             <Ionicons
               name={checked ? 'checkmark-circle' : 'ellipse-outline'}

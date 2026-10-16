@@ -70,6 +70,8 @@ export type Expense = {
   envelope_color: string;
   envelope_period: EnvelopePeriod;
   envelope_month: MonthKey;
+  /** Pointée (débitée sur le compte) à ce moment ; null = « à pointer ». */
+  cleared_at: string | null;
 };
 
 // ---------- Ma base ----------
@@ -347,12 +349,11 @@ export function normalizeSearch(text: string): string {
  */
 export async function searchExpenses(
   db: SQLiteDatabase,
-  input: { month: MonthKey | null; query: string },
+  input: { month: MonthKey | null; query: string; unclearedOnly?: boolean },
 ): Promise<Expense[]> {
+  const where = [input.month ? 'e.month = ?' : null, input.unclearedOnly ? 'x.cleared_at IS NULL' : null].filter(Boolean);
   const rows = await db.getAllAsync<Expense>(
-    input.month
-      ? `${EXPENSE_SELECT} WHERE e.month = ? ORDER BY x.date DESC, x.id DESC`
-      : `${EXPENSE_SELECT} ORDER BY x.date DESC, x.id DESC`,
+    `${EXPENSE_SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY x.date DESC, x.id DESC`,
     input.month ? [input.month] : [],
   );
   const words = normalizeSearch(input.query).split(' ').filter(Boolean);
@@ -388,20 +389,45 @@ export async function getExpense(db: SQLiteDatabase, id: number): Promise<Expens
 
 export async function saveExpense(
   db: SQLiteDatabase,
-  input: { id?: number; envelopeId: number; label: string; amountCents: number; date: string },
+  input: {
+    id?: number;
+    envelopeId: number;
+    label: string;
+    amountCents: number;
+    date: string;
+    /** Déjà débitée sur le compte (pointée). Par défaut : à pointer. */
+    cleared?: boolean;
+  },
 ): Promise<void> {
   const week = weekKeyOf(input.date);
+  const cleared = input.cleared ? 1 : 0;
   if (input.id) {
     await db.runAsync(
-      'UPDATE expenses SET envelope_id = ?, label = ?, amount_cents = ?, date = ?, week = ? WHERE id = ?',
-      [input.envelopeId, input.label, input.amountCents, input.date, week, input.id],
+      `UPDATE expenses SET envelope_id = ?, label = ?, amount_cents = ?, date = ?, week = ?,
+         cleared_at = CASE WHEN ? = 1 THEN COALESCE(cleared_at, datetime('now')) ELSE NULL END
+       WHERE id = ?`,
+      [input.envelopeId, input.label, input.amountCents, input.date, week, cleared, input.id],
     );
   } else {
     await db.runAsync(
-      "INSERT INTO expenses (envelope_id, label, amount_cents, date, week, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
-      [input.envelopeId, input.label, input.amountCents, input.date, week],
+      `INSERT INTO expenses (envelope_id, label, amount_cents, date, week, created_at, cleared_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'), CASE WHEN ? = 1 THEN datetime('now') END)`,
+      [input.envelopeId, input.label, input.amountCents, input.date, week, cleared],
     );
   }
+  invalidateQueries();
+}
+
+/**
+ * Pointe (ou dépointe) une dépense : pointée = débitée sur le compte. Le
+ * solde estimé du compte ne compte que les dépenses pointées ; les autres
+ * sont retirées de la fin de mois prévue (« à pointer »).
+ */
+export async function setExpenseCleared(db: SQLiteDatabase, id: number, cleared: boolean): Promise<void> {
+  await db.runAsync(
+    `UPDATE expenses SET cleared_at = ${cleared ? "COALESCE(cleared_at, datetime('now'))" : 'NULL'} WHERE id = ?`,
+    [id],
+  );
   invalidateQueries();
 }
 
