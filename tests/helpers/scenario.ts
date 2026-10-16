@@ -26,12 +26,19 @@ export async function seedScenario(db: SQLiteDatabase): Promise<void> {
 }
 
 /** Ajoute une dépense dans l'enveloppe `name` du mois (ouvre le mois si besoin). */
-export async function spend(db: SQLiteDatabase, month: MonthKey, name: string, cents: number, date: string): Promise<number> {
+export async function spend(
+  db: SQLiteDatabase,
+  month: MonthKey,
+  name: string,
+  cents: number,
+  date: string,
+  cleared = false,
+): Promise<number> {
   const envelope = (await listEnvelopesForMonth(db, month, '2000-01-03')).find((e) => e.name === name);
   if (!envelope) throw new Error(`Enveloppe ${name} absente de ${month}`);
   const id = await resolveEnvelopeId(db, envelope);
   if (!id) throw new Error('Enveloppe introuvable');
-  await saveExpense(db, { envelopeId: id, label: name, amountCents: cents, date });
+  await saveExpense(db, { envelopeId: id, label: name, amountCents: cents, date, cleared });
   return id;
 }
 

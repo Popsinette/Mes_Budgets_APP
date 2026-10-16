@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getAccountStatus } from '@/src/features/account/repository';
 import { spacing, useTheme } from '@/src/theme';
+import { formatCents } from '@/src/utils/money';
 import { Card } from './ui/Card';
 import { Body, Caption, Eyebrow, Money } from './ui/Text';
 
@@ -41,6 +42,12 @@ export function AccountCard() {
           <Caption>Fin de mois prévue :</Caption>
           <Money cents={end} size={13} tone={end < 0 ? 'danger' : 'text'} />
         </View>
+        {status.uncleared_count > 0 ? (
+          <Caption>
+            {status.uncleared_count === 1 ? '1 dépense à pointer' : `${status.uncleared_count} dépenses à pointer`} ·{' '}
+            {formatCents(status.uncleared_cents)}
+          </Caption>
+        ) : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
     </Card>

@@ -314,7 +314,25 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     });
     await db.execAsync('PRAGMA user_version = 16');
   }
+
+  if (current < 17) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V17);
+    });
+    await db.execAsync('PRAGMA user_version = 17');
+  }
 }
+
+/**
+ * V17 — pointage des dépenses : `expenses.cleared_at` = moment où la dépense
+ * a été pointée (débitée sur le compte), NULL = « à pointer ». Les dépenses
+ * déjà notées sont considérées pointées au moment de leur saisie : le solde
+ * du compte ne bouge pas à la mise à jour.
+ */
+const MIGRATION_V17 = `
+ALTER TABLE expenses ADD COLUMN cleared_at TEXT;
+UPDATE expenses SET cleared_at = COALESCE(created_at, '1970-01-01 00:00:00');
+`;
 
 /**
  * V16 — sauvegarde & clôture du mois.

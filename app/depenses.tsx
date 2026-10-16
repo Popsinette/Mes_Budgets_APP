@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Card } from '@/src/components/ui/Card';
@@ -11,22 +12,28 @@ import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Eyebrow, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
-import { searchExpenses, type Expense } from '@/src/features/envelopes/repository';
+import { searchExpenses, setExpenseCleared, type Expense } from '@/src/features/envelopes/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { fonts, radius, spacing, useTheme } from '@/src/theme';
 import { monthKeyLabel, shortDayLabel } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
-/** « Mes dépenses » : toutes les dépenses du mois (ou de tous les mois), avec recherche. */
+/**
+ * « Mes dépenses » : toutes les dépenses du mois (ou de tous les mois), avec
+ * recherche et pointage (coche = débitée sur le compte). `pointer=1` ouvre
+ * directement les dépenses à pointer, tous mois confondus.
+ */
 export default function ExpensesModal() {
   const theme = useTheme();
+  const params = useLocalSearchParams<{ pointer?: string }>();
   const month = useSelectedMonth((s) => s.month);
   const setMonth = useSelectedMonth((s) => s.setMonth);
   const [query, setQuery] = useState('');
-  const [allMonths, setAllMonths] = useState(false);
+  const [allMonths, setAllMonths] = useState(params.pointer === '1');
+  const [pending, setPending] = useState(params.pointer === '1');
   const { data } = useLiveQuery(
-    (db) => searchExpenses(db, { month: allMonths ? null : month, query }),
-    [month, allMonths, query],
+    (db) => searchExpenses(db, { month: allMonths ? null : month, query, unclearedOnly: pending }),
+    [month, allMonths, query, pending],
   );
   const expenses = data ?? [];
   const total = expenses.reduce((s, x) => s + x.amount_cents, 0);
@@ -57,7 +64,13 @@ export default function ExpensesModal() {
       <View style={styles.chips}>
         <Chip label={allMonths ? monthKeyLabel(month) : `Ce mois-ci`} selected={!allMonths} onPress={() => setAllMonths(false)} />
         <Chip label="Tous les mois" selected={allMonths} onPress={() => setAllMonths(true)} />
+        <Chip label="À pointer" selected={pending} onPress={() => setPending(!pending)} />
       </View>
+      {pending ? (
+        <Caption>
+          Pointe une dépense (coche) quand tu la vois débitée sur ton compte : ton solde estimé suit ta banque.
+        </Caption>
+      ) : null}
 
       <View style={styles.totalRow}>
         <Body weight="semibold" style={{ flex: 1 }}>
@@ -70,8 +83,14 @@ export default function ExpensesModal() {
         <Card>
           <EmptyState
             icon={query ? 'search-outline' : 'receipt-outline'}
-            title={query ? 'Rien trouvé' : 'Aucune dépense'}
-            subtitle={query ? 'Essaie un autre mot, un nom d’enveloppe ou un montant.' : 'Les dépenses notées apparaîtront ici.'}
+            title={query ? 'Rien trouvé' : pending ? 'Tout est pointé' : 'Aucune dépense'}
+            subtitle={
+              query
+                ? 'Essaie un autre mot, un nom d’enveloppe ou un montant.'
+                : pending
+                  ? 'Toutes tes dépenses sont débitées sur ton compte.'
+                  : 'Les dépenses notées apparaîtront ici.'
+            }
           />
         </Card>
       ) : (
@@ -95,29 +114,43 @@ export default function ExpensesModal() {
 
 function ExpenseRow({ expense, showDate, last }: { expense: Expense; showDate: boolean; last: boolean }) {
   const theme = useTheme();
+  const db = useSQLiteContext();
+  const cleared = Boolean(expense.cleared_at);
   return (
-    <Pressable
-      onPress={() => router.push({ pathname: '/depense', params: { id: String(expense.id) } })}
-      accessibilityRole="button"
-      accessibilityLabel={`${expense.label}, ${formatCents(expense.amount_cents)}, ${expense.envelope_name}. Modifier`}
-      style={({ pressed }) => [
-        styles.row,
-        !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline },
-        { opacity: pressed ? 0.6 : 1 },
-      ]}
-    >
-      <CategoryIcon icon={expense.envelope_icon} color={expense.envelope_color} size={34} />
-      <View style={{ flex: 1 }}>
-        <Body weight="medium" numberOfLines={1}>
-          {expense.label}
-        </Body>
-        <Caption numberOfLines={1}>
-          {expense.envelope_name}
-          {showDate ? ` · ${shortDayLabel(expense.date)}` : ''}
-        </Caption>
-      </View>
-      <Money cents={-expense.amount_cents} signed size={15} weight="semibold" tone="expense" />
-    </Pressable>
+    <View style={[styles.rowWrap, !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline }]}>
+      <Pressable
+        onPress={() => router.push({ pathname: '/depense', params: { id: String(expense.id) } })}
+        accessibilityRole="button"
+        accessibilityLabel={`${expense.label}, ${formatCents(expense.amount_cents)}, ${expense.envelope_name}. Modifier`}
+        style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
+      >
+        <CategoryIcon icon={expense.envelope_icon} color={expense.envelope_color} size={34} />
+        <View style={{ flex: 1 }}>
+          <Body weight="medium" numberOfLines={1}>
+            {expense.label}
+          </Body>
+          <Caption numberOfLines={1}>
+            {expense.envelope_name}
+            {showDate ? ` · ${shortDayLabel(expense.date)}` : ''}
+            {cleared ? '' : ' · à pointer'}
+          </Caption>
+        </View>
+        <Money cents={-expense.amount_cents} signed size={15} weight="semibold" tone="expense" />
+      </Pressable>
+      <Pressable
+        hitSlop={10}
+        onPress={() => void setExpenseCleared(db, expense.id, !cleared)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: cleared }}
+        accessibilityLabel={`${expense.label} : ${cleared ? 'pointée (débitée)' : 'à pointer'}`}
+      >
+        <Ionicons
+          name={cleared ? 'checkmark-circle' : 'ellipse-outline'}
+          size={26}
+          color={cleared ? theme.colors.secondary : theme.colors.textMuted}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -149,5 +182,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', gap: spacing.sm },
   totalRow: { flexDirection: 'row', alignItems: 'center' },
   groupHead: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm + 2 },
+  rowWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  row: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm + 2 },
 });
