@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -60,7 +60,7 @@ export default function PotsScreen() {
       <View style={styles.topRow}>
         <Card style={[styles.forecast, { backgroundColor: theme.colors.primarySoft, borderColor: 'transparent' }]}>
           <View style={styles.forecastHead}>
-            <Ionicons name="bag-handle" size={20} color={theme.colors.primary} />
+            <MaterialCommunityIcons name="piggy-bank-outline" size={22} color={theme.colors.primary} />
             <Body weight="semibold" size={14} style={{ textAlign: 'center', flex: 1 }}>
               Prévisions de {monthName}
             </Body>
