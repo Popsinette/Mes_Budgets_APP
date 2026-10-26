@@ -13,7 +13,7 @@ import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Heading } from '@/src/components/ui/Text';
 import { seedPots, upgradeLegacyColors } from '@/src/db/schema';
 import { seedBase } from '@/src/features/envelopes/repository';
-import { backupStats, getBackupStatus, parseBackup, restoreBackup } from '@/src/features/backup/repository';
+import { backupStats, getBackupStatus, getMeta, OPEN_ON_EXPENSE_KEY, parseBackup, restoreBackup, setMeta } from '@/src/features/backup/repository';
 import { pickJsonFileText } from '@/src/features/backup/pickFile';
 import { exportAllDataAsJson, exportExpensesAsCsv } from '@/src/features/export/exporter';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
@@ -111,6 +111,8 @@ export default function SettingsScreen() {
         void (async () => {
           await db.withTransactionAsync(async () => {
             await db.execAsync(`
+              DELETE FROM habit_logs;
+              DELETE FROM expense_habits;
               DELETE FROM account;
               DELETE FROM health_expenses;
               DELETE FROM week_closures;
@@ -199,6 +201,17 @@ export default function SettingsScreen() {
       </Card>
 
       <Card style={{ gap: spacing.md }}>
+        <Heading>Habitudes et année</Heading>
+        <Body tone="muted" size={13.5}>
+          Les dépenses qui reviennent (cantine, essence…) et les grosses charges de l’année à lisser.
+        </Body>
+        <Button label="Mes habitudes" variant="secondary" onPress={() => router.push('/habitudes')} />
+        <Button label="Mon année" variant="secondary" onPress={() => router.push('/annee')} />
+      </Card>
+
+      <QuickAccessCard />
+
+      <Card style={{ gap: spacing.md }}>
         <Heading>Sauvegarde</Heading>
         <Body tone="muted" size={13.5}>
           Tes données ne sont que sur cet appareil. Garde une sauvegarde (JSON) ailleurs — Fichiers, iCloud Drive,
@@ -270,3 +283,33 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
 });
+
+/**
+ * Noter une dépense en un geste : ouvrir l'app directement sur « Nouvelle
+ * dépense » (réglage stocké dans app_meta), et sur Android les raccourcis de
+ * l'icône (manifest « shortcuts »).
+ */
+function QuickAccessCard() {
+  const theme = useTheme();
+  const db = useSQLiteContext();
+  const { data: on } = useLiveQuery(async (db) => (await getMeta(db, OPEN_ON_EXPENSE_KEY)) === '1', []);
+  const toggle = async (next: boolean) => {
+    await setMeta(db, OPEN_ON_EXPENSE_KEY, next ? '1' : null);
+    invalidateQueries();
+  };
+  return (
+    <Card style={{ gap: spacing.md }}>
+      <Heading>Noter une dépense en un geste</Heading>
+      <View style={styles.toggleRow}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Body weight="semibold">Ouvrir sur « Nouvelle dépense »</Body>
+          <Caption>À chaque ouverture de l’app, le formulaire de dépense s’affiche directement (fermer = ton budget).</Caption>
+        </View>
+        <Switch value={Boolean(on)} onValueChange={(next) => void toggle(next)} trackColor={{ true: theme.colors.primary }} />
+      </View>
+      {Platform.OS === 'web' ? (
+        <Caption>Sur Android, un appui long sur l’icône de l’app propose aussi « Nouvelle dépense » et « Mes dépenses ».</Caption>
+      ) : null}
+    </Card>
+  );
+}

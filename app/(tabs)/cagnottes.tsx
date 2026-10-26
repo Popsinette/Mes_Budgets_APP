@@ -8,6 +8,7 @@ import { LineChart, type LinePoint } from '@/src/components/charts/LineChart';
 import { AppHeader } from '@/src/components/ui/AppHeader';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { Chip } from '@/src/components/ui/Chip';
+import { GoalHint } from '@/src/components/GoalHint';
 import { Card } from '@/src/components/ui/Card';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
@@ -17,10 +18,12 @@ import { Body, Caption, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   getSavingsProjection,
+  goalAdvice,
   listPots,
   POT_KIND_LABELS,
   setPlanDone,
   setPlanSkipped,
+  setPotMonthly,
   type PotWithBalance,
 } from '@/src/features/savings/repository';
 import { getMonthSummary } from '@/src/features/summary/repository';
@@ -111,7 +114,7 @@ export default function PotsScreen() {
               </View>
               <Card style={{ paddingVertical: spacing.xs }}>
                 {group.map((pot, i) => (
-                  <PotRow key={pot.id} pot={pot} last={i === group.length - 1} />
+                  <PotRow key={pot.id} pot={pot} month={month} last={i === group.length - 1} />
                 ))}
               </Card>
             </View>
@@ -221,8 +224,10 @@ function PlanProjection() {
  * date limite) ou versement mensuel. Toucher → détail ; crayon → corriger
  * le montant.
  */
-function PotRow({ pot, last }: { pot: PotWithBalance; last: boolean }) {
+function PotRow({ pot, month, last }: { pot: PotWithBalance; month: string; last: boolean }) {
   const theme = useTheme();
+  const db = useSQLiteContext();
+  const advice = goalAdvice(pot, month);
   const target = pot.target_cents ?? 0;
   const ratio = target > 0 ? pot.balance_cents / target : 0;
   const reached = target > 0 && pot.balance_cents >= target;
@@ -257,6 +262,7 @@ function PotRow({ pot, last }: { pot: PotWithBalance; last: boolean }) {
             </View>
           ) : null}
           <Caption numberOfLines={1}>{details.join(' · ')}</Caption>
+          <GoalHint pot={pot} advice={advice} onAdjust={(cents) => void setPotMonthly(db, pot.id, cents)} />
         </View>
       </Pressable>
       <Pressable

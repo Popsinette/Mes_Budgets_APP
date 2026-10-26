@@ -6,6 +6,7 @@ import { saveFixedItem, setFixedChecked, listFixedForMonth } from '@/src/feature
 import { saveHealthExpense } from '@/src/features/health/repository';
 import { addMove, listPots, savePot, setPlanDone } from '@/src/features/savings/repository';
 import { categoryPalette } from '@/src/theme/palette';
+import { saveHabit } from '@/src/features/habits/repository';
 import { emptyDb } from './db';
 import { spend } from './scenario';
 
@@ -35,6 +36,10 @@ async function main(out: string) {
   for (const [name, cents, day, icon] of charges) {
     await saveFixedItem(db, { kind: 'charge', name, amountCents: cents, day, frequency: 'monthly', startMonth: '2026-01', icon });
   }
+  // Charges non mensuelles (« Mon année ») et une habitude (« À noter »).
+  await saveFixedItem(db, { kind: 'charge', name: 'Assurance habitation', amountCents: 24000, day: 10, frequency: 'yearly', startMonth: '2026-03', icon: 'home-outline' });
+  await saveFixedItem(db, { kind: 'charge', name: 'Taxe foncière', amountCents: 96000, day: 15, frequency: 'yearly', startMonth: '2026-09', icon: 'business-outline' });
+  await saveFixedItem(db, { kind: 'charge', name: 'Eau', amountCents: 9000, day: 5, frequency: 'quarterly', startMonth: '2026-02', icon: 'water-outline' });
   await saveTemplate(db, { name: 'Courses', icon: 'cart-outline', color: categoryPalette[1], amountCents: 9000, period: 'week' });
   await saveTemplate(db, { name: 'Plaisir', icon: 'happy-outline', color: categoryPalette[5], amountCents: 4000, period: 'week' });
   await saveTemplate(db, { name: 'Essence', icon: 'car-sport-outline', color: categoryPalette[4], amountCents: 12000, period: 'month' });
@@ -68,6 +73,7 @@ async function main(out: string) {
   }
   const pots = await listPots(db, '2026-10');
   await addMove(db, { potId: pots.find((p) => p.name === 'Vacances')!.id, amountCents: 12000, date: '2026-09-30', note: 'Reste de septembre' });
+  await saveHabit(db, { label: 'Boulangerie', envelopeName: 'Courses', envelopePeriod: 'week', amountCents: 850, frequency: 'weekly', startDate: '2026-10-03' });
   writeFileSync(out, JSON.stringify(await buildBackup(db), null, 1));
   console.log('ok', out);
 }

@@ -26,11 +26,12 @@ import {
   type EnvelopeForMonth,
   type Expense,
 } from '@/src/features/envelopes/repository';
-import { listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/src/features/fixed/repository';
+import { getAnnualCharges, listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/src/features/fixed/repository';
 import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
 import { AccountCard } from '@/src/components/AccountCard';
 import { ExpenseList } from '@/src/components/ExpenseList';
 import { ClosurePrompt } from '@/src/components/ClosurePrompt';
+import { HabitsDue } from '@/src/components/HabitsDue';
 import { ForecastPill } from '@/src/components/ForecastPill';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
@@ -109,6 +110,7 @@ function VariablesTab({ month }: { month: string }) {
 
   return (
     <>
+      {month === currentMonthKey() ? <HabitsDue /> : null}
       <Card style={{ gap: spacing.sm }}>
         <View style={styles.overviewRow}>
           <View style={{ flex: 1 }}>
@@ -363,6 +365,8 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
       />
 
 
+      {isCharge ? <AnnualLink /> : null}
+
       {list.length === 0 ? (
         <Card>
           <EmptyState
@@ -398,6 +402,26 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
         </Card>
       )}
     </>
+  );
+}
+
+/** Lien vers « Mon année » quand des charges trimestrielles ou annuelles sont à lisser. */
+function AnnualLink() {
+  const theme = useTheme();
+  const { data } = useLiveQuery((db) => getAnnualCharges(db, currentMonthKey()), []);
+  if (!data || data.length === 0) return null;
+  const provision = data.reduce((s, c) => s + c.monthly_provision_cents, 0);
+  return (
+    <Card onPress={() => router.push('/annee')} style={styles.annual}>
+      <CategoryIcon icon="calendar-outline" color={theme.colors.navy} size={36} />
+      <View style={{ flex: 1 }}>
+        <Body weight="semibold">Mon année</Body>
+        <Caption>
+          {data.length === 1 ? '1 charge annuelle' : `${data.length} charges non mensuelles`} · {formatCents(provision, { compact: true })}/mois à prévoir
+        </Caption>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+    </Card>
   );
 }
 
@@ -491,6 +515,7 @@ function SectionTitle({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
 }
 
 const styles = StyleSheet.create({
+  annual: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
   overviewRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   addRow: { flexDirection: 'row', gap: spacing.sm },
   monthlyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { GoalHint } from '@/src/components/GoalHint';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -15,8 +16,10 @@ import {
   deleteMove,
   listMoves,
   listPots,
+  goalAdvice,
   setPlanDone,
   setPlanSkipped,
+  setPotMonthly,
   POT_KIND_LABELS,
   type SavingsMove,
 } from '@/src/features/savings/repository';
@@ -73,6 +76,7 @@ export default function PotDetailModal() {
 
       {pot.target_cents ? (
         <View style={{ gap: spacing.sm }}>
+          <GoalHint pot={pot} advice={goalAdvice(pot, month)} onAdjust={(cents) => void setPotMonthly(db, pot.id, cents)} />
           <ProgressBar ratio={ratio} color={ratio >= 1 ? theme.colors.success : pot.color} height={11} />
           <Caption>
             {ratio >= 1
