@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -6,13 +6,13 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { LineChart, type LinePoint } from '@/src/components/charts/LineChart';
 import { AppHeader } from '@/src/components/ui/AppHeader';
+import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { Chip } from '@/src/components/ui/Chip';
 import { Card } from '@/src/components/ui/Card';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
-import { Segmented } from '@/src/components/ui/Segmented';
 import { Body, Caption, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
@@ -21,7 +21,6 @@ import {
   POT_KIND_LABELS,
   setPlanDone,
   setPlanSkipped,
-  type PotKind,
   type PotWithBalance,
 } from '@/src/features/savings/repository';
 import { getMonthSummary } from '@/src/features/summary/repository';
@@ -41,94 +40,83 @@ import { formatCents } from '@/src/utils/money';
 export default function PotsScreen() {
   const theme = useTheme();
   const month = useSelectedMonth((s) => s.month);
-  const [kind, setKind] = useState<PotKind>('projet');
   const { data: pots } = useLiveQuery((db) => listPots(db, month), [month]);
   const { data: summary } = useLiveQuery((db) => getMonthSummary(db, month), [month]);
 
   const planned = summary?.savings_planned_cents ?? 0;
   const income = summary?.income_cents ?? 0;
-  const list = (pots ?? []).filter((p) => p.kind === kind);
-  const total = list.reduce((s, p) => s + p.balance_cents, 0);
+  const all = pots ?? [];
+  const total = all.reduce((s, p) => s + p.balance_cents, 0);
+  const withTarget = all.filter((p) => p.target_cents);
+  const reached = withTarget.filter((p) => p.balance_cents >= (p.target_cents ?? 0)).length;
   const monthName = monthKeyLabel(month).split(' ')[0];
-  const scheduled = (pots ?? []).filter((p) => (p.monthly_cents ?? 0) > 0);
+  const scheduled = all.filter((p) => (p.monthly_cents ?? 0) > 0);
   const skipped = scheduled.filter((p) => p.plan_skipped === 1);
 
   return (
     <Screen bottomInset={90}>
       <AppHeader title="Mes économies" />
 
-      <View style={styles.topRow}>
-        <Card style={[styles.forecast, { backgroundColor: theme.colors.primarySoft, borderColor: 'transparent' }]}>
-          <View style={styles.forecastHead}>
-            <Ionicons name="bag-handle" size={20} color={theme.colors.primary} />
-            <Body weight="semibold" size={14} style={{ textAlign: 'center', flex: 1 }}>
-              Prévisions de {monthName}
-            </Body>
-          </View>
-          <Money cents={planned} size={20} weight="bold" color={theme.colors.primary} />
-          <Caption style={{ fontStyle: 'italic', textAlign: 'center' }}>
-            {income > 0 ? `soit ${((planned / income) * 100).toFixed(1).replace('.', ',')} % de tes revenus` : 'versements programmés'}
-          </Caption>
-          {skipped.length > 0 ? (
-            <Caption style={{ textAlign: 'center', fontSize: 11.5 }}>
-              {skipped.length === 1 ? '1 cagnotte en pause' : `${skipped.length} cagnottes en pause`} ce mois-ci
-            </Caption>
-          ) : null}
-        </Card>
+      <Card style={[styles.hero, { backgroundColor: theme.colors.primarySoft }]}>
+        <View style={styles.heroHead}>
+          <MaterialCommunityIcons name="piggy-bank-outline" size={24} color={theme.colors.primary} />
+          <Body weight="semibold" style={{ flex: 1 }}>
+            Total de mon épargne
+          </Body>
+        </View>
+        <Money cents={total} size={34} weight="xbold" color={theme.colors.primary} />
+        <Caption tone="text">
+          {all.length === 0
+            ? 'Crée ta première cagnotte.'
+            : `${all.length} cagnotte${all.length > 1 ? 's' : ''}${
+                withTarget.length > 0 ? ` · ${reached}/${withTarget.length} objectif${withTarget.length > 1 ? 's' : ''} atteint${reached > 1 ? 's' : ''}` : ''
+              }`}
+        </Caption>
+        <Caption>
+          {planned > 0
+            ? `En ${monthName} : ${formatCents(planned)} programmés${
+                income > 0 ? ` (${((planned / income) * 100).toFixed(1).replace('.', ',')} % de tes revenus)` : ''
+              }`
+            : `Aucun versement programmé en ${monthName}.`}
+          {skipped.length > 0 ? ` · ${skipped.length} en pause` : ''}
+        </Caption>
         <View style={styles.actions}>
           <PillButton
             icon="add"
-            label="Ajouter une cagnotte"
+            label="Nouvelle cagnotte"
             color={theme.colors.primary}
-            onPress={() => router.push({ pathname: '/poche', params: { kind } })}
+            onPress={() => router.push({ pathname: '/poche', params: { kind: 'projet' } })}
           />
-          <PillButton
-            icon="repeat"
-            label="Mes virements"
-            color={theme.colors.navy}
-            onPress={() => router.push('/virements')}
-          />
+          <PillButton icon="repeat" label="Mes virements" color={theme.colors.navy} onPress={() => router.push('/virements')} />
         </View>
-      </View>
+      </Card>
 
-      <PlanProjection />
-
-      <SectionHeader title="Mes cagnottes" />
-      <Segmented
-        segments={[
-          { key: 'projet', label: POT_KIND_LABELS.projet },
-          { key: 'securite', label: POT_KIND_LABELS.securite },
-        ]}
-        value={kind}
-        onChange={setKind}
-      />
-
-      <View style={styles.countRow}>
-        <Ionicons name="play-circle-outline" size={22} color={theme.colors.text} />
-        <Body weight="semibold" size={17} style={{ flex: 1 }}>
-          Mes cagnottes ({list.length})
-        </Body>
-        <Money cents={total} size={17} weight="bold" color={theme.colors.primary} />
-      </View>
-
-      {list.length === 0 ? (
+      {all.length === 0 ? (
         <Card>
           <EmptyState
-            icon="bag-handle-outline"
-            title="Aucune cagnotte ici"
-            subtitle={
-              kind === 'projet'
-                ? 'Vacances, voiture, travaux… crée une cagnotte pour chaque projet.'
-                : 'Ton matelas de sécurité : l’argent auquel on ne touche pas.'
-            }
+            icon="wallet-outline"
+            title="Aucune cagnotte"
+            subtitle="Matelas de sécurité, vacances, voiture… crée une cagnotte par compte ou par projet."
           />
         </Card>
       ) : (
-        <View style={styles.grid}>
-          {list.map((pot) => (
-            <PotCard key={pot.id} pot={pot} month={month} />
-          ))}
-        </View>
+        (['securite', 'projet'] as const).map((kind) => {
+          const group = all.filter((p) => p.kind === kind);
+          if (group.length === 0) return null;
+          return (
+            <View key={kind} style={{ gap: spacing.sm }}>
+              <View style={styles.groupHead}>
+                <SectionHeader title={POT_KIND_LABELS[kind]} />
+                <Money cents={group.reduce((s, p) => s + p.balance_cents, 0)} size={14} weight="semibold" tone="muted" />
+              </View>
+              <Card style={{ paddingVertical: spacing.xs }}>
+                {group.map((pot, i) => (
+                  <PotRow key={pot.id} pot={pot} last={i === group.length - 1} />
+                ))}
+              </Card>
+            </View>
+          );
+        })
       )}
 
       {scheduled.length > 0 ? (
@@ -144,6 +132,8 @@ export default function PotsScreen() {
           </Caption>
         </>
       ) : null}
+
+      <PlanProjection />
     </Screen>
   );
 }
@@ -226,75 +216,59 @@ function PlanProjection() {
   );
 }
 
-function PotCard({ pot, month }: { pot: PotWithBalance; month: string }) {
+/**
+ * Une cagnotte d'un coup d'œil : solde, objectif (jauge, %, ce qu'il reste,
+ * date limite) ou versement mensuel. Toucher → détail ; crayon → corriger
+ * le montant.
+ */
+function PotRow({ pot, last }: { pot: PotWithBalance; last: boolean }) {
   const theme = useTheme();
-  const db = useSQLiteContext();
-  const ratio = pot.target_cents ? pot.balance_cents / pot.target_cents : 0;
-  const done = pot.plan_done === 1;
-  const skipped = pot.plan_skipped === 1;
-
-  const togglePlan = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (skipped) {
-      void setPlanSkipped(db, pot.id, month, false);
-      return;
-    }
-    void setPlanDone(db, pot, month, !done, planDate(month));
-  };
-
+  const target = pot.target_cents ?? 0;
+  const ratio = target > 0 ? pot.balance_cents / target : 0;
+  const reached = target > 0 && pot.balance_cents >= target;
+  const missing = Math.max(0, target - pot.balance_cents);
+  const details = [
+    target > 0 ? (reached ? 'Objectif atteint 🎉' : `${Math.round(ratio * 100)} % · encore ${formatCents(missing)}`) : 'Sans objectif',
+    pot.deadline && !reached ? `avant le ${numericDate(pot.deadline)}` : null,
+    pot.monthly_cents ? `+${formatCents(pot.monthly_cents)}/mois` : null,
+  ].filter(Boolean);
   return (
-    <Card
-      style={styles.potCard}
-      onPress={() => router.push({ pathname: '/poche-detail', params: { id: String(pot.id) } })}
-    >
-      <View style={[styles.cover, { backgroundColor: `${theme.tint(pot.color)}${theme.dark ? '33' : '24'}` }]}>
-        <Ionicons
-          name={(pot.icon in Ionicons.glyphMap ? pot.icon : 'wallet-outline') as keyof typeof Ionicons.glyphMap}
-          size={34}
-          color={theme.tint(pot.color)}
-        />
-        {pot.monthly_cents ? (
-          <Pressable
-            hitSlop={8}
-            onPress={togglePlan}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: done }}
-            accessibilityLabel={
-              skipped
-                ? `${pot.name} : pas de versement ce mois-ci. Reprendre`
-                : `Versement du mois de ${formatCents(pot.monthly_cents)} pour ${pot.name}`
-            }
-            style={[styles.planCheck, { backgroundColor: theme.colors.card }]}
-          >
-            <Ionicons
-              name={skipped ? 'pause-circle-outline' : done ? 'checkmark-circle' : 'ellipse-outline'}
-              size={22}
-              color={done ? theme.colors.secondary : theme.colors.textMuted}
-            />
-          </Pressable>
-        ) : null}
-      </View>
-      <Body weight="semibold" size={14} style={styles.potName} numberOfLines={1}>
-        {pot.name.toUpperCase()}
-      </Body>
-      {pot.deadline ? (
-        <Caption style={{ fontStyle: 'italic', fontSize: 11 }}>Limite : {numericDate(pot.deadline)}</Caption>
-      ) : null}
-      <Body size={14}>
-        <Body weight="bold" size={14}>
-          {formatCents(pot.balance_cents, { compact: true })}
-        </Body>
-        {pot.target_cents ? <Caption> /{formatCents(pot.target_cents, { compact: true })}</Caption> : null}
-      </Body>
-      {pot.target_cents ? (
-        <View style={styles.progressRow}>
-          <View style={{ flex: 1 }}>
-            <ProgressBar ratio={ratio} color={ratio >= 1 ? theme.colors.success : theme.colors.primary} height={5} />
+    <View style={[styles.potRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline }]}>
+      <Pressable
+        onPress={() => router.push({ pathname: '/poche-detail', params: { id: String(pot.id) } })}
+        accessibilityRole="button"
+        accessibilityLabel={`${pot.name} : ${formatCents(pot.balance_cents)}${target ? ` sur ${formatCents(target)}` : ''}`}
+        style={({ pressed }) => [styles.potMain, { opacity: pressed ? 0.6 : 1 }]}
+      >
+        <CategoryIcon icon={pot.icon} color={pot.color} size={40} />
+        <View style={{ flex: 1, gap: 4 }}>
+          <View style={styles.potHead}>
+            <Body weight="semibold" style={{ flex: 1 }} numberOfLines={1}>
+              {pot.name}
+            </Body>
+            <Money cents={pot.balance_cents} size={16} weight="bold" />
           </View>
-          <Caption style={{ fontSize: 10.5 }}>{Math.round(ratio * 100)}%</Caption>
+          {target > 0 ? (
+            <View style={styles.potTargetRow}>
+              <View style={{ flex: 1 }}>
+                <ProgressBar ratio={ratio} color={reached ? theme.colors.success : pot.color} height={7} />
+              </View>
+              <Caption style={{ fontSize: 12 }}>/ {formatCents(target, { compact: true })}</Caption>
+            </View>
+          ) : null}
+          <Caption numberOfLines={1}>{details.join(' · ')}</Caption>
         </View>
-      ) : null}
-    </Card>
+      </Pressable>
+      <Pressable
+        onPress={() => router.push({ pathname: '/poche', params: { id: String(pot.id) } })}
+        accessibilityRole="button"
+        accessibilityLabel={`Modifier le montant de ${pot.name}`}
+        hitSlop={10}
+        style={[styles.editBtn, { backgroundColor: theme.colors.primarySoft }]}
+      >
+        <Ionicons name="create-outline" size={17} color={theme.colors.primary} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -406,6 +380,14 @@ function PillButton({
 }
 
 const styles = StyleSheet.create({
+  hero: { gap: spacing.xs },
+  heroHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  groupHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  potRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  potMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  potHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  potTargetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  editBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   horizon: { flexDirection: 'row', gap: spacing.sm },
   projRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   projSwatch: { width: 10, height: 10, borderRadius: 3 },
@@ -427,11 +409,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   actions: {
-    flex: 1.1,
-    justifyContent: 'center',
+    flexDirection: 'row',
     gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   pill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

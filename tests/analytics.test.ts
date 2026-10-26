@@ -115,3 +115,18 @@ describe('palette pastel', () => {
     expect(seriesColor('#123456', true)).toBe('#123456');
   });
 });
+
+describe('corriger le montant d’une cagnotte', () => {
+  it('le montant saisi devient le solde, l’historique est gardé, le compte n’est pas touché', async () => {
+    const { setPotBalance, listMoves, listPots: list } = await import('@/src/features/savings/repository');
+    const pot = await vacances(db, OCT);
+    await addMove(db, { potId: pot.id, amountCents: 30000, date: '2026-10-01', note: null });
+    const movesBefore = raw.prepare('SELECT COUNT(*) AS n FROM savings_moves').get();
+    await setPotBalance(db, pot.id, 125000);
+    const after = (await list(db, OCT)).find((p) => p.id === pot.id)!;
+    expect(after.balance_cents).toBe(125000);
+    expect(after.initial_cents).toBe(125000 - 30000);
+    expect((await listMoves(db, pot.id)).length).toBe(1);
+    expect(raw.prepare('SELECT COUNT(*) AS n FROM savings_moves').get()).toEqual(movesBefore);
+  });
+});

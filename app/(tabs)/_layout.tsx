@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, Tabs } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,11 @@ function tabIcon(active: IconName, inactive: IconName) {
   return ({ color, focused }: { color: ColorValue; focused: boolean }) => (
     <Ionicons name={focused ? active : inactive} size={26} color={color as string} />
   );
+}
+
+/** Onglet Cagnottes : une tirelire (absente d'Ionicons, prise chez Material Community Icons). */
+function piggyIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
+  return <MaterialCommunityIcons name={focused ? 'piggy-bank' : 'piggy-bank-outline'} size={28} color={color as string} />;
 }
 
 /** Bouton + central, en relief au-dessus de la barre (dégradé lavande → pivoine) : ouvre le choix d'ajout. */
@@ -69,7 +74,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Budget', tabBarAccessibilityLabel: 'Budget', tabBarIcon: tabIcon('layers', 'layers-outline') }} />
       <Tabs.Screen
         name="cagnottes"
-        options={{ title: 'Cagnottes', tabBarAccessibilityLabel: 'Cagnottes', tabBarIcon: tabIcon('bag-handle', 'bag-handle-outline') }}
+        options={{ title: 'Cagnottes', tabBarAccessibilityLabel: 'Cagnottes', tabBarIcon: piggyIcon }}
       />
       <Tabs.Screen
         name="ajouter-onglet"
