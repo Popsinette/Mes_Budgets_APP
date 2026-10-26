@@ -109,8 +109,8 @@ function MoveForm({
               style={[
                 styles.pot,
                 {
-                  backgroundColor: isSelected ? `${pot.color}22` : theme.colors.card,
-                  borderColor: isSelected ? pot.color : theme.colors.border,
+                  backgroundColor: isSelected ? `${theme.tint(pot.color)}22` : theme.colors.card,
+                  borderColor: isSelected ? theme.tint(pot.color) : theme.colors.border,
                 },
               ]}
             >

@@ -17,9 +17,9 @@ export type SpendingGroup = 'fixes' | 'variables' | 'postes' | 'sante';
 
 export const SPENDING_GROUPS: Record<SpendingGroup, { label: string; color: string }> = {
   // Ordre fixe de la palette validée (contraste + daltonisme, clair et sombre).
-  fixes: { label: 'Fixes', color: categoryPalette[0] },
-  variables: { label: 'Variables', color: categoryPalette[1] },
-  postes: { label: 'Postes du mois', color: categoryPalette[2] },
+  fixes: { label: 'Factures', color: categoryPalette[0] },
+  variables: { label: 'Semaine', color: categoryPalette[1] },
+  postes: { label: 'Montants fixes', color: categoryPalette[2] },
   sante: { label: 'Santé', color: categoryPalette[3] },
 };
 

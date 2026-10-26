@@ -17,7 +17,7 @@ export function HBars({ items }: { items: BarItem[] }) {
       {items.map((item) => (
         <View key={item.key} style={{ gap: 6 }} accessibilityLabel={`${item.label} : ${item.cents / 100} euros`}>
           <View style={styles.labelRow}>
-            <View style={[styles.swatch, { backgroundColor: item.color }]} />
+            <View style={[styles.swatch, { backgroundColor: theme.tint(item.color) }]} />
             <Body size={14} weight="medium" style={{ flex: 1 }} numberOfLines={1}>
               {item.label}
             </Body>
@@ -28,7 +28,7 @@ export function HBars({ items }: { items: BarItem[] }) {
             <View
               style={[
                 styles.fill,
-                { backgroundColor: item.color, width: `${(Math.max(0, item.cents) / max) * 100}%` },
+                { backgroundColor: theme.tint(item.color), width: `${(Math.max(0, item.cents) / max) * 100}%` },
               ]}
             />
           </View>

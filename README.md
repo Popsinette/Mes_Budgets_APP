@@ -1,19 +1,19 @@
 # Mes Budgets 💜
 
 Application mobile de suivi budgétaire **100 % locale et chiffrée**, pour iOS et Android — et aussi en **PWA installable** (utilisable sur iPhone sans compte développeur Apple).
-Une seule base de code (React Native + Expo), une interface soignée, et aucune donnée qui ne quitte jamais votre téléphone.
+Une seule base de code (React Native + Expo), une interface pastel soignée (lavande, menthe, rose poudré ; thème sombre nuit indigo), et aucune donnée qui ne quitte jamais votre téléphone.
 
 ## ✨ Fonctionnalités
 
 Calquée sur **Budgetiz** (méthode Deux Sœurs Un Agenda) : simple, sans connexion bancaire.
 
 - **Budget** — le mois et sa semaine en cours (« Semaine 2/4 »), en quatre onglets :
-  - **Variables** : enveloppes hebdomadaires (Courses, Autres…) avec anneau de progression, reste du mois et de la semaine, dernières dépenses ;
-  - **Fixes** : total · réglé · à débiter, postes mensuels (Essence, Garderie, Cantine…), charges à cocher (badge « en retard ») ;
+  - **Variables** : tout ce qui n'est pas une facture — enveloppes de la semaine (Courses, Plaisir…) avec anneau de progression, et **montants fixes du mois** (Coiffure 60 €, Essence…) : prévus chaque mois sans être des factures ; dernières dépenses ;
+  - **Factures** : total · réglé · à débiter, charges à cocher (badge « en retard ») ;
   - **Revenus** : total · crédité · à créditer, revenus à cocher ;
   - **Santé** : avancé · remboursé · reste à charge, « Solder » quand le remboursement arrive.
-- **Cagnottes** — « Projets & pépins » et « Urgence & avenir », objectif, date limite, versement mensuel à cocher — ou « Pas ce mois-ci » pour sauter un mois sans changer le montant —, prévisions du mois en % des revenus, historique des virements.
-- **Analyse** — constats clés du mois (enveloppe dépassée, rythme trop rapide, cagnotte en retard, dépenses vs ta moyenne…), rythme du mois, semaine bouclée à mettre de côté, courbe d'épargne cumulée avec projection à 6 mois, moyennes, répartition par cagnotte.
+- **Cagnottes** — **« Mon plan d'épargne »** : combien j'aurai au 31 décembre (ou dans 12 mois) si je fais chaque versement programmé, courbe et détail par cagnotte ; « Projets & pépins » et « Urgence & avenir », objectif, date limite, versement mensuel à cocher — ou « Pas ce mois-ci » pour sauter un mois sans changer le montant —, prévisions du mois en % des revenus, historique des virements.
+- **Où va mon argent** (Analyse) — en trois volets : *Ce mois* (barre « sur 100 € gagnés » : factures, semaine, montants fixes, santé, épargne, reste ; dépensé par jour et possible par jour ; enveloppes face au rythme ; semaine après semaine ; plus grosses dépenses), *Tendances* (6 mois par famille avec les revenus en repère, moyennes, mois le plus cher), *Épargne* (économies cumulées, répartition des cagnottes). Constats clés du mois (enveloppe dépassée, rythme trop rapide, cagnotte en retard, dépenses vs ta moyenne…), rythme du mois, semaine bouclée à mettre de côté, courbe d'épargne cumulée avec projection à 6 mois, moyennes, répartition par cagnotte.
 - **Mon plan du mois** (Synthèse) — revenus − charges − postes − enveloppes − épargne programmée = reste à répartir, puis le reste prévisionnel avec les dépassements. Une **pastille** sur l'écran Budget passe au rouge dès que le mois l'est, et le formulaire de dépense prévient avant d'enregistrer.
 - **Pointage des dépenses** — chaque dépense se coche quand elle est débitée sur ton compte : ton budget la compte dès la saisie, ton solde seulement une fois pointée, et la fin de mois retire celles encore « à pointer ».
 - **Mon compte** — tu saisis le solde de ton compte courant une fois ; l'app le tient à jour avec ce que tu notes, coches et pointes, prévoit le solde de fin de mois et te montre l'écart avec ta banque.

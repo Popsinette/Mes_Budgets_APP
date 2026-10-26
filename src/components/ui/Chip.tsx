@@ -10,8 +10,10 @@ type ChipProps = {
 
 export function Chip({ label, selected, onPress, color }: ChipProps) {
   const theme = useTheme();
-  const accent = color ?? theme.colors.primary;
-  const textColor = selected ? (color ? '#FFFFFF' : theme.colors.onAccent) : theme.colors.textMuted;
+  // Pastel : sélectionnée = fond teinté doux + bord de la couleur, texte en encre.
+  const accent = color ? theme.tint(color) : theme.colors.primary;
+  const soft = color ? `${accent}${theme.dark ? '33' : '22'}` : theme.colors.primarySoft;
+  const textColor = selected ? (color ? theme.colors.text : theme.colors.primary) : theme.colors.textMuted;
 
   return (
     <Pressable
@@ -24,7 +26,7 @@ export function Chip({ label, selected, onPress, color }: ChipProps) {
         return [
           styles.chip,
           {
-            backgroundColor: selected ? accent : 'transparent',
+            backgroundColor: selected ? soft : theme.colors.card,
             borderColor: selected ? accent : hovered ? theme.colors.textMuted : theme.colors.border,
             opacity: state.pressed ? 0.7 : 1,
           },

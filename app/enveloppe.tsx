@@ -44,6 +44,10 @@ const ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   'school-outline',
   'football-outline',
   'water-outline',
+  'cut-outline',
+  'fitness-outline',
+  'book-outline',
+  'flower-outline',
 ];
 
 type Draft = { name: string; icon: string; color: string; amount: number; period: EnvelopePeriod };
@@ -151,7 +155,7 @@ function EnvelopeForm({
     });
   };
 
-  const what = isWeek ? 'l’enveloppe' : 'le poste';
+  const what = isWeek ? 'l’enveloppe' : 'le montant fixe';
   const title = isBase
     ? id
       ? 'Modifier ma base'
@@ -160,7 +164,7 @@ function EnvelopeForm({
       ? `Modifier ${what}`
       : isWeek
         ? 'Nouvelle enveloppe'
-        : 'Nouveau poste';
+        : 'Nouveau montant fixe';
 
   return (
     <Screen>
@@ -173,26 +177,26 @@ function EnvelopeForm({
       <View style={{ gap: spacing.sm }}>
         <Eyebrow>Type</Eyebrow>
         <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-          <Chip label="Variable · par semaine" selected={isWeek} onPress={() => setPeriod('week')} />
-          <Chip label="Poste fixe · par mois" selected={!isWeek} onPress={() => setPeriod('month')} />
+          <Chip label="Par semaine" selected={isWeek} onPress={() => setPeriod('week')} />
+          <Chip label="Montant fixe par mois" selected={!isWeek} onPress={() => setPeriod('month')} />
         </View>
         <Caption>
           {isWeek
-            ? 'Budget variable (Courses, Plaisir…) : un montant par semaine, du lundi au dimanche.'
-            : 'Poste suivi avec tes Fixes (Essence, Garderie, Cantine…) : un montant par mois.'}
+            ? 'Courses, Plaisir… : un montant par semaine, du lundi au dimanche.'
+            : 'Coiffure, essence, cantine… : un montant prévu chaque mois. Il reste dans tes Variables — ce n’est pas une facture.'}
         </Caption>
       </View>
       <FormField
         label="Nom"
         value={name}
         onChangeText={setName}
-        placeholder={isWeek ? 'Courses, Plaisir…' : 'Essence, Garderie, Cantine…'}
+        placeholder={isWeek ? 'Courses, Plaisir…' : 'Coiffure, Essence, Cantine…'}
       />
       <AmountField
         label={isWeek ? 'Montant par semaine' : 'Montant par mois'}
         value={amount}
         onChangeText={setAmount}
-        placeholder={isWeek ? '80' : '300'}
+        placeholder={isWeek ? '80' : '60'}
       />
       {isWeek && weekly ? (
         <Caption>Environ {formatCents(Math.round((weekly * 52) / 12))} par mois.</Caption>

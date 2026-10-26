@@ -4,7 +4,9 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { LineChart, type LinePoint } from '@/src/components/charts/LineChart';
 import { AppHeader } from '@/src/components/ui/AppHeader';
+import { Chip } from '@/src/components/ui/Chip';
 import { Card } from '@/src/components/ui/Card';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
@@ -14,6 +16,7 @@ import { Segmented } from '@/src/components/ui/Segmented';
 import { Body, Caption, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
+  getSavingsProjection,
   listPots,
   POT_KIND_LABELS,
   setPlanDone,
@@ -24,7 +27,15 @@ import {
 import { getMonthSummary } from '@/src/features/summary/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, isoDayInMonth, monthKeyLabel, numericDate, todayIso } from '@/src/utils/dates';
+import {
+  currentMonthKey,
+  isoDayInMonth,
+  monthKeyLabel,
+  numericDate,
+  shiftMonthKey,
+  shortMonthLabel,
+  todayIso,
+} from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 export default function PotsScreen() {
@@ -47,7 +58,7 @@ export default function PotsScreen() {
       <AppHeader title="Mes économies" />
 
       <View style={styles.topRow}>
-        <Card style={[styles.forecast, { borderColor: theme.colors.primary }]}>
+        <Card style={[styles.forecast, { backgroundColor: theme.colors.primarySoft, borderColor: 'transparent' }]}>
           <View style={styles.forecastHead}>
             <Ionicons name="bag-handle" size={20} color={theme.colors.primary} />
             <Body weight="semibold" size={14} style={{ textAlign: 'center', flex: 1 }}>
@@ -74,12 +85,15 @@ export default function PotsScreen() {
           <PillButton
             icon="repeat"
             label="Mes virements"
-            color={theme.colors.secondary}
+            color={theme.colors.navy}
             onPress={() => router.push('/virements')}
           />
         </View>
       </View>
 
+      <PlanProjection />
+
+      <SectionHeader title="Mes cagnottes" />
       <Segmented
         segments={[
           { key: 'projet', label: POT_KIND_LABELS.projet },
@@ -134,6 +148,84 @@ export default function PotsScreen() {
   );
 }
 
+type Horizon = 'annee' | '12mois';
+
+/**
+ * « Si je suis mon plan » : le total de mes cagnottes à la fin de l'année (ou
+ * dans 12 mois) si chaque versement programmé est fait — mois sautés exclus,
+ * objectifs plafonnés. Une seule série (pointillé = projection), le détail par
+ * cagnotte en tableau dessous.
+ */
+function PlanProjection() {
+  const theme = useTheme();
+  const [horizon, setHorizon] = useState<Horizon>('annee');
+  const from = currentMonthKey();
+  const yearEnd = `${from.slice(0, 4)}-12`;
+  const to = horizon === 'annee' && yearEnd > from ? yearEnd : shiftMonthKey(from, 11);
+  const { data } = useLiveQuery((db) => getSavingsProjection(db, from, to), [from, to]);
+  if (!data) return null;
+  const added = data.end_cents - data.now_cents;
+  const monthly = data.pots.reduce((s, p) => s + p.monthly_cents, 0);
+  const points: LinePoint[] = [
+    { label: 'Auj.', cents: data.now_cents },
+    ...data.months.map((m) => ({ label: shortMonthLabel(m.month), cents: m.total_cents, projected: true })),
+  ];
+  const endLabel = monthKeyLabel(to);
+
+  return (
+    <>
+      <SectionHeader title="Mon plan d’épargne" />
+      <Card style={{ gap: spacing.md }}>
+        <View style={styles.horizon}>
+          <Chip label="Fin d’année" selected={horizon === 'annee'} onPress={() => setHorizon('annee')} />
+          <Chip label="Dans 12 mois" selected={horizon === '12mois'} onPress={() => setHorizon('12mois')} />
+        </View>
+        <View>
+          <Caption>Si je suis mon plan, fin {endLabel}</Caption>
+          <Money cents={data.end_cents} size={34} weight="xbold" color={theme.colors.primary} />
+          <Caption>
+            {monthly > 0
+              ? `soit +${formatCents(added)} d’ici là, avec ${formatCents(monthly)} programmés par mois`
+              : 'Aucun versement programmé : ajoute un montant mensuel à une cagnotte.'}
+          </Caption>
+        </View>
+        {monthly > 0 ? (
+          <LineChart points={points} color={theme.colors.primary} projectionColor={theme.colors.primary} zeroBased={false} />
+        ) : null}
+        {data.pots.length > 0 ? (
+          <View>
+            {data.pots.map((p, i) => (
+              <View
+                key={p.id}
+                style={[styles.projRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.colors.hairline }]}
+              >
+                <View style={[styles.projSwatch, { backgroundColor: theme.tint(p.color) }]} />
+                <View style={{ flex: 1 }}>
+                  <Body size={14} weight="medium" numberOfLines={1}>
+                    {p.name}
+                  </Body>
+                  <Caption>
+                    {p.monthly_cents > 0 ? `${formatCents(p.monthly_cents)} / mois` : 'pas de versement programmé'}
+                    {p.reaches_target ? ' · objectif atteint 🎉' : ''}
+                  </Caption>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Money cents={p.end_cents} size={14.5} weight="semibold" />
+                  <Caption>aujourd’hui {formatCents(p.now_cents)}</Caption>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
+        <Caption>
+          Mois « Pas ce mois-ci » exclus, versements arrêtés à l’objectif, retraits non prévus. Touche un point pour voir
+          le total du mois.
+        </Caption>
+      </Card>
+    </>
+  );
+}
+
 function PotCard({ pot, month }: { pot: PotWithBalance; month: string }) {
   const theme = useTheme();
   const db = useSQLiteContext();
@@ -155,11 +247,11 @@ function PotCard({ pot, month }: { pot: PotWithBalance; month: string }) {
       style={styles.potCard}
       onPress={() => router.push({ pathname: '/poche-detail', params: { id: String(pot.id) } })}
     >
-      <View style={[styles.cover, { backgroundColor: `${pot.color}33` }]}>
+      <View style={[styles.cover, { backgroundColor: `${theme.tint(pot.color)}${theme.dark ? '33' : '24'}` }]}>
         <Ionicons
           name={(pot.icon in Ionicons.glyphMap ? pot.icon : 'wallet-outline') as keyof typeof Ionicons.glyphMap}
           size={34}
-          color={pot.color}
+          color={theme.tint(pot.color)}
         />
         {pot.monthly_cents ? (
           <Pressable
@@ -227,11 +319,11 @@ function PlanRow({ pot, month, last }: { pot: PotWithBalance; month: string; las
 
   return (
     <View style={[styles.planRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline }]}>
-      <View style={[styles.planIcon, { backgroundColor: pot.color, opacity: skipped ? 0.45 : 1 }]}>
+      <View style={[styles.planIcon, { backgroundColor: `${theme.tint(pot.color)}${theme.dark ? '33' : '22'}`, opacity: skipped ? 0.45 : 1 }]}>
         <Ionicons
           name={(pot.icon in Ionicons.glyphMap ? pot.icon : 'wallet-outline') as keyof typeof Ionicons.glyphMap}
           size={17}
-          color={theme.colors.onAccent}
+          color={theme.tint(pot.color)}
         />
       </View>
       <View style={{ flex: 1 }}>
@@ -314,6 +406,9 @@ function PillButton({
 }
 
 const styles = StyleSheet.create({
+  horizon: { flexDirection: 'row', gap: spacing.sm },
+  projRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
+  projSwatch: { width: 10, height: 10, borderRadius: 3 },
   topRow: {
     flexDirection: 'row',
     gap: spacing.md,

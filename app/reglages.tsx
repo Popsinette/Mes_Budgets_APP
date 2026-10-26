@@ -11,7 +11,7 @@ import { Chip } from '@/src/components/ui/Chip';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Heading } from '@/src/components/ui/Text';
-import { seedPots } from '@/src/db/schema';
+import { seedPots, upgradeLegacyColors } from '@/src/db/schema';
 import { seedBase } from '@/src/features/envelopes/repository';
 import { backupStats, getBackupStatus, parseBackup, restoreBackup } from '@/src/features/backup/repository';
 import { pickJsonFileText } from '@/src/features/backup/pickFile';
@@ -127,6 +127,7 @@ export default function SettingsScreen() {
             `);
             await seedBase(db);
             await seedPots(db);
+            await upgradeLegacyColors(db);
           });
           invalidateQueries();
           notify('Données effacées', 'Toutes vos données ont été supprimées.');
@@ -192,7 +193,7 @@ export default function SettingsScreen() {
       <Card style={{ gap: spacing.md }}>
         <Heading>Mes enveloppes</Heading>
         <Body tone="muted" size={13.5}>
-          Montants de tes enveloppes variables (par semaine) et de tes postes du mois.
+          Montants de tes enveloppes de la semaine et de tes montants fixes du mois.
         </Body>
         <Button label="Gérer mes enveloppes" variant="secondary" onPress={() => router.push('/enveloppes')} />
       </Card>

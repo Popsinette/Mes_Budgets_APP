@@ -59,7 +59,7 @@ export default function SummaryScreen() {
         <SmallTile icon="bag-handle-outline" color={theme.colors.rose} label="Cagnottes actives" value={String(summary?.pots_count ?? 0)} />
       </View>
 
-      <Card style={[styles.assets, { borderColor: theme.colors.text }]}>
+      <Card style={styles.assets}>
         <Ionicons name="document-text-outline" size={24} color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Body weight="semibold">Total de mes avoirs</Body>
@@ -96,9 +96,9 @@ function Tile({
 }) {
   const theme = useTheme();
   return (
-    <Card style={[styles.tile, { borderColor: theme.colors.text }]}>
-      <View style={[styles.bigDot, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={26} color={theme.colors.onAccent} />
+    <Card style={styles.tile}>
+      <View style={[styles.bigDot, { backgroundColor: `${color}${theme.dark ? '33' : '22'}` }]}>
+        <Ionicons name={icon} size={26} color={color} />
       </View>
       <Body weight="semibold" size={15}>
         {title}
@@ -113,8 +113,8 @@ function SmallTile({ icon, color, label, value }: { icon: IconName; color: strin
   const theme = useTheme();
   return (
     <Card style={styles.smallTile}>
-      <View style={[styles.dot, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={20} color={theme.colors.onAccent} />
+      <View style={[styles.dot, { backgroundColor: `${color}${theme.dark ? '33' : '22'}` }]}>
+        <Ionicons name={icon} size={20} color={color} />
       </View>
       <Caption tone="text" style={{ textAlign: 'center' }}>
         {label}
@@ -136,7 +136,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.xs,
-    borderWidth: 1.2,
     borderRadius: radius.xl,
   },
   bigDot: {
@@ -165,7 +164,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    borderWidth: 1.2,
     borderRadius: radius.xl,
   },
 });
