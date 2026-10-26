@@ -1,5 +1,8 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { listEnvelopesForMonth, type Expense } from '@/src/features/envelopes/repository';
+import { listFixedForMonth } from '@/src/features/fixed/repository';
+import { listHealthForMonth } from '@/src/features/health/repository';
+import { listPots, plannedFor } from '@/src/features/savings/repository';
 import { getMonthSummary, SPENDING_GROUPS, type MonthSummary, type SpendingGroup } from '@/src/features/summary/repository';
 import { categoryPalette } from '@/src/theme/palette';
 import { shiftMonthKey, weeksOfMonth, type MonthKey, type WeekKey } from '@/src/utils/dates';
@@ -100,4 +103,81 @@ export async function getTopExpenses(db: SQLiteDatabase, month: MonthKey, limit 
      LIMIT ?`,
     [month, limit],
   );
+}
+
+// ---------- Flux détaillé (diagramme « Où va mon argent ») ----------
+
+export type FlowItem = { key: string; label: string; cents: number; color: string | null };
+export type FlowFamily = FlowItem & { key: FlowKey; items: FlowItem[] };
+
+export type MoneyFlowDetail = {
+  income_cents: number;
+  /** Revenus du mois, un par ligne (Salaire, CAF…). */
+  sources: FlowItem[];
+  /** Familles non vides, dans l'ordre fixe, chacune avec ses postes (du plus gros au plus petit). */
+  families: FlowFamily[];
+  /** Dépenses + épargne au-delà des revenus (0 sinon). */
+  over_cents: number;
+};
+
+/**
+ * Le même découpage que `moneyFlowOf` (mêmes totaux par famille), détaillé
+ * poste par poste : chaque facture, chaque enveloppe (dépensé), chaque frais
+ * de santé (reste à charge), chaque versement programmé, et le reste.
+ */
+export async function getMoneyFlowDetail(db: SQLiteDatabase, month: MonthKey): Promise<MoneyFlowDetail> {
+  const [summary, fixed, envelopes, health, pots] = await Promise.all([
+    getMonthSummary(db, month),
+    listFixedForMonth(db, month),
+    listEnvelopesForMonth(db, month, '2000-01-03'),
+    listHealthForMonth(db, month),
+    listPots(db, month),
+  ]);
+  const flow = moneyFlowOf(summary);
+  const byDesc = (a: FlowItem, b: FlowItem) => b.cents - a.cents;
+  const color = (key: FlowKey) => flow.slices.find((s) => s.key === key)?.color ?? null;
+
+  const itemsOf: Record<FlowKey, FlowItem[]> = {
+    fixes: fixed
+      .filter((f) => f.kind === 'charge')
+      .map((f) => ({ key: `fix-${f.id}`, label: f.name, cents: f.amount_cents, color: color('fixes') })),
+    variables: envelopes
+      .filter((e) => e.period === 'week' && e.spent_cents > 0)
+      .map((e) => ({ key: `env-${e.id}`, label: e.name, cents: e.spent_cents, color: e.color })),
+    postes: envelopes
+      .filter((e) => e.period === 'month' && e.spent_cents > 0)
+      .map((e) => ({ key: `env-${e.id}`, label: e.name, cents: e.spent_cents, color: e.color })),
+    sante:
+      flow.slices.find((s) => s.key === 'sante')!.cents > 0
+        ? [{ key: 'sante', label: 'Reste à charge', cents: flow.slices.find((s) => s.key === 'sante')!.cents, color: color('sante') }]
+        : [],
+    epargne: pots
+      .filter((p) => plannedFor(p) > 0)
+      .map((p) => ({ key: `pot-${p.id}`, label: p.name, cents: plannedFor(p), color: p.color })),
+    reste: [],
+  };
+  // Le détail santé : un poste par frais quand la somme tombe juste (sinon, un seul poste « reste à charge »).
+  const healthItems = health
+    .map((h) => ({ key: `sante-${h.id}`, label: h.label, cents: Math.max(0, h.amount_cents - h.refund_cents), color: color('sante') }))
+    .filter((h) => h.cents > 0);
+  if (healthItems.reduce((s, h) => s + h.cents, 0) === flow.slices.find((s) => s.key === 'sante')!.cents) {
+    itemsOf.sante = healthItems;
+  }
+
+  const families = flow.slices
+    .filter((s) => s.cents > 0)
+    .map<FlowFamily>((s) => ({
+      ...s,
+      items: (s.key === 'reste' ? [{ key: 'reste', label: 'Encore libre', cents: s.cents, color: null }] : itemsOf[s.key]).sort(byDesc),
+    }));
+
+  return {
+    income_cents: flow.income_cents,
+    sources: fixed
+      .filter((f) => f.kind === 'income' && f.amount_cents > 0)
+      .map((f) => ({ key: `inc-${f.id}`, label: f.name, cents: f.amount_cents, color: null }))
+      .sort(byDesc),
+    families,
+    over_cents: flow.over_cents,
+  };
 }
