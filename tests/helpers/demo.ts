@@ -13,6 +13,18 @@ async function main(out: string) {
   const { db } = await emptyDb();
   await saveFixedItem(db, { kind: 'income', name: 'Salaire', amountCents: 245000, day: 28, frequency: 'monthly', startMonth: '2026-01', icon: 'cash-outline' });
   await saveFixedItem(db, { kind: 'income', name: 'CAF', amountCents: 14000, day: 5, frequency: 'monthly', startMonth: '2026-01', icon: 'people-outline' });
+  // Petits revenus ponctuels d'octobre : beaucoup de sources (cas réel du diagramme).
+  const extras: Array<[string, number]> = [
+    ['Acompte 106', 25000],
+    ['Prime carburant', 20000],
+    ['Remboursement mamie', 5400],
+    ['Remboursement Vinted', 2900],
+    ['Remboursement normal', 2900],
+    ['Régul', 100],
+  ];
+  for (const [name, cents] of extras) {
+    await saveFixedItem(db, { kind: 'income', name, amountCents: cents, day: 12, frequency: 'once', startMonth: '2026-10', icon: 'cash-outline' });
+  }
   const charges: Array<[string, number, number, string]> = [
     ['Loyer', 82000, 5, 'home-outline'],
     ['Électricité', 9500, 10, 'flash-outline'],
