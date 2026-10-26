@@ -157,8 +157,8 @@ function ExpenseForm({
                 style={[
                   styles.envelope,
                   {
-                    backgroundColor: selected ? `${envelope.color}22` : theme.colors.card,
-                    borderColor: selected ? envelope.color : theme.colors.border,
+                    backgroundColor: selected ? `${theme.tint(envelope.color)}22` : theme.colors.card,
+                    borderColor: selected ? theme.tint(envelope.color) : theme.colors.border,
                   },
                 ]}
               >

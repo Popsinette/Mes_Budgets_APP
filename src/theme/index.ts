@@ -7,15 +7,16 @@ import { useThemePref } from '@/src/store/themePref';
  */
 
 export const palette = {
-  terracotta: '#A8654A', // action principale (onglet actif, boutons)
-  slate: '#5E6B66', // vert ardoise (FAB, actions secondaires)
-  navy: '#2E3B4E', // bleu nuit (« à venir »)
-  rose: '#D49A86', // vieux rose (« réglé »)
-  gold: '#C9A45C', // or doux
-  sage: '#8A9682',
+  lavender: '#6E62D0', // action principale (onglet actif, boutons)
+  mint: '#3F8F83', // menthe profonde (bouton +, coches faites)
+  indigo: '#3D3F72', // indigo (« à venir »)
+  blush: '#D97A9E', // rose poudré (« réglé »)
+  honey: '#D9A33A', // miel doux
 };
 
-export { categoryPalette } from './palette';
+import { seriesColor } from './palette';
+
+export { categoryPalette, categoryPaletteDark, seriesColor } from './palette';
 
 /** Familles chargées au démarrage (voir app/_layout.tsx). */
 export const fonts = {
@@ -63,71 +64,77 @@ export type Theme = {
     onAccent: string;
     onAccentMuted: string;
   };
+  /** Couleur d'une enveloppe / cagnotte (stockée en teinte claire) pour ce mode. */
+  tint: (hex: string) => string;
 };
 
 /**
- * Direction « Budgetiz » : fond gris très clair, cartes blanches arrondies,
- * terracotta pour l'action, vert ardoise, bleu nuit et vieux rose pour les
- * pastilles d'état. Thème sombre : brun-gris chaud, jamais de noir pur.
+ * Direction « pastel » : fond lilas très clair, cartes blanches sans bord
+ * avec une ombre lavande à peine visible, lavande pour l'action, menthe,
+ * indigo et rose poudré pour les pastilles d'état (toujours en teinte
+ * douce + icône colorée). Thème sombre : nuit indigo, jamais de brun.
+ * Contrastes vérifiés : texte ≥ 4,5:1 sur carte et fond, blanc sur lavande 4,9:1.
  */
 export const lightTheme: Theme = {
   dark: false,
   colors: {
-    background: '#F6F5F2',
+    background: '#F6F5FB',
     card: '#FFFFFF',
-    cardMuted: '#EFEDE8',
-    text: '#26282B',
-    textMuted: '#85827C',
-    border: '#E7E4DE',
-    hairline: '#EDEBE6',
-    primary: palette.terracotta,
+    cardMuted: '#F0EEF8',
+    text: '#24233A',
+    textMuted: '#706D88',
+    border: '#E9E6F3',
+    hairline: '#F0EEF6',
+    primary: palette.lavender,
     onPrimary: '#FFFFFF',
-    primarySoft: '#F3E6E0',
-    secondary: palette.slate,
-    navy: palette.navy,
-    rose: palette.rose,
-    gold: palette.gold,
-    success: '#5F8B6D',
-    successSoft: '#E4EEE6',
-    warning: '#B7791F',
-    warningSoft: '#F3EAD7',
-    danger: '#B4523A',
-    dangerSoft: '#F5E1DA',
-    income: '#4F7A61',
-    expense: palette.terracotta,
+    primarySoft: '#ECE9FB',
+    secondary: palette.mint,
+    navy: palette.indigo,
+    rose: palette.blush,
+    gold: palette.honey,
+    success: '#2A8460',
+    successSoft: '#E1F3EA',
+    warning: '#9A6A00',
+    warningSoft: '#FBF1DA',
+    danger: '#C2415F',
+    dangerSoft: '#FCE6EC',
+    income: '#2A8460',
+    expense: '#B0466F',
     onAccent: '#FFFFFF',
-    onAccentMuted: 'rgba(255,255,255,0.8)',
+    onAccentMuted: 'rgba(255,255,255,0.82)',
   },
+  tint: (hex) => seriesColor(hex, false),
 };
 
 export const darkTheme: Theme = {
   dark: true,
   colors: {
-    background: '#1E1C1A',
-    card: '#2A2724',
-    cardMuted: '#36322E',
-    text: '#F1EEE9',
-    textMuted: '#A7A199',
-    border: '#3A3632',
-    hairline: '#332F2B',
-    primary: '#C9805F',
-    onPrimary: '#1E1C1A',
-    primarySoft: '#43302A',
-    secondary: '#8A9A93',
-    navy: '#8FA3BF',
-    rose: '#DDA996',
-    gold: '#D6B474',
-    success: '#7FAE8D',
-    successSoft: '#26352B',
-    warning: '#D3A24C',
-    warningSoft: '#3B2F17',
-    danger: '#D98A72',
-    dangerSoft: '#41291F',
-    income: '#8FBE9D',
-    expense: '#D8977A',
-    onAccent: '#1E1C1A',
-    onAccentMuted: 'rgba(30,28,26,0.75)',
+    background: '#16161F',
+    card: '#222230',
+    cardMuted: '#2C2C3D',
+    text: '#EEEDF7',
+    textMuted: '#A4A2BA',
+    border: '#30304A',
+    hairline: '#2B2B3C',
+    primary: '#A99EF0',
+    onPrimary: '#16161F',
+    primarySoft: '#2F2B4D',
+    secondary: '#7CCBBD',
+    navy: '#A9B0EB',
+    rose: '#F0A9C3',
+    gold: '#EBC266',
+    success: '#79CBA4',
+    successSoft: '#1E3830',
+    warning: '#E6B65A',
+    warningSoft: '#3A311C',
+    danger: '#F08AA0',
+    dangerSoft: '#42222F',
+    income: '#79CBA4',
+    expense: '#F0A0BE',
+    onAccent: '#16161F',
+    onAccentMuted: 'rgba(22,22,31,0.75)',
   },
+  tint: (hex) => seriesColor(hex, true),
 };
 
 export function useTheme(): Theme {
@@ -148,8 +155,8 @@ export const spacing = {
 
 export const radius = {
   sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
+  md: 16,
+  lg: 22,
+  xl: 28,
   full: 999,
 } as const;

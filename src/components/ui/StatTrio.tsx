@@ -26,8 +26,8 @@ export function StatTrio({ stats, ratio, ratioLabel }: { stats: Stat[]; ratio?: 
       <View style={styles.row}>
         {stats.map((stat) => (
           <View key={stat.label} style={styles.col}>
-            <View style={[styles.dot, { backgroundColor: stat.color }]}>
-              <Ionicons name={stat.icon} size={21} color={theme.colors.onAccent} />
+            <View style={[styles.dot, { backgroundColor: `${stat.color}${theme.dark ? '33' : '22'}` }]}>
+              <Ionicons name={stat.icon} size={21} color={stat.color} />
             </View>
             <Caption tone="text" style={{ fontSize: 13 }}>
               {stat.label}

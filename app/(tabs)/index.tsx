@@ -5,6 +5,9 @@ import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ProgressRing } from '@/src/components/charts/ProgressRing';
+import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
+import { ProgressBar } from '@/src/components/ui/ProgressBar';
+import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { AppHeader } from '@/src/components/ui/AppHeader';
 import { Card } from '@/src/components/ui/Card';
 import { CheckRow } from '@/src/components/ui/CheckRow';
@@ -18,8 +21,8 @@ import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deleteExpense,
   listEnvelopesForMonth,
-  listExpensesForMonth,
   resolveEnvelopeId,
+  searchExpenses,
   type EnvelopeForMonth,
   type Expense,
 } from '@/src/features/envelopes/repository';
@@ -39,7 +42,7 @@ type Tab = 'variables' | 'fixes' | 'revenus' | 'sante';
 
 const SEGMENTS: Array<{ key: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: 'variables', label: 'Variables', icon: 'basket-outline' },
-  { key: 'fixes', label: 'Fixes', icon: 'receipt-outline' },
+  { key: 'fixes', label: 'Factures', icon: 'receipt-outline' },
   { key: 'revenus', label: 'Revenus', icon: 'wallet-outline' },
   { key: 'sante', label: 'Santé', icon: 'medkit-outline' },
 ];
@@ -74,14 +77,26 @@ export default function BudgetScreen() {
   );
 }
 
-/* ─────────────── Variables : enveloppes de la semaine ─────────────── */
+/* ─────────────── Variables : semaine + montants fixes du mois ─────────────── */
 
+/**
+ * Tout ce qui n'est pas une facture : enveloppes de la semaine (Courses,
+ * Plaisir…) et montants fixes du mois (Coiffure 60 €, Essence…) — un montant
+ * prévu, mais pas une charge prélevée.
+ */
 function VariablesTab({ month }: { month: string }) {
+  const theme = useTheme();
   const db = useSQLiteContext();
   const week = currentWeekKey();
   const { data: envelopes } = useLiveQuery((db) => listEnvelopesForMonth(db, month, week), [month, week]);
-  const { data: expenses } = useLiveQuery((db) => listExpensesForMonth(db, month, 'week'), [month]);
+  const { data: expenses } = useLiveQuery((db) => searchExpenses(db, { month, query: '' }), [month]);
   const weekly = (envelopes ?? []).filter((e) => e.period === 'week');
+  const monthly = (envelopes ?? []).filter((e) => e.period === 'month');
+  const all = envelopes ?? [];
+  const budget = all.reduce((s, e) => s + e.budget_cents, 0);
+  const spent = all.reduce((s, e) => s + e.spent_cents, 0);
+  const left = budget - spent;
+  const latest = (expenses ?? []).slice(0, 8);
 
   const confirmDelete = (expense: Expense) =>
     confirmAction({
@@ -94,10 +109,49 @@ function VariablesTab({ month }: { month: string }) {
 
   return (
     <>
+      <Card style={{ gap: spacing.sm }}>
+        <View style={styles.overviewRow}>
+          <View style={{ flex: 1 }}>
+            <Caption>Mes variables du mois</Caption>
+            <Money cents={left} size={26} weight="bold" tone={left < 0 ? 'danger' : 'text'} />
+            <Caption>{left < 0 ? 'de dépassement' : 'encore disponibles'}</Caption>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Caption>Dépensé</Caption>
+            <Money cents={spent} size={15} weight="semibold" />
+            <Caption>sur {formatCents(budget)}</Caption>
+          </View>
+        </View>
+        <ProgressBar ratio={budget > 0 ? spent / budget : 0} height={8} />
+      </Card>
+
+      <SectionHeader title="Chaque semaine" />
       <View style={styles.grid}>
         {weekly.map((envelope) => (
           <EnvelopeCard key={envelope.id} envelope={envelope} month={month} />
         ))}
+        {weekly.length === 0 ? (
+          <Card style={{ flexBasis: '100%' }}>
+            <Caption style={{ textAlign: 'center' }}>Courses, Plaisir… : un montant par semaine, du lundi au dimanche.</Caption>
+          </Card>
+        ) : null}
+      </View>
+
+      <SectionHeader title="Montants fixes du mois" />
+      <Caption>Coiffure, essence, cantine… : un montant prévu chaque mois, sans être une facture.</Caption>
+      {monthly.length > 0 ? (
+        <Card style={styles.listCard}>
+          {monthly.map((envelope, i) => (
+            <MonthlyRow key={envelope.id} envelope={envelope} last={i === monthly.length - 1} />
+          ))}
+        </Card>
+      ) : null}
+      <View style={styles.addRow}>
+        <AddTile
+          icon="add"
+          label="Montant fixe"
+          onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month', month } })}
+        />
         <AddTile icon="options-outline" label="Gérer mes enveloppes" onPress={() => router.push('/enveloppes')} />
       </View>
 
@@ -106,11 +160,58 @@ function VariablesTab({ month }: { month: string }) {
         <SearchLink />
       </View>
       <ExpenseList
-        expenses={expenses ?? []}
+        expenses={latest}
         empty="Note chaque achat dès que tu le fais : ton reste se met à jour."
         onDelete={confirmDelete}
       />
+      {(expenses ?? []).length > latest.length ? (
+        <Pressable onPress={() => router.push('/depenses')} accessibilityRole="button" hitSlop={8}>
+          <Caption tone="primary" style={{ textAlign: 'center' }}>
+            Voir les {(expenses ?? []).length} dépenses du mois
+          </Caption>
+        </Pressable>
+      ) : null}
     </>
+  );
+}
+
+/** Ligne d'un montant fixe du mois : pastille, dépensé / prévu, jauge, reste. */
+function MonthlyRow({ envelope, last }: { envelope: EnvelopeForMonth; last: boolean }) {
+  const theme = useTheme();
+  const db = useSQLiteContext();
+  const left = envelope.budget_cents - envelope.spent_cents;
+  const ratio = envelope.budget_cents > 0 ? envelope.spent_cents / envelope.budget_cents : 0;
+  const unset = envelope.weekly_cents === 0 && envelope.budget_cents === 0;
+  return (
+    <Pressable
+      onPress={() => void openEnvelope(db, envelope, unset ? 'edit' : 'detail')}
+      accessibilityRole="button"
+      accessibilityLabel={`${envelope.name} : ${formatCents(envelope.spent_cents)} sur ${formatCents(envelope.budget_cents)}`}
+      style={({ pressed }) => [
+        styles.monthlyRow,
+        !last && { borderBottomWidth: 1, borderBottomColor: theme.colors.hairline },
+        { opacity: pressed ? 0.6 : 1 },
+      ]}
+    >
+      <CategoryIcon icon={envelope.icon} color={envelope.color} size={38} />
+      <View style={{ flex: 1, gap: 5 }}>
+        <View style={styles.monthlyHead}>
+          <Body weight="semibold" style={{ flex: 1 }} numberOfLines={1}>
+            {envelope.name}
+          </Body>
+          <Body size={14}>
+            <Body weight="bold" size={14}>
+              {formatCents(envelope.spent_cents)}
+            </Body>
+            {` / ${formatCents(envelope.budget_cents)}`}
+          </Body>
+        </View>
+        <ProgressBar ratio={ratio} color={ratio > 1 ? theme.colors.danger : envelope.color} height={6} />
+        <Caption tone={left < 0 ? 'danger' : 'muted'}>
+          {unset ? 'Touche pour fixer le montant' : left < 0 ? `Dépassé de ${formatCents(-left)}` : `Reste ${formatCents(left)}`}
+        </Caption>
+      </View>
+    </Pressable>
   );
 }
 
@@ -167,15 +268,9 @@ function EnvelopeCard({ envelope, month }: { envelope: EnvelopeForMonth; month: 
       </Body>
       <View style={styles.ringRow}>
         <ProgressRing ratio={ratio} color={ratio > 1 ? theme.colors.danger : envelope.color} size={92} strokeWidth={6}>
-          <View style={[styles.ringCenter, { backgroundColor: envelope.color }]}>
-            <Ionicons
-              name={(envelope.icon in Ionicons.glyphMap ? envelope.icon : 'pricetag-outline') as keyof typeof Ionicons.glyphMap}
-              size={30}
-              color={theme.colors.onAccent}
-            />
-          </View>
+          <CategoryIcon icon={envelope.icon} color={envelope.color} size={70} />
         </ProgressRing>
-        <Ionicons name="chevron-forward" size={18} color={theme.colors.text} style={styles.chevron} />
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} style={styles.chevron} />
       </View>
       <View style={[styles.envelopeFooter, { borderTopColor: theme.colors.hairline }]}>
         {unset ? (
@@ -212,10 +307,10 @@ function AddTile({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[styles.addTile, { borderColor: theme.colors.border }]}
+      style={({ pressed }) => [styles.addTile, { backgroundColor: theme.colors.primarySoft, opacity: pressed ? 0.7 : 1 }]}
     >
-      <Ionicons name={icon} size={18} color={theme.colors.text} />
-      <Body size={14} weight="semibold">
+      <Ionicons name={icon} size={18} color={theme.colors.primary} />
+      <Body size={14} weight="semibold" color={theme.colors.primary}>
         {label}
       </Body>
     </Pressable>
@@ -228,12 +323,7 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
   const theme = useTheme();
   const db = useSQLiteContext();
   const { data: items } = useLiveQuery((db) => listFixedForMonth(db, month), [month]);
-  const { data: envelopes } = useLiveQuery(
-    (db) => listEnvelopesForMonth(db, month, currentWeekKey()),
-    [month],
-  );
   const list = (items ?? []).filter((i) => i.kind === kind);
-  const postes = (envelopes ?? []).filter((e) => e.period === 'month');
   const isCharge = kind === 'charge';
   const total = list.reduce((s, i) => s + i.amount_cents, 0);
   const done = list.filter((i) => i.checked).reduce((s, i) => s + i.amount_cents, 0);
@@ -247,7 +337,10 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
 
   return (
     <>
-      <SectionTitle icon="bar-chart" label={isCharge ? 'Suivi des dépenses' : 'Suivi des revenus'} />
+      <SectionTitle icon="bar-chart" label={isCharge ? 'Mes factures et charges fixes' : 'Mes revenus'} />
+      {isCharge ? (
+        <Caption>Prélevées chaque mois (loyer, électricité, abonnements…). Les montants prévus comme la coiffure vont dans Variables.</Caption>
+      ) : null}
       <StatTrio
         stats={[
           { label: 'Total', cents: total, icon: 'wallet-outline', color: theme.colors.secondary },
@@ -269,50 +362,6 @@ function FixedTab({ month, kind }: { month: string; kind: 'charge' | 'income' })
         ratioLabel={`${pct(done, total)} % ${isCharge ? 'réglé' : 'crédité'}`}
       />
 
-      {isCharge ? (
-        <View style={styles.chips}>
-          {postes.map((poste) => (
-            <Pressable
-              key={poste.id}
-              onPress={() => void openEnvelope(db, poste, 'detail')}
-              accessibilityRole="button"
-              accessibilityLabel={`${poste.name} : ${formatCents(poste.spent_cents)} sur ${formatCents(poste.budget_cents)}`}
-              style={[styles.chip, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-            >
-              <View style={[styles.chipHead, { backgroundColor: poste.color }]}>
-                <Ionicons
-                  name={(poste.icon in Ionicons.glyphMap ? poste.icon : 'pricetag-outline') as keyof typeof Ionicons.glyphMap}
-                  size={14}
-                  color={theme.colors.onAccent}
-                />
-                <Body size={13} weight="semibold" color={theme.colors.onAccent} numberOfLines={1}>
-                  {poste.name}
-                </Body>
-              </View>
-              <View style={styles.chipBody}>
-                <Body
-                  size={13.5}
-                  weight="semibold"
-                  tone={poste.spent_cents > poste.budget_cents ? 'danger' : 'text'}
-                  numberOfLines={1}
-                >
-                  {formatCents(poste.spent_cents, { compact: true })}/{formatCents(poste.budget_cents, { compact: true })}
-                </Body>
-                <Ionicons name="chevron-forward" size={14} color={theme.colors.textMuted} />
-              </View>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month', month } })}
-            accessibilityRole="button"
-            accessibilityLabel="Nouveau poste du mois"
-            style={[styles.chip, styles.chipAdd, { borderColor: theme.colors.border }]}
-          >
-            <Ionicons name="add" size={16} color={theme.colors.textMuted} />
-            <Caption>Poste</Caption>
-          </Pressable>
-        </View>
-      ) : null}
 
       {list.length === 0 ? (
         <Card>
@@ -442,6 +491,10 @@ function SectionTitle({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
 }
 
 const styles = StyleSheet.create({
+  overviewRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
+  addRow: { flexDirection: 'row', gap: spacing.sm },
+  monthlyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  monthlyHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   grid: {
     flexDirection: 'row',
@@ -461,13 +514,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: spacing.xs,
   },
-  ringCenter: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   chevron: {
     position: 'absolute',
     right: -26,
@@ -480,14 +526,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   addTile: {
-    flexBasis: '100%',
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.full,
   },
   sectionTitle: {
     marginTop: spacing.sm,
@@ -500,41 +545,6 @@ const styles = StyleSheet.create({
   },
   listCard: {
     paddingVertical: spacing.xs,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  chip: {
-    flexBasis: '31%',
-    flexGrow: 1,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  chipHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: spacing.sm,
-  },
-  chipBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: spacing.sm,
-  },
-  chipAdd: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    borderStyle: 'dashed',
-    minHeight: 64,
   },
   badge: {
     paddingHorizontal: spacing.md,

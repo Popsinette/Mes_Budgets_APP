@@ -69,11 +69,11 @@ export default function AddSheet() {
             accessibilityLabel={choice.title}
             style={({ pressed }) => [
               styles.row,
-              { backgroundColor: theme.colors.card, borderColor: theme.colors.border, opacity: pressed ? 0.7 : 1 },
+              { backgroundColor: theme.colors.card, borderColor: theme.dark ? theme.colors.border : 'transparent', opacity: pressed ? 0.7 : 1 },
             ]}
           >
-            <View style={[styles.icon, { backgroundColor: theme.colors[choice.color] }]}>
-              <Ionicons name={choice.icon} size={22} color={theme.colors.onAccent} />
+            <View style={[styles.icon, { backgroundColor: `${theme.colors[choice.color]}${theme.dark ? '33' : '22'}` }]}>
+              <Ionicons name={choice.icon} size={22} color={theme.colors[choice.color]} />
             </View>
             <View style={{ flex: 1 }}>
               <Body weight="semibold">{choice.title}</Body>

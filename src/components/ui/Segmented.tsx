@@ -5,7 +5,7 @@ import { Body } from './Text';
 
 type Segment<K extends string> = { key: K; label: string; icon?: keyof typeof Ionicons.glyphMap };
 
-/** Onglets segmentés (Variables · Fixes · Revenus · Santé) : pastille terracotta pour l'actif. */
+/** Onglets segmentés (Variables · Fixes · Revenus · Santé) : pastille lavande douce pour l'actif. */
 export function Segmented<K extends string>({
   segments,
   value,
@@ -17,10 +17,10 @@ export function Segmented<K extends string>({
 }) {
   const theme = useTheme();
   return (
-    <View style={[styles.row, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+    <View style={[styles.row, { backgroundColor: theme.colors.card, borderColor: theme.dark ? theme.colors.border : 'transparent' }]}>
       {segments.map((segment) => {
         const active = segment.key === value;
-        const color = active ? theme.colors.onPrimary : theme.colors.text;
+        const color = active ? theme.colors.primary : theme.colors.textMuted;
         return (
           <Pressable
             key={segment.key}
@@ -28,7 +28,7 @@ export function Segmented<K extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={segment.label}
-            style={[styles.segment, active && { backgroundColor: theme.colors.primary }]}
+            style={[styles.segment, active && { backgroundColor: theme.colors.primarySoft }]}
           >
             {segment.icon ? <Ionicons name={segment.icon} size={18} color={color} /> : null}
             <Body size={12.5} weight={active ? 'semibold' : 'medium'} color={color} numberOfLines={1}>

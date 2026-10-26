@@ -8,7 +8,7 @@ type CardProps = PropsWithChildren<{
   onLongPress?: () => void;
 }>;
 
-/** Carte plate : fond, filet fin, coins doux. Pas d'ombre lourde — le calme vient de l'air. */
+/** Carte douce : fond blanc, sans bord en clair, ombre lavande à peine visible, grands coins arrondis. */
 export function Card({ children, style, onPress, onLongPress }: CardProps) {
   const theme = useTheme();
   const interactive = Boolean(onPress || onLongPress);
@@ -25,9 +25,10 @@ export function Card({ children, style, onPress, onLongPress }: CardProps) {
           styles.card,
           {
             backgroundColor: theme.colors.card,
-            borderColor: theme.colors.border,
-            opacity: pressed && interactive ? 0.7 : 1,
-            shadowOpacity: hovered ? 0.09 : 0.03,
+            borderColor: theme.dark ? theme.colors.border : 'transparent',
+            shadowColor: theme.dark ? '#000000' : '#5B4FC4',
+            opacity: pressed && interactive ? 0.75 : 1,
+            shadowOpacity: theme.dark ? 0.2 : hovered ? 0.12 : 0.06,
             transform: [{ translateY: hovered && !pressed ? -1 : 0 }],
           },
           style,
@@ -44,9 +45,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     padding: spacing.lg,
-    shadowColor: '#101014',
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
   },
 });

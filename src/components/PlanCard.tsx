@@ -19,9 +19,9 @@ export function PlanCard({ summary, month }: { summary: MonthSummary; month: Mon
   const weeklyTotal = weeks > 0 ? Math.round(summary.variables_budget_cents / weeks) : 0;
   const lines: Array<[string, number, string?]> = [
     ['Revenus prévus', summary.income_cents],
-    ['Charges fixes', -summary.charges_cents],
-    ['Postes du mois', -summary.postes_budget_cents],
-    ['Enveloppes variables', -summary.variables_budget_cents, `${weeks} semaines × ${formatCents(weeklyTotal)}`],
+    ['Factures et charges fixes', -summary.charges_cents],
+    ['Enveloppes de la semaine', -summary.variables_budget_cents, `${weeks} semaines × ${formatCents(weeklyTotal)}`],
+    ['Montants fixes du mois', -summary.postes_budget_cents, 'Coiffure, essence…'],
     ['Épargne programmée', -summary.savings_planned_cents],
   ];
   const plan = summary.plan_left_cents;
@@ -83,7 +83,7 @@ export function PlanCard({ summary, month }: { summary: MonthSummary; month: Mon
         <Body size={13.5} style={{ flex: 1 }} color={red ? theme.colors.danger : theme.colors.success}>
           {red
             ? plan < 0
-              ? `Ton plan dépasse tes revenus de ${formatCents(-forecast)} : réduis une enveloppe, un poste ou l’épargne programmée.`
+              ? `Ton plan dépasse tes revenus de ${formatCents(-forecast)} : réduis une enveloppe, un montant fixe ou l’épargne programmée.`
               : `Tes dépassements te mettent dans le rouge de ${formatCents(-forecast)} : freine sur les enveloppes qui débordent ou ajuste ton plan.`
             : forecast === 0
               ? 'Chaque euro a sa place : ton plan tient.'

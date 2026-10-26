@@ -46,9 +46,9 @@ export function HeaderIconButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={[styles.iconButton, { backgroundColor: color ?? theme.colors.secondary }]}
+      style={[styles.iconButton, { backgroundColor: theme.colors.primarySoft }]}
     >
-      <Ionicons name={icon} size={18} color={theme.colors.onAccent} />
+      <Ionicons name={icon} size={18} color={color ?? theme.colors.primary} />
     </Pressable>
   );
 }

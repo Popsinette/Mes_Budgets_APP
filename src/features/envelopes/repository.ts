@@ -112,8 +112,8 @@ export async function deleteTemplate(db: SQLiteDatabase, id: number): Promise<vo
 export async function seedBase(db: SQLiteDatabase): Promise<void> {
   await db.execAsync(`
     INSERT INTO envelope_templates (name, icon, color, amount_cents, period, sort_order) VALUES
-      ('Courses', 'cart-outline', '#4FA173', 0, 'week', 0),
-      ('Autres', 'bag-handle-outline', '#C97558', 0, 'week', 1);
+      ('Courses', 'cart-outline', '#7BB15A', 0, 'week', 0),
+      ('Autres', 'bag-handle-outline', '#8B7FE0', 0, 'week', 1);
   `);
 }
 

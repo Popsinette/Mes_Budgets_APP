@@ -35,7 +35,7 @@ export function ProgressRing({ ratio, color, size = 52, strokeWidth = 4.5, child
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={color}
+            stroke={theme.tint(color)}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             fill="none"

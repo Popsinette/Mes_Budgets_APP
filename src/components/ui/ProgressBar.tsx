@@ -26,7 +26,7 @@ export function ProgressBar({ ratio, color, height = 9, markerRatio }: ProgressB
   const clamped = clampRatio(ratio);
   const over = ratio > 1;
   const barColor =
-    color ?? (over ? theme.colors.danger : ratio > 0.9 ? theme.colors.warning : theme.colors.primary);
+    (color ? theme.tint(color) : null) ?? (over ? theme.colors.danger : ratio > 0.9 ? theme.colors.warning : theme.colors.primary);
   const markerColor = theme.dark ? 'rgba(255,255,255,0.5)' : 'rgba(20,20,26,0.34)';
   // Un minimum visible dès qu'il y a la moindre dépense.
   const targetPct = clamped > 0 ? Math.max(clamped * 100, height / 2) : 0;

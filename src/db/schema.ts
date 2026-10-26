@@ -1,4 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { categoryPalette, LEGACY_PALETTE } from '@/src/theme/palette';
 import { currentMonthKey, monthOfWeek } from '@/src/utils/dates';
 import { migrateLegacyToV9 } from './legacy';
 
@@ -320,6 +321,28 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await db.execAsync(MIGRATION_V17);
     });
     await db.execAsync('PRAGMA user_version = 17');
+  }
+
+  if (current < 18) {
+    await db.withTransactionAsync(async () => {
+      await upgradeLegacyColors(db);
+    });
+    await db.execAsync('PRAGMA user_version = 18');
+  }
+}
+
+/**
+ * V18 — nouvelle palette pastel : chaque couleur de l'ancienne palette
+ * (teintes sourdes, brunes) devient la teinte de même rang de la nouvelle,
+ * pour les enveloppes, la base et les cagnottes. Aussi appelée après les
+ * données d'exemple de « Tout effacer » (elles reprennent l'ancienne palette).
+ */
+export async function upgradeLegacyColors(db: SQLiteDatabase): Promise<void> {
+  const cases = LEGACY_PALETTE.map(
+    (old, i) => `WHEN '${old}' THEN '${categoryPalette[i % categoryPalette.length]}'`,
+  ).join(' ');
+  for (const table of ['envelopes', 'envelope_templates', 'savings_pots']) {
+    await db.execAsync(`UPDATE ${table} SET color = CASE upper(color) ${cases} ELSE color END`);
   }
 }
 

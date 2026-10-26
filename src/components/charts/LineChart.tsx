@@ -20,15 +20,30 @@ function compactEuros(cents: number): string {
  * la projection. Toucher un point affiche sa valeur. Axe et grille discrets,
  * chiffres en encre (jamais en couleur de série).
  */
-export function LineChart({ points, color, projectionColor }: { points: LinePoint[]; color: string; projectionColor: string }) {
+export function LineChart({
+  points,
+  color,
+  projectionColor,
+  zeroBased = true,
+}: {
+  points: LinePoint[];
+  color: string;
+  projectionColor: string;
+  /** false : l'axe se resserre sur les valeurs (évolution lisible même loin de 0). */
+  zeroBased?: boolean;
+}) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
   const values = points.map((p) => p.cents);
-  const max = Math.max(0, ...values);
-  const min = Math.min(0, ...values);
+  const rawMax = zeroBased ? Math.max(0, ...values) : Math.max(...values);
+  const rawMin = zeroBased ? Math.min(0, ...values) : Math.min(...values);
+  // Hors base zéro : 15 % d'air au-dessus et en dessous de la courbe.
+  const pad = zeroBased ? 0 : Math.max((rawMax - rawMin) * 0.15, Math.abs(rawMax) * 0.02, 100);
+  const max = rawMax + pad;
+  const min = rawMin - pad;
   const span = max - min || 1;
   const plotW = Math.max(1, width - PAD.left - PAD.right);
   const plotH = HEIGHT - PAD.top - PAD.bottom;
@@ -46,7 +61,7 @@ export function LineChart({ points, color, projectionColor }: { points: LinePoin
       ? [...real.map((p) => `${x(p.i)},${y(p.cents)}`), `${x(lastReal.i)},${y(Math.max(min, 0))}`, `${x(real[0].i)},${y(Math.max(min, 0))}`].join(' ')
       : '';
 
-  const shownLabels = new Set([0, lastReal?.i ?? 0, points.length - 1]);
+  const shownLabels = new Set(points.length <= 7 ? points.map((_, i) => i) : [0, lastReal?.i ?? 0, points.length - 1]);
 
   return (
     <View onLayout={onLayout} style={{ height: HEIGHT }}>

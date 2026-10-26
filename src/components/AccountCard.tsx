@@ -17,8 +17,8 @@ export function AccountCard() {
   if (!status) {
     return (
       <Card style={styles.row} onPress={() => router.push('/compte')}>
-        <View style={[styles.icon, { backgroundColor: theme.colors.navy }]}>
-          <Ionicons name="card-outline" size={20} color={theme.colors.onAccent} />
+        <View style={[styles.icon, { backgroundColor: theme.colors.primarySoft }]}>
+          <Ionicons name="card-outline" size={20} color={theme.colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Body weight="semibold">Mon compte</Body>
@@ -32,8 +32,8 @@ export function AccountCard() {
   const end = status.end_of_month_cents;
   return (
     <Card style={styles.row} onPress={() => router.push('/compte')}>
-      <View style={[styles.icon, { backgroundColor: theme.colors.navy }]}>
-        <Ionicons name="card-outline" size={20} color={theme.colors.onAccent} />
+      <View style={[styles.icon, { backgroundColor: theme.colors.primarySoft }]}>
+        <Ionicons name="card-outline" size={20} color={theme.colors.primary} />
       </View>
       <View style={{ flex: 1, gap: 1 }}>
         <Eyebrow>Mon compte · estimé</Eyebrow>

@@ -16,6 +16,7 @@ type AppearancePickerProps = {
 /** Choix d'icône et de couleur (palette validée) pour une enveloppe ou une poche. */
 export function AppearancePicker({ icons, icon, color, onIcon, onColor }: AppearancePickerProps) {
   const theme = useTheme();
+  const shown = theme.tint(color);
   return (
     <>
       <View style={{ gap: spacing.sm }}>
@@ -30,12 +31,12 @@ export function AppearancePicker({ icons, icon, color, onIcon, onColor }: Appear
               style={[
                 styles.icon,
                 {
-                  backgroundColor: icon === value ? `${color}22` : theme.colors.card,
-                  borderColor: icon === value ? color : theme.colors.border,
+                  backgroundColor: icon === value ? `${shown}22` : theme.colors.card,
+                  borderColor: icon === value ? shown : theme.colors.border,
                 },
               ]}
             >
-              <Ionicons name={value} size={22} color={icon === value ? color : theme.colors.textMuted} />
+              <Ionicons name={value} size={22} color={icon === value ? shown : theme.colors.textMuted} />
             </Pressable>
           ))}
         </View>
@@ -51,7 +52,7 @@ export function AppearancePicker({ icons, icon, color, onIcon, onColor }: Appear
               accessibilityLabel={`Couleur ${value}`}
               style={[
                 styles.color,
-                { backgroundColor: value, borderWidth: color === value ? 3 : 0, borderColor: theme.colors.text },
+                { backgroundColor: theme.tint(value), borderWidth: color === value ? 3 : 0, borderColor: theme.colors.text },
               ]}
             />
           ))}

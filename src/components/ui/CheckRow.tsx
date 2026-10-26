@@ -50,8 +50,8 @@ export function CheckRow({
         accessibilityLabel={title}
         style={({ pressed }) => [styles.main, { opacity: pressed ? 0.6 : 1 }]}
       >
-        <View style={[styles.icon, { backgroundColor: iconColor }]}>
-          <Ionicons name={name} size={17} color={theme.colors.onAccent} />
+        <View style={[styles.icon, { backgroundColor: `${theme.tint(iconColor)}${theme.dark ? '33' : '22'}` }]}>
+          <Ionicons name={name} size={17} color={theme.tint(iconColor)} />
         </View>
         <View style={{ flex: 1 }}>
           <Body weight="medium" numberOfLines={1}>
@@ -101,9 +101,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   icon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

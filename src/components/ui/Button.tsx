@@ -16,13 +16,13 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
       ? theme.colors.primary
       : variant === 'danger'
         ? theme.colors.dangerSoft
-        : theme.colors.cardMuted;
+        : theme.colors.primarySoft;
   const color =
     variant === 'primary'
       ? theme.colors.onPrimary
       : variant === 'danger'
         ? theme.colors.danger
-        : theme.colors.text;
+        : theme.colors.primary;
 
   return (
     <Pressable
@@ -52,7 +52,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',

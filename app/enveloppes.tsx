@@ -80,11 +80,11 @@ export default function EnvelopesModal() {
         onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'week', month } })}
       />
 
-      <SectionHeader title={`Postes du mois · ${formatCents(monthlyTotal)}`} />
-      <Caption>Essence, Garderie, Cantine… : un montant par mois, affiché avec tes Fixes.</Caption>
+      <SectionHeader title={`Montants fixes du mois · ${formatCents(monthlyTotal)}`} />
+      <Caption>Coiffure, essence, cantine… : un montant prévu par mois, suivi dans tes Variables (ce n’est pas une facture).</Caption>
       <EnvelopeRows envelopes={monthly} unit="mois" month={month} />
       <Button
-        label={`+ Poste en ${short}`}
+        label={`+ Montant fixe en ${short}`}
         variant="secondary"
         onPress={() => router.push({ pathname: '/enveloppe', params: { period: 'month', month } })}
       />

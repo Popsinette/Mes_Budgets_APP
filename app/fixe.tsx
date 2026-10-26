@@ -188,10 +188,10 @@ function FixedForm({ item, month, kind: initialKind }: { item: FixedItem | null;
                 accessibilityState={{ selected }}
                 style={[
                   styles.icon,
-                  { backgroundColor: selected ? theme.colors.secondary : theme.colors.card, borderColor: theme.colors.border },
+                  { backgroundColor: selected ? theme.colors.primarySoft : theme.colors.card, borderColor: selected ? theme.colors.primary : theme.colors.border },
                 ]}
               >
-                <Ionicons name={value} size={20} color={selected ? theme.colors.onAccent : theme.colors.textMuted} />
+                <Ionicons name={value} size={20} color={selected ? theme.colors.primary : theme.colors.textMuted} />
               </Pressable>
             );
           })}
