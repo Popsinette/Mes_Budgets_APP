@@ -110,6 +110,21 @@ export async function savePot(
   invalidateQueries();
 }
 
+/**
+ * Corrige le solde d'une cagnotte : le montant saisi devient son solde
+ * actuel. Seul le montant de départ est ajusté (solde = départ + virements) :
+ * l'historique des virements est gardé et le compte courant n'est pas touché.
+ */
+export async function setPotBalance(db: SQLiteDatabase, potId: number, balanceCents: number): Promise<void> {
+  await db.runAsync(
+    `UPDATE savings_pots
+     SET initial_cents = ? - COALESCE((SELECT SUM(amount_cents) FROM savings_moves WHERE pot_id = ?), 0)
+     WHERE id = ?`,
+    [balanceCents, potId, potId],
+  );
+  invalidateQueries();
+}
+
 export async function deletePot(db: SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM savings_pots WHERE id = ?', [id]);
   invalidateQueries();

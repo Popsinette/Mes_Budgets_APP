@@ -60,6 +60,14 @@ export default function PotDetailModal() {
         <View style={{ flex: 1 }}>
           <Eyebrow>{POT_KIND_LABELS[pot.kind]}</Eyebrow>
           <Money cents={pot.balance_cents} size={36} weight="xbold" />
+          <Pressable
+            onPress={() => router.push({ pathname: '/poche', params: { id: String(pot.id) } })}
+            accessibilityRole="button"
+            accessibilityLabel="Corriger le montant"
+            hitSlop={8}
+          >
+            <Caption tone="primary">Corriger le montant</Caption>
+          </Pressable>
         </View>
       </View>
 
@@ -127,7 +135,7 @@ export default function PotDetailModal() {
         </View>
       </View>
       <Button
-        label="Modifier la poche"
+        label="Modifier la cagnotte"
         variant="secondary"
         onPress={() => router.push({ pathname: '/poche', params: { id: String(pot.id) } })}
       />

@@ -9,7 +9,7 @@ import { Chip } from '@/src/components/ui/Chip';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
 import { Screen } from '@/src/components/ui/Screen';
-import { Eyebrow } from '@/src/components/ui/Text';
+import { Caption, Eyebrow } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   deletePot,
@@ -17,8 +17,9 @@ import {
   listPots,
   POT_KIND_LABELS,
   savePot,
-  type Pot,
+  setPotBalance,
   type PotKind,
+  type PotWithBalance,
 } from '@/src/features/savings/repository';
 import { categoryPalette, spacing } from '@/src/theme';
 import { currentMonthKey } from '@/src/utils/dates';
@@ -67,11 +68,13 @@ export default function PotModal() {
   return <PotForm pot={pot ?? null} count={all.length} kind={params.kind === 'securite' ? 'securite' : 'projet'} />;
 }
 
-function PotForm({ pot, count, kind: initialKind }: { pot: Pot | null; count: number; kind: PotKind }) {
+function PotForm({ pot, count, kind: initialKind }: { pot: PotWithBalance | null; count: number; kind: PotKind }) {
   const db = useSQLiteContext();
   const [name, setName] = useState(pot?.name ?? '');
   const [kind, setKind] = useState<PotKind>(pot?.kind ?? initialKind);
-  const [initial, setInitial] = useState(centsToInput(pot?.initial_cents));
+  // « Montant actuel » = le solde (départ + virements). Le modifier ne touche
+  // que le montant de départ : l'historique des virements reste.
+  const [initial, setInitial] = useState(centsToInput(pot?.balance_cents));
   const [monthly, setMonthly] = useState(centsToInput(pot?.monthly_cents));
   const [target, setTarget] = useState(centsToInput(pot?.target_cents));
   const [icon, setIcon] = useState(pot?.icon ?? 'wallet-outline');
@@ -106,17 +109,18 @@ function PotForm({ pot, count, kind: initialKind }: { pot: Pot | null; count: nu
       kind,
       icon,
       color,
-      initialCents,
+      initialCents: pot ? pot.initial_cents : initialCents,
       monthlyCents: monthlyCents || null,
       targetCents: targetCents || null,
     });
+    if (pot && initialCents !== pot.balance_cents) await setPotBalance(db, pot.id, initialCents);
     router.back();
   };
 
   const remove = () => {
     if (!pot) return;
     confirmAction({
-      title: 'Supprimer la poche',
+      title: 'Supprimer la cagnotte',
       message: `Supprimer « ${pot.name} » et tout son historique ?`,
       confirmLabel: 'Supprimer',
       destructive: true,
@@ -131,7 +135,7 @@ function PotForm({ pot, count, kind: initialKind }: { pot: Pot | null; count: nu
 
   return (
     <Screen>
-      <ModalHeader title={pot ? 'Modifier la poche' : 'Nouvelle poche'} />
+      <ModalHeader title={pot ? 'Modifier la cagnotte' : 'Nouvelle cagnotte'} />
       <FormField label="Nom" value={name} onChangeText={setName} placeholder="Fonds d’urgence, Vacances…" />
       <View style={{ gap: spacing.sm }}>
         <Eyebrow>Type</Eyebrow>
@@ -141,7 +145,12 @@ function PotForm({ pot, count, kind: initialKind }: { pot: Pot | null; count: nu
           ))}
         </View>
       </View>
-      <AmountField label="Déjà épargné" value={initial} onChangeText={setInitial} placeholder="0" />
+      <AmountField label="Montant actuel sur cette cagnotte" value={initial} onChangeText={setInitial} placeholder="0" />
+      <Caption>
+        {pot
+          ? 'Corrige-le à tout moment pour qu’il colle à ta banque : il devient le solde de la cagnotte, l’historique des virements est gardé.'
+          : 'Ce que tu as déjà sur ce compte d’épargne aujourd’hui.'}
+      </Caption>
       <AmountField label="Versement mensuel programmé (optionnel)" value={monthly} onChangeText={setMonthly} placeholder="50" />
       <AmountField label="Objectif (optionnel)" value={target} onChangeText={setTarget} placeholder="3 000" />
       <FormField
@@ -152,8 +161,8 @@ function PotForm({ pot, count, kind: initialKind }: { pot: Pot | null; count: nu
         keyboardType="numbers-and-punctuation"
       />
       <AppearancePicker icons={ICONS} icon={icon} color={color} onIcon={setIcon} onColor={setColor} />
-      <Button label={pot ? 'Enregistrer' : 'Créer la poche'} onPress={() => void save()} loading={saving} />
-      {pot ? <Button label="Supprimer la poche" variant="danger" onPress={remove} /> : null}
+      <Button label={pot ? 'Enregistrer' : 'Créer la cagnotte'} onPress={() => void save()} loading={saving} />
+      {pot ? <Button label="Supprimer la cagnotte" variant="danger" onPress={remove} /> : null}
     </Screen>
   );
 }
