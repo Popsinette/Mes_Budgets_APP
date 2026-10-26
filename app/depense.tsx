@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button } from '@/src/components/ui/Button';
+import { Chip } from '@/src/components/ui/Chip';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { AmountField, FormField } from '@/src/components/ui/FormField';
 import { ModalHeader } from '@/src/components/ui/ModalHeader';
@@ -18,8 +19,11 @@ import {
   listEnvelopesForMonth,
   saveExpense,
   type EnvelopeForMonth,
+  type EnvelopePeriod,
   type Expense,
 } from '@/src/features/envelopes/repository';
+import { HABIT_FREQUENCY_LABELS, saveHabit, type HabitFrequency } from '@/src/features/habits/repository';
+import { getExpenseSuggestions, matchSuggestion, type ExpenseSuggestion } from '@/src/features/quick/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, currentWeekKey, isoDayInMonth, monthOfWeek, todayIso, weekKeyOf } from '@/src/utils/dates';
 import { useSelectedMonth } from '@/src/store/month';
@@ -87,11 +91,36 @@ function ExpenseForm({
     envelopes[0] ??
     null;
   const selectedEnvelope = current?.id ?? null;
-  const setSelectedEnvelope = (id: number) =>
+  // Choix manuel de l'enveloppe : la saisie du libellé ne la change plus ensuite.
+  const [manualEnvelope, setManualEnvelope] = useState(Boolean(expense || envelopeId));
+  const setSelectedEnvelope = (id: number) => {
+    setManualEnvelope(true);
     setPicked({ id, name: envelopes.find((e) => e.id === id)?.name ?? null });
+  };
   const [saving, setSaving] = useState(false);
+  // Saisie express : raccourcis tirés de l'historique, enveloppe devinée au libellé.
+  const { data: suggestions } = useLiveQuery((db) => getExpenseSuggestions(db, todayIso()), []);
+  const shortcuts = expense ? [] : (suggestions ?? []).filter((s) => s.count >= 2).slice(0, 6);
+  const pickByName = (name: string, period: EnvelopePeriod) => {
+    const match = envelopes.find((e) => e.name === name && e.period === period);
+    setPicked({ id: match?.id ?? null, name });
+  };
+  const onLabel = (text: string) => {
+    setLabel(text);
+    if (manualEnvelope) return;
+    const guess = matchSuggestion(suggestions ?? [], text);
+    if (guess) pickByName(guess.envelope_name, guess.envelope_period);
+  };
+  const applyShortcut = (s: ExpenseSuggestion) => {
+    setLabel(s.label);
+    setAmount(centsToInput(s.amount_cents));
+    pickByName(s.envelope_name, s.envelope_period);
+    setManualEnvelope(true);
+  };
+  const [habit, setHabit] = useState<HabitFrequency | null>(null);
+  const [lastAdded, setLastAdded] = useState<string | null>(null);
 
-  const save = async () => {
+  const save = async (again = false) => {
     const cents = parseAmountToCents(amount);
     if (!cents || cents <= 0) {
       notify('Montant invalide', 'Saisis un montant, par exemple 12,50.');
@@ -117,6 +146,26 @@ function ExpenseForm({
       date,
       cleared,
     });
+    if (!expense && habit) {
+      await saveHabit(db, {
+        label: label.trim() || envelope.name,
+        envelopeName: envelope.name,
+        envelopePeriod: envelope.period,
+        amountCents: cents,
+        frequency: habit,
+        startDate: date,
+      });
+    }
+    if (again) {
+      // « Ajouter et en noter une autre » : même date, formulaire vidé.
+      setAmount('');
+      setLabel('');
+      setHabit(null);
+      setManualEnvelope(false);
+      setSaving(false);
+      setLastAdded(`${label.trim() || envelope.name} · ${formatCents(cents)}`);
+      return;
+    }
     router.back();
   };
 
@@ -140,7 +189,39 @@ function ExpenseForm({
     <Screen>
       <ModalHeader title={expense ? 'Modifier la dépense' : 'Nouvelle dépense'} />
 
+      {lastAdded ? (
+        <View style={[styles.added, { backgroundColor: theme.colors.successSoft }]}>
+          <Ionicons name="checkmark-circle" size={18} color={theme.colors.success} />
+          <Body size={13.5} color={theme.colors.success} style={{ flex: 1 }}>
+            Ajoutée : {lastAdded}
+          </Body>
+        </View>
+      ) : null}
       <AmountField label="Montant" value={amount} onChangeText={setAmount} placeholder="0,00" autoFocus={!expense} />
+
+      {shortcuts.length > 0 ? (
+        <View style={{ gap: spacing.sm }}>
+          <Eyebrow>En un toucher</Eyebrow>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcuts}>
+            {shortcuts.map((s) => (
+              <Pressable
+                key={`${s.label}-${s.envelope_name}`}
+                onPress={() => applyShortcut(s)}
+                accessibilityRole="button"
+                accessibilityLabel={`${s.label}, ${formatCents(s.amount_cents)}, ${s.envelope_name}`}
+                style={({ pressed }) => [styles.shortcut, { backgroundColor: theme.colors.primarySoft, opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Body size={13.5} weight="semibold" color={theme.colors.primary} numberOfLines={1}>
+                  {s.label}
+                </Body>
+                <Caption numberOfLines={1}>
+                  {formatCents(s.amount_cents, { compact: true })} · {s.envelope_name}
+                </Caption>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <View style={{ gap: spacing.sm }}>
         <Eyebrow>Enveloppe</Eyebrow>
@@ -172,7 +253,7 @@ function ExpenseForm({
         </View>
       </View>
 
-      <FormField label="Libellé (optionnel)" value={label} onChangeText={setLabel} placeholder="Marché, coiffeur, cadeau…" />
+      <FormField label="Libellé (optionnel)" value={label} onChangeText={onLabel} placeholder="Marché, coiffeur, cadeau…" />
 
       <Pressable
         onPress={() => setCleared(!cleared)}
@@ -207,7 +288,28 @@ function ExpenseForm({
 
       <DatePickerGrid value={date} onChange={setDate} />
 
+      {!expense ? (
+        <View style={{ gap: spacing.sm }}>
+          <Eyebrow>Revient régulièrement ?</Eyebrow>
+          <View style={styles.habitRow}>
+            <Chip label="Non" selected={habit === null} onPress={() => setHabit(null)} />
+            {(Object.keys(HABIT_FREQUENCY_LABELS) as HabitFrequency[]).map((f) => (
+              <Chip key={f} label={HABIT_FREQUENCY_LABELS[f]} selected={habit === f} onPress={() => setHabit(f)} />
+            ))}
+          </View>
+          {habit ? (
+            <Caption>
+              Elle te sera proposée à chaque échéance (« À noter » dans Variables) : un toucher pour la noter. Ce n’est pas une
+              facture, rien n’est noté sans toi.
+            </Caption>
+          ) : null}
+        </View>
+      ) : null}
+
       <Button label={expense ? 'Enregistrer' : 'Ajouter la dépense'} onPress={() => void save()} loading={saving} />
+      {!expense ? (
+        <Button label="Ajouter et en noter une autre" variant="secondary" onPress={() => void save(true)} loading={saving} />
+      ) : null}
       {expense ? <Button label="Supprimer" variant="danger" onPress={remove} /> : null}
     </Screen>
   );
@@ -283,6 +385,10 @@ function ImpactPreview({
 }
 
 const styles = StyleSheet.create({
+  added: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md },
+  shortcuts: { gap: spacing.sm, paddingRight: spacing.sm },
+  shortcut: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.md, maxWidth: 170 },
+  habitRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   clearRow: {
     flexDirection: 'row',
     alignItems: 'center',

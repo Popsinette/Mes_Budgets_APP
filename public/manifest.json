@@ -22,5 +22,46 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouvelle dépense",
+      "short_name": "Dépense",
+      "description": "Noter une dépense tout de suite",
+      "url": "depense",
+      "icons": [
+        {
+          "src": "icons/icon.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Mes dépenses",
+      "short_name": "Dépenses",
+      "description": "Chercher et pointer mes dépenses",
+      "url": "depenses",
+      "icons": [
+        {
+          "src": "icons/icon.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Mes économies",
+      "short_name": "Épargne",
+      "description": "Mes cagnottes et mon plan d'épargne",
+      "url": "cagnottes",
+      "icons": [
+        {
+          "src": "icons/icon.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

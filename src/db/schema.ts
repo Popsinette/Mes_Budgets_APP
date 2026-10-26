@@ -329,7 +329,40 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     });
     await db.execAsync('PRAGMA user_version = 18');
   }
+
+  if (current < 19) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V19);
+    });
+    await db.execAsync('PRAGMA user_version = 19');
+  }
 }
+
+/**
+ * V19 — habitudes : dépenses qui reviennent sans être des factures (cantine
+ * chaque lundi, essence toutes les deux semaines…). Rien n'est noté tout
+ * seul : chaque échéance passée est proposée, puis notée ou ignorée
+ * (`habit_logs`, une ligne par échéance traitée).
+ */
+const MIGRATION_V19 = `
+CREATE TABLE IF NOT EXISTS expense_habits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  envelope_name TEXT NOT NULL,
+  envelope_period TEXT NOT NULL DEFAULT 'week',
+  amount_cents INTEGER NOT NULL,
+  frequency TEXT NOT NULL CHECK (frequency IN ('weekly', 'biweekly', 'monthly')),
+  start_date TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS habit_logs (
+  habit_id INTEGER NOT NULL REFERENCES expense_habits(id) ON DELETE CASCADE,
+  due_date TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('done', 'skipped')),
+  expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL,
+  PRIMARY KEY (habit_id, due_date)
+);
+`;
 
 /**
  * V18 — nouvelle palette pastel : chaque couleur de l'ancienne palette

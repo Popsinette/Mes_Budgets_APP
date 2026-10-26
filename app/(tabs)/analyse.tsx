@@ -18,7 +18,15 @@ import { EmptyState } from '@/src/components/ui/EmptyState';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Eyebrow, Heading, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
-import { getMoneyFlowDetail, getTopExpenses, getTrend, getWeeklySpending, moneyFlowOf } from '@/src/features/analytics/repository';
+import {
+  changeRatio,
+  getMoneyFlowDetail,
+  getPreviousSpending,
+  getTopExpenses,
+  getTrend,
+  getWeeklySpending,
+  moneyFlowOf,
+} from '@/src/features/analytics/repository';
 import { closeWeek, isWeekClosed, listEnvelopesForMonth, listEnvelopesForWeek } from '@/src/features/envelopes/repository';
 import { listPots } from '@/src/features/savings/repository';
 import { getBalanceHistory, getMonthSummary, SPENDING_GROUPS, type SpendingGroup } from '@/src/features/summary/repository';
@@ -80,18 +88,21 @@ function MonthSection({ month }: { month: MonthKey }) {
   const { data } = useLiveQuery(
     async (db) => {
       const summary = await getMonthSummary(db, month);
-      const [envelopes, weeks, top, detail] = await Promise.all([
+      const isNow = month === currentMonthKey();
+      const [envelopes, weeks, top, detail, previous] = await Promise.all([
         listEnvelopesForMonth(db, month, currentWeekKey()),
         getWeeklySpending(db, month),
         getTopExpenses(db, month, 5),
         getMoneyFlowDetail(db, month),
+        getPreviousSpending(db, month, isNow ? new Date().getDate() : null),
       ]);
-      return { summary, flow: moneyFlowOf(summary), envelopes, weeks, top, detail };
+      return { summary, flow: moneyFlowOf(summary), envelopes, weeks, top, detail, previous };
     },
     [month],
   );
   if (!data) return null;
-  const { summary, flow, envelopes, weeks, top, detail } = data;
+  const { summary, flow, envelopes, weeks, top, detail, previous } = data;
+  const prevName = shortMonthLabel(shiftMonthKey(month, -1));
   const elapsed = elapsedRatio(month);
   const days = daysInMonthOf(month);
   const daysPassed = Math.max(1, Math.round(elapsed * days));
@@ -202,9 +213,16 @@ function MonthSection({ month }: { month: MonthKey }) {
                   height={7}
                   markerRatio={isCurrent ? elapsed : undefined}
                 />
-                <Caption tone={left < 0 ? 'danger' : 'muted'}>
-                  {left < 0 ? `Dépassé de ${formatCents(-left)}` : `Reste ${formatCents(left)}`}
-                </Caption>
+                <View style={styles.envFoot}>
+                  <Caption tone={left < 0 ? 'danger' : 'muted'} style={{ flex: 1 }}>
+                    {left < 0 ? `Dépassé de ${formatCents(-left)}` : `Reste ${formatCents(left)}`}
+                  </Caption>
+                  <CompareBadge
+                    current={e.spent_cents}
+                    previous={previous.get(`${e.period}|${e.name}`)}
+                    label={isCurrent ? `vs ${prevName} à date` : `vs ${prevName}`}
+                  />
+                </View>
               </View>
             );
           })
@@ -265,6 +283,25 @@ function MonthSection({ month }: { month: MonthKey }) {
         <WeekClosingCard />
       </View>
     </>
+  );
+}
+
+/** Écart avec le mois précédent (même enveloppe, même date si mois en cours) : moins = vert, plus = rouge. */
+function CompareBadge({ current, previous, label }: { current: number; previous: number | undefined; label: string }) {
+  const theme = useTheme();
+  const ratio = changeRatio(current, previous);
+  if (ratio === null) return null;
+  const up = ratio > 0;
+  return (
+    <View
+      style={[styles.badge, { backgroundColor: up ? theme.colors.dangerSoft : theme.colors.successSoft }]}
+      accessibilityLabel={`${up ? 'Plus' : 'Moins'} ${Math.abs(ratio)} % ${label} (${formatCents(previous ?? 0)})`}
+    >
+      <Ionicons name={up ? 'arrow-up' : 'arrow-down'} size={11} color={up ? theme.colors.danger : theme.colors.success} />
+      <Caption style={{ fontSize: 11.5 }} color={up ? theme.colors.danger : theme.colors.success}>
+        {Math.abs(ratio)} % {label}
+      </Caption>
+    </View>
   );
 }
 
@@ -582,6 +619,8 @@ const styles = StyleSheet.create({
   tile: { flexBasis: '47%', flexGrow: 1, gap: 2, padding: spacing.md },
   tileIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   alert: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md },
+  envFoot: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
   envHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   rank: { width: 14, textAlign: 'center' },

@@ -97,6 +97,8 @@ export default function RootLayout() {
               <Stack.Screen name="virements" options={{ presentation: 'modal' }} />
               <Stack.Screen name="enveloppe" options={{ presentation: 'modal' }} />
               <Stack.Screen name="fixe" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="habitudes" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="annee" options={{ presentation: 'modal' }} />
               <Stack.Screen name="poche" options={{ presentation: 'modal' }} />
               <Stack.Screen name="poche-detail" options={{ presentation: 'modal' }} />
               <Stack.Screen name="mouvement" options={{ presentation: 'modal' }} />

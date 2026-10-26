@@ -22,14 +22,17 @@ export const BACKUP_TABLES = [
   'week_closures',
   'health_expenses',
   'account',
+  'expense_habits',
+  'habit_logs',
 ] as const;
 
 export const BACKUP_APP = 'Mes Budgets';
 /**
  * 3 : ajout de savings_skips (V15) et month_closures / adjust_cents (V16).
  * 4 : pointage des dépenses (expenses.cleared_at, V17).
+ * 5 : habitudes (expense_habits, habit_logs, V19).
  */
-export const BACKUP_FORMAT = 4;
+export const BACKUP_FORMAT = 5;
 
 export type Backup = {
   app: string;
@@ -132,6 +135,8 @@ function toSqlValue(value: unknown): string | number | null {
 // ---------- Rappel de sauvegarde ----------
 
 const LAST_BACKUP_KEY = 'last_backup_at';
+/** Réglage « Ouvrir l'app sur Nouvelle dépense » ('1' = oui). */
+export const OPEN_ON_EXPENSE_KEY = 'open_on_expense';
 /** Au-delà, l'Analyse et les Réglages rappellent de sauvegarder. */
 export const BACKUP_REMINDER_DAYS = 30;
 

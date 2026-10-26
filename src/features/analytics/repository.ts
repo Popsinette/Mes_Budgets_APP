@@ -181,3 +181,32 @@ export async function getMoneyFlowDetail(db: SQLiteDatabase, month: MonthKey): P
     over_cents: flow.over_cents,
   };
 }
+
+// ---------- Comparaison avec le mois précédent ----------
+
+/**
+ * Dépensé le mois précédent, par enveloppe (même nom et même période) —
+ * jusqu'au même jour du mois si `uptoDay` est donné (comparaison juste en
+ * cours de mois). Clé : `${period}|${name}`.
+ */
+export async function getPreviousSpending(
+  db: SQLiteDatabase,
+  month: MonthKey,
+  uptoDay: number | null,
+): Promise<Map<string, number>> {
+  const previous = shiftMonthKey(month, -1);
+  const rows = await db.getAllAsync<{ name: string; period: string; spent: number }>(
+    `SELECT e.name, e.period, SUM(x.amount_cents) AS spent
+     FROM expenses x JOIN envelopes e ON e.id = x.envelope_id
+     WHERE e.month = ? ${uptoDay ? 'AND CAST(substr(x.date, 9, 2) AS INTEGER) <= ?' : ''}
+     GROUP BY e.name, e.period`,
+    uptoDay ? [previous, uptoDay] : [previous],
+  );
+  return new Map(rows.map((r) => [`${r.period}|${r.name}`, r.spent]));
+}
+
+/** Écart en % avec le mois précédent (null si rien à comparer). */
+export function changeRatio(current: number, previous: number | undefined): number | null {
+  if (!previous || previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}

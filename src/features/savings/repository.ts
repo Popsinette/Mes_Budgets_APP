@@ -322,3 +322,85 @@ function shiftMonth(month: MonthKey): MonthKey {
   const [y, m] = month.split('-').map(Number);
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 }
+
+// ---------- Objectifs intelligents ----------
+
+export type GoalAdvice = {
+  /** Reste à mettre pour atteindre l'objectif (0 si atteint, null sans objectif). */
+  missing_cents: number | null;
+  /** Versements encore possibles avant la date limite (mois en cours compris s'il n'est pas versé). */
+  months_left: number | null;
+  /** Versement mensuel nécessaire pour tenir la date limite (arrondi à l'euro supérieur). */
+  needed_monthly_cents: number | null;
+  /** Le versement programmé suffit-il pour la date limite ? */
+  on_track: boolean | null;
+  /** Au rythme programmé, mois où l'objectif sera atteint. */
+  reach_month: MonthKey | null;
+};
+
+/** Ce qu'il faut pour atteindre l'objectif d'une cagnotte, vu depuis `month`. */
+export function goalAdvice(pot: PotWithBalance, month: MonthKey): GoalAdvice {
+  const target = pot.target_cents ?? 0;
+  if (target <= 0) return { missing_cents: null, months_left: null, needed_monthly_cents: null, on_track: null, reach_month: null };
+  const missing = Math.max(0, target - pot.balance_cents);
+  if (missing === 0) return { missing_cents: 0, months_left: null, needed_monthly_cents: 0, on_track: true, reach_month: null };
+  const doneNow = pot.plan_done === 1;
+  const first = doneNow ? shiftMonth(month) : month;
+  let monthsLeft: number | null = null;
+  let needed: number | null = null;
+  if (pot.deadline) {
+    const end = pot.deadline.slice(0, 7);
+    monthsLeft = Math.max(0, monthIndex(end) - monthIndex(first) + 1);
+    needed = Math.ceil(missing / Math.max(1, monthsLeft) / 100) * 100;
+  }
+  const monthly = pot.monthly_cents ?? 0;
+  let reach: MonthKey | null = null;
+  if (monthly > 0) {
+    let m = first;
+    for (let i = 1; i < Math.ceil(missing / monthly); i++) m = shiftMonth(m);
+    reach = m;
+  }
+  return {
+    missing_cents: missing,
+    months_left: monthsLeft,
+    needed_monthly_cents: needed,
+    on_track: needed === null ? null : monthly >= needed,
+    reach_month: reach,
+  };
+}
+
+function monthIndex(month: MonthKey): number {
+  const [y, m] = month.split('-').map(Number);
+  return y * 12 + (m - 1);
+}
+
+/** Change le versement mensuel programmé d'une cagnotte (ex. « Ajuster à 85 € »). */
+export async function setPotMonthly(db: SQLiteDatabase, potId: number, monthlyCents: number | null): Promise<void> {
+  await db.runAsync('UPDATE savings_pots SET monthly_cents = ? WHERE id = ?', [monthlyCents, potId]);
+  invalidateQueries();
+}
+
+// ---------- Provisions pour les charges annuelles ----------
+
+/**
+ * Crée une cagnotte qui lisse une grosse charge (assurance annuelle,
+ * impôts…) : objectif = montant, date limite = échéance, versement mensuel =
+ * de quoi l'atteindre avant l'échéance. Le jour J, on retire la cagnotte
+ * pour payer.
+ */
+export async function createProvisionPot(
+  db: SQLiteDatabase,
+  input: { name: string; amountCents: number; dueDate: string; fromMonth: MonthKey; color: string },
+): Promise<void> {
+  const months = Math.max(1, monthIndex(input.dueDate.slice(0, 7)) - monthIndex(input.fromMonth));
+  await savePot(db, {
+    name: `Provision ${input.name}`,
+    icon: 'calendar-outline',
+    color: input.color,
+    kind: 'projet',
+    initialCents: 0,
+    targetCents: input.amountCents,
+    monthlyCents: Math.ceil(input.amountCents / months / 100) * 100,
+    deadline: input.dueDate,
+  });
+}

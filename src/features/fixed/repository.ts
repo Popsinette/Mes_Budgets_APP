@@ -120,3 +120,50 @@ export async function stopFixedItem(db: SQLiteDatabase, item: FixedItem, month: 
   }
   invalidateQueries();
 }
+
+// ---------- Mon année : charges non mensuelles à lisser ----------
+
+export type AnnualCharge = FixedItem & {
+  /** Prochaine échéance (mois en cours compris). */
+  next_month: MonthKey;
+  /** Mois d'ici l'échéance (0 = ce mois-ci). */
+  months_until: number;
+  /** À mettre de côté chaque mois pour lisser : montant ÷ période. */
+  monthly_provision_cents: number;
+  /** Ce que la charge coûte sur un an. */
+  yearly_cents: number;
+};
+
+/**
+ * Charges trimestrielles et annuelles encore actives, avec leur prochaine
+ * échéance et la provision mensuelle qui les lisse — pour ne plus être
+ * surprise par l'assurance ou les impôts.
+ */
+export async function getAnnualCharges(db: SQLiteDatabase, month: MonthKey): Promise<AnnualCharge[]> {
+  const items = await db.getAllAsync<FixedItem>(
+    `SELECT * FROM fixed_items
+     WHERE kind = 'charge' AND frequency IN ('quarterly', 'yearly') AND (end_month IS NULL OR end_month >= ?)`,
+    [month],
+  );
+  const out: AnnualCharge[] = [];
+  for (const item of items) {
+    const step = STEP[item.frequency];
+    let next: MonthKey | null = null;
+    for (let i = 0; i <= step; i++) {
+      const m = shiftMonthKey(month, i);
+      if (isDueIn(item, m)) {
+        next = m;
+        break;
+      }
+    }
+    if (!next) continue;
+    out.push({
+      ...item,
+      next_month: next,
+      months_until: monthsBetween(month, next),
+      monthly_provision_cents: Math.round(item.amount_cents / step),
+      yearly_cents: item.amount_cents * (12 / step),
+    });
+  }
+  return out.sort((a, b) => a.months_until - b.months_until || b.amount_cents - a.amount_cents);
+}

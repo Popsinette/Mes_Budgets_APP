@@ -12,6 +12,7 @@ import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Eyebrow, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getCarryInto } from '@/src/features/closure/repository';
+import { changeRatio, getPreviousSpending } from '@/src/features/analytics/repository';
 import {
   deleteExpense,
   listEnvelopesForMonth,
@@ -20,7 +21,7 @@ import {
 } from '@/src/features/envelopes/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { spacing, useTheme } from '@/src/theme';
-import { currentWeekKey, monthKeyLabel, weekLabel, weekPaceRatio, weeksOfMonth } from '@/src/utils/dates';
+import { currentMonthKey, currentWeekKey, monthKeyLabel, shiftMonthKey, weekLabel, weekPaceRatio, weeksOfMonth } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
@@ -36,6 +37,11 @@ export default function EnvelopeDetail() {
   const { data: envelopes } = useLiveQuery((db) => listEnvelopesForMonth(db, month, thisWeek), [month, thisWeek]);
   const { data: expenses } = useLiveQuery((db) => listExpensesForEnvelope(db, id), [id]);
   const { data: carry } = useLiveQuery((db) => getCarryInto(db, id), [id]);
+  const isNow = month === currentMonthKey();
+  const { data: previous } = useLiveQuery(
+    (db) => getPreviousSpending(db, month, isNow ? new Date().getDate() : null),
+    [month, isNow],
+  );
   const envelope = envelopes?.find((e) => e.id === id);
   if (!envelope) return <Screen />;
 
@@ -67,6 +73,18 @@ export default function EnvelopeDetail() {
         </View>
       </View>
       <ProgressBar ratio={ratio} color={ratio > 1 ? theme.colors.danger : envelope.color} height={10} />
+      {previous?.has(`${envelope.period}|${envelope.name}`) ? (
+        <Caption>
+          {(() => {
+            const prev = previous.get(`${envelope.period}|${envelope.name}`) ?? 0;
+            const pct = changeRatio(envelope.spent_cents, prev);
+            const name = monthKeyLabel(shiftMonthKey(month, -1)).split(' ')[0];
+            return `${name.charAt(0).toUpperCase()}${name.slice(1)}${isNow ? ' à la même date' : ''} : ${formatCents(prev)}${
+              pct === null ? '' : ` (${pct > 0 ? '+' : ''}${pct} % ce mois-ci)`
+            }`;
+          })()}
+        </Caption>
+      ) : null}
       {envelope.adjust_cents !== 0 ? (
         <Caption>
           {carry && carry.amount_cents === envelope.adjust_cents

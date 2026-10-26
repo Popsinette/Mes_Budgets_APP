@@ -1,6 +1,9 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, Tabs } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useEffect } from 'react';
+import { getMeta, OPEN_ON_EXPENSE_KEY } from '@/src/features/backup/repository';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View, type ColorValue } from 'react-native';
 import { useTheme } from '@/src/theme';
@@ -45,8 +48,19 @@ function AddButton() {
   );
 }
 
+let launchHandled = false;
+
 export default function TabsLayout() {
   const theme = useTheme();
+  const db = useSQLiteContext();
+  // « Ouvrir sur Nouvelle dépense » : une fois par lancement de l'app.
+  useEffect(() => {
+    if (launchHandled) return;
+    launchHandled = true;
+    void getMeta(db, OPEN_ON_EXPENSE_KEY).then((value) => {
+      if (value === '1') router.push('/depense');
+    });
+  }, [db]);
 
   return (
     <Tabs
