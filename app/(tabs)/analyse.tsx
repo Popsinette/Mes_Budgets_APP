@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { ChartLegend, ColumnChart } from '@/src/components/charts/ColumnChart';
 import { HBars } from '@/src/components/charts/HBars';
-import { StackedBar } from '@/src/components/charts/StackedBar';
+import { FlowChart } from '@/src/components/charts/FlowChart';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
@@ -18,7 +18,7 @@ import { EmptyState } from '@/src/components/ui/EmptyState';
 import { Screen } from '@/src/components/ui/Screen';
 import { Body, Caption, Eyebrow, Heading, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
-import { getTopExpenses, getTrend, getWeeklySpending, moneyFlowOf } from '@/src/features/analytics/repository';
+import { getMoneyFlowDetail, getTopExpenses, getTrend, getWeeklySpending, moneyFlowOf } from '@/src/features/analytics/repository';
 import { closeWeek, isWeekClosed, listEnvelopesForMonth, listEnvelopesForWeek } from '@/src/features/envelopes/repository';
 import { listPots } from '@/src/features/savings/repository';
 import { getBalanceHistory, getMonthSummary, SPENDING_GROUPS, type SpendingGroup } from '@/src/features/summary/repository';
@@ -80,17 +80,18 @@ function MonthSection({ month }: { month: MonthKey }) {
   const { data } = useLiveQuery(
     async (db) => {
       const summary = await getMonthSummary(db, month);
-      const [envelopes, weeks, top] = await Promise.all([
+      const [envelopes, weeks, top, detail] = await Promise.all([
         listEnvelopesForMonth(db, month, currentWeekKey()),
         getWeeklySpending(db, month),
         getTopExpenses(db, month, 5),
+        getMoneyFlowDetail(db, month),
       ]);
-      return { summary, flow: moneyFlowOf(summary), envelopes, weeks, top };
+      return { summary, flow: moneyFlowOf(summary), envelopes, weeks, top, detail };
     },
     [month],
   );
   if (!data) return null;
-  const { summary, flow, envelopes, weeks, top } = data;
+  const { summary, flow, envelopes, weeks, top, detail } = data;
   const elapsed = elapsedRatio(month);
   const days = daysInMonthOf(month);
   const daysPassed = Math.max(1, Math.round(elapsed * days));
@@ -158,26 +159,7 @@ function MonthSection({ month }: { month: MonthKey }) {
               : 'Ajoute tes revenus pour voir comment ils se répartissent.'}
           </Caption>
         </View>
-        {income > 0 || summary.expense_cents > 0 ? (
-          <StackedBar
-            total={Math.max(income, flow.slices.reduce((s, x) => s + x.cents, 0))}
-            items={flow.slices.map((s) => ({
-              ...s,
-              hint:
-                s.key === 'fixes'
-                  ? 'loyer, abonnements…'
-                  : s.key === 'variables'
-                    ? 'courses, plaisir…'
-                    : s.key === 'postes'
-                      ? 'coiffure, essence…'
-                      : s.key === 'epargne'
-                        ? 'versements programmés'
-                        : s.key === 'reste'
-                          ? 'encore libre'
-                          : 'reste à charge',
-            }))}
-          />
-        ) : null}
+        {detail.families.length > 0 ? <FlowChart detail={detail} /> : null}
         {flow.over_cents > 0 ? (
           <View style={[styles.alert, { backgroundColor: theme.colors.dangerSoft }]}>
             <Ionicons name="alert-circle" size={18} color={theme.colors.danger} />

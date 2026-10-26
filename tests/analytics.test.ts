@@ -130,3 +130,39 @@ describe('corriger le montant d’une cagnotte', () => {
     expect(raw.prepare('SELECT COUNT(*) AS n FROM savings_moves').get()).toEqual(movesBefore);
   });
 });
+
+describe('flux détaillé (diagramme)', () => {
+  it('les postes de chaque famille somment au total de la famille, les sources aux revenus', async () => {
+    const { getMoneyFlowDetail } = await import('@/src/features/analytics/repository');
+    await saveFixedItemCharge(db, 'Internet', 3000);
+    await spend(db, OCT, 'Courses', 32000, '2026-10-06');
+    await spend(db, OCT, 'Essence', 15000, '2026-10-07');
+    await saveHealthExpense(db, { label: 'Médecin', date: '2026-10-08', amountCents: 5000, refundCents: 3000, settled: false });
+    const d = await getMoneyFlowDetail(db, OCT);
+    const flow = await getMoneyFlow(db, OCT);
+    for (const f of d.families) {
+      expect(f.items.reduce((s, i) => s + i.cents, 0)).toBe(f.cents);
+      expect(flow.slices.find((s) => s.key === f.key)?.cents).toBe(f.cents);
+    }
+    expect(d.families.map((f) => f.key)).toEqual(['fixes', 'variables', 'postes', 'sante', 'epargne', 'reste']);
+    expect(d.families[0].items.map((i) => i.label)).toEqual(['Loyer', 'Internet']);
+    expect(d.families[3].items).toEqual([expect.objectContaining({ label: 'Médecin', cents: 2000 })]);
+    expect(d.sources.reduce((s, x) => s + x.cents, 0) + d.over_cents).toBe(
+      d.families.reduce((s, f) => s + f.cents, 0),
+    );
+  });
+
+  it('au-delà des revenus : le dépassement comble l’écart, pas de reste', async () => {
+    const { getMoneyFlowDetail } = await import('@/src/features/analytics/repository');
+    await spend(db, OCT, 'Courses', 160000, '2026-10-06');
+    const d = await getMoneyFlowDetail(db, OCT);
+    expect(d.families.some((f) => f.key === 'reste')).toBe(false);
+    expect(d.over_cents).toBe(60000);
+    expect(d.income_cents + d.over_cents).toBe(d.families.reduce((s, f) => s + f.cents, 0));
+  });
+});
+
+async function saveFixedItemCharge(database: SQLiteDatabase, name: string, cents: number) {
+  const { saveFixedItem } = await import('@/src/features/fixed/repository');
+  await saveFixedItem(database, { kind: 'charge', name, amountCents: cents, day: 3, frequency: 'monthly', startMonth: '2026-01', icon: null });
+}
