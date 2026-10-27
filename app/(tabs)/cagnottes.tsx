@@ -19,7 +19,9 @@ import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   getSavingsProjection,
   goalAdvice,
+  hasMonthPlan,
   listPots,
+  plannedFor,
   POT_KIND_LABELS,
   setPlanDone,
   setPlanSkipped,
@@ -53,7 +55,7 @@ export default function PotsScreen() {
   const withTarget = all.filter((p) => p.target_cents);
   const reached = withTarget.filter((p) => p.balance_cents >= (p.target_cents ?? 0)).length;
   const monthName = monthKeyLabel(month).split(' ')[0];
-  const scheduled = all.filter((p) => (p.monthly_cents ?? 0) > 0);
+  const scheduled = all.filter(hasMonthPlan);
   const skipped = scheduled.filter((p) => p.plan_skipped === 1);
 
   return (
@@ -122,16 +124,28 @@ export default function PotsScreen() {
         })
       )}
 
-      {scheduled.length > 0 ? (
+      {all.length > 0 ? (
         <>
           <SectionHeader title={`Versements de ${monthName}`} />
           <Card style={{ paddingVertical: spacing.xs }}>
             {scheduled.map((pot, i) => (
-              <PlanRow key={pot.id} pot={pot} month={month} last={i === scheduled.length - 1} />
+              <PlanRow key={pot.id} pot={pot} month={month} last={false} />
             ))}
+            <Pressable
+              onPress={() => router.push({ pathname: '/versement', params: { month } })}
+              accessibilityRole="button"
+              accessibilityLabel={`Planifier un virement en ${monthName}`}
+              style={({ pressed }) => [styles.planAdd, { opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
+              <Body weight="semibold" color={theme.colors.primary}>
+                Planifier un virement
+              </Body>
+            </Pressable>
           </Card>
           <Caption style={{ textAlign: 'center' }}>
-            « Pas ce mois-ci » : rien à mettre de côté ce mois-là, le montant reste prévu pour les mois suivants.
+            Touche un versement pour changer son montant ce mois-ci, sa date ou le passer (« Pas ce mois-ci ») ; coche-le
+            une fois le virement fait.
           </Caption>
         </>
       ) : null}
@@ -286,7 +300,17 @@ function PlanRow({ pot, month, last }: { pot: PotWithBalance; month: string; las
   const db = useSQLiteContext();
   const done = pot.plan_done === 1;
   const skipped = pot.plan_skipped === 1;
-  const cents = pot.monthly_cents ?? 0;
+  const monthly = pot.monthly_cents ?? 0;
+  const cents = skipped ? monthly : plannedFor(pot);
+  const changed = !skipped && pot.plan_amount_cents !== null && monthly > 0 && pot.plan_amount_cents !== monthly;
+  const status = skipped
+    ? 'Pas ce mois-ci'
+    : done
+      ? `Pointé${pot.plan_date ? ` le ${numericDate(pot.plan_date).slice(0, 5)}` : ''}`
+      : pot.plan_date
+        ? `Prévu le ${numericDate(pot.plan_date).slice(0, 5)}`
+        : 'À verser';
+  const open = () => router.push({ pathname: '/versement', params: { potId: String(pot.id), month } });
 
   const toggleDone = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -306,46 +330,51 @@ function PlanRow({ pot, month, last }: { pot: PotWithBalance; month: string; las
           color={theme.tint(pot.color)}
         />
       </View>
-      <View style={{ flex: 1 }}>
-        <Body weight="medium" numberOfLines={1} color={skipped ? theme.colors.textMuted : undefined}>
-          {pot.name}
-        </Body>
-        <Caption>{skipped ? 'Pas ce mois-ci' : done ? 'Versé' : 'À verser'}</Caption>
-      </View>
-      <Money
-        cents={cents}
-        size={15}
-        weight="semibold"
-        tone={skipped ? 'muted' : 'text'}
-        style={skipped ? { textDecorationLine: 'line-through' } : undefined}
-      />
       <Pressable
-        hitSlop={6}
-        onPress={toggleSkip}
+        onPress={open}
         accessibilityRole="button"
-        accessibilityLabel={skipped ? `Reprendre le versement de ${pot.name} ce mois-ci` : `Pas de versement pour ${pot.name} ce mois-ci`}
-        style={({ pressed }) => [
-          styles.skipChip,
-          {
-            borderColor: skipped ? theme.colors.primary : theme.colors.border,
-            backgroundColor: skipped ? `${theme.colors.primary}18` : 'transparent',
-            opacity: pressed ? 0.6 : 1,
-          },
-        ]}
+        accessibilityLabel={`Modifier le virement de ${pot.name}`}
+        style={({ pressed }) => [styles.planMain, { opacity: pressed ? 0.6 : 1 }]}
       >
-        <Caption style={{ fontSize: 11.5 }} color={skipped ? theme.colors.primary : undefined}>
-          {skipped ? 'Reprendre' : 'Pas ce mois-ci'}
-        </Caption>
+        <View style={{ flex: 1 }}>
+          <Body weight="medium" numberOfLines={1} color={skipped ? theme.colors.textMuted : undefined}>
+            {pot.name}
+          </Body>
+          <Caption numberOfLines={1}>
+            {status}
+            {changed ? ` · au lieu de ${formatCents(monthly, { compact: true })}` : ''}
+          </Caption>
+        </View>
+        <Money
+          cents={cents}
+          size={15}
+          weight="semibold"
+          tone={skipped ? 'muted' : 'text'}
+          style={skipped ? { textDecorationLine: 'line-through' } : undefined}
+        />
       </Pressable>
       {skipped ? (
-        <View style={{ width: 26 }} />
+        <Pressable
+          hitSlop={6}
+          onPress={toggleSkip}
+          accessibilityRole="button"
+          accessibilityLabel={`Reprendre le versement de ${pot.name} ce mois-ci`}
+          style={({ pressed }) => [
+            styles.skipChip,
+            { borderColor: theme.colors.primary, backgroundColor: `${theme.colors.primary}18`, opacity: pressed ? 0.6 : 1 },
+          ]}
+        >
+          <Caption style={{ fontSize: 11.5 }} color={theme.colors.primary}>
+            Reprendre
+          </Caption>
+        </Pressable>
       ) : (
         <Pressable
           hitSlop={10}
           onPress={toggleDone}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: done }}
-          accessibilityLabel={`${pot.name} : ${done ? 'versé' : 'à verser'}`}
+          accessibilityLabel={`${pot.name} : ${done ? 'pointé' : 'à pointer'}`}
         >
           <Ionicons
             name={done ? 'checkmark-circle' : 'ellipse-outline'}
@@ -466,6 +495,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+  },
+  planMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  planAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
     paddingVertical: spacing.sm + 2,
   },
   planIcon: {

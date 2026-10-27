@@ -17,6 +17,8 @@ import {
   listMoves,
   listPots,
   goalAdvice,
+  hasMonthPlan,
+  plannedFor,
   setPlanDone,
   setPlanSkipped,
   setPotMonthly,
@@ -25,7 +27,7 @@ import {
 } from '@/src/features/savings/repository';
 import { spacing, useTheme } from '@/src/theme';
 import { useSelectedMonth } from '@/src/store/month';
-import { currentMonthKey, isoDayInMonth, monthKeyLabel, shortDayLabel, todayIso } from '@/src/utils/dates';
+import { currentMonthKey, isoDayInMonth, monthKeyLabel, numericDate, shortDayLabel, todayIso } from '@/src/utils/dates';
 import { confirmAction } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
@@ -50,6 +52,8 @@ export default function PotDetailModal() {
       onConfirm: () => void deleteMove(db, move),
     });
   };
+
+  const openPlan = () => router.push({ pathname: '/versement', params: { potId: String(pot.id), month } });
 
   const openMove = (type: 'deposit' | 'withdraw') =>
     router.push({ pathname: '/mouvement', params: { potId: String(pot.id), type } });
@@ -86,26 +90,31 @@ export default function PotDetailModal() {
         </View>
       ) : null}
 
-      {pot.monthly_cents ? (
+      {hasMonthPlan(pot) ? (
         <Card style={{ gap: spacing.sm }}>
           <View style={styles.hero}>
             <View style={{ flex: 1 }}>
-              <Eyebrow>Versement de {monthKeyLabel(month)}</Eyebrow>
+              <Eyebrow>Virement de {monthKeyLabel(month)}</Eyebrow>
               <Caption>
                 {pot.plan_skipped === 1
                   ? 'Pas ce mois-ci : rien à mettre de côté ce mois-là.'
                   : pot.plan_done === 1
-                    ? 'Versé ✓'
-                    : 'À verser'}
+                    ? `Pointé ✓${pot.plan_date ? ` · ${numericDate(pot.plan_date)}` : ''}`
+                    : pot.plan_date
+                      ? `Prévu le ${numericDate(pot.plan_date)} · à pointer`
+                      : 'À verser'}
+                {pot.plan_skipped !== 1 && pot.plan_amount_cents !== null && pot.monthly_cents && pot.plan_amount_cents !== pot.monthly_cents
+                  ? ` · au lieu de ${formatCents(pot.monthly_cents, { compact: true })}`
+                  : ''}
               </Caption>
             </View>
-            <Money cents={pot.plan_skipped === 1 ? 0 : pot.monthly_cents} size={20} weight="bold" />
+            <Money cents={plannedFor(pot)} size={20} weight="bold" />
           </View>
           <View style={styles.buttons}>
             {pot.plan_skipped === 1 ? null : (
               <View style={{ flex: 1 }}>
                 <Button
-                  label={pot.plan_done === 1 ? 'Annuler le versement' : 'Marquer versé'}
+                  label={pot.plan_done === 1 ? 'Dépointer' : 'Pointer : fait'}
                   variant={pot.plan_done === 1 ? 'secondary' : 'primary'}
                   onPress={() =>
                     void setPlanDone(
@@ -120,15 +129,23 @@ export default function PotDetailModal() {
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Button
-                label={pot.plan_skipped === 1 ? 'Reprendre ce mois-ci' : 'Pas ce mois-ci'}
-                variant="secondary"
-                onPress={() => void setPlanSkipped(db, pot.id, month, pot.plan_skipped !== 1)}
-              />
+              <Button label="Montant · date" variant="secondary" onPress={openPlan} />
             </View>
           </View>
+          {pot.monthly_cents ? (
+            <Pressable
+              onPress={() => void setPlanSkipped(db, pot.id, month, pot.plan_skipped !== 1)}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={{ alignSelf: 'center' }}
+            >
+              <Caption tone="primary">{pot.plan_skipped === 1 ? 'Reprendre ce mois-ci' : 'Pas ce mois-ci'}</Caption>
+            </Pressable>
+          ) : null}
         </Card>
-      ) : null}
+      ) : (
+        <Button label={`Planifier un virement en ${monthKeyLabel(month).split(' ')[0]}`} variant="secondary" onPress={openPlan} />
+      )}
 
       <View style={styles.buttons}>
         <View style={{ flex: 1 }}>

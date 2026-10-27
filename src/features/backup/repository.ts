@@ -18,6 +18,7 @@ export const BACKUP_TABLES = [
   'savings_pots',
   'savings_moves',
   'savings_skips',
+  'savings_plan_months',
   'month_closures',
   'week_closures',
   'health_expenses',
@@ -31,8 +32,9 @@ export const BACKUP_APP = 'Mes Budgets';
  * 3 : ajout de savings_skips (V15) et month_closures / adjust_cents (V16).
  * 4 : pointage des dépenses (expenses.cleared_at, V17).
  * 5 : habitudes (expense_habits, habit_logs, V19).
+ * 6 : virement du mois des cagnottes (savings_plan_months, V20).
  */
-export const BACKUP_FORMAT = 5;
+export const BACKUP_FORMAT = 6;
 
 export type Backup = {
   app: string;

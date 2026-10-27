@@ -102,6 +102,7 @@ export default function RootLayout() {
               <Stack.Screen name="poche" options={{ presentation: 'modal' }} />
               <Stack.Screen name="poche-detail" options={{ presentation: 'modal' }} />
               <Stack.Screen name="mouvement" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="versement" options={{ presentation: 'modal' }} />
               <Stack.Screen name="reglages" options={{ presentation: 'modal' }} />
             </Stack>
           </SQLiteProvider>

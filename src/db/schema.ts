@@ -336,7 +336,28 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
     });
     await db.execAsync('PRAGMA user_version = 19');
   }
+  if (current < 20) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(MIGRATION_V20);
+    });
+    await db.execAsync('PRAGMA user_version = 20');
+  }
 }
+
+/**
+ * V20 — virement du mois d'une cagnotte : montant propre à ce mois (plus ou
+ * moins que le versement mensuel, ou un virement ponctuel sans versement
+ * mensuel) et date prévue. Pointé = mouvement `plan_month`, comme avant.
+ */
+const MIGRATION_V20 = `
+CREATE TABLE IF NOT EXISTS savings_plan_months (
+  pot_id INTEGER NOT NULL REFERENCES savings_pots(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  amount_cents INTEGER,
+  date TEXT,
+  PRIMARY KEY (pot_id, month)
+);
+`;
 
 /**
  * V19 — habitudes : dépenses qui reviennent sans être des factures (cantine
