@@ -60,6 +60,21 @@ export default function AddSheet() {
   return (
     <Screen>
       <ModalHeader title="Ajouter" />
+      <Pressable
+        onPress={() => router.replace('/simuler')}
+        accessibilityRole="button"
+        accessibilityLabel="Puis-je me le permettre ?"
+        style={({ pressed }) => [styles.row, { backgroundColor: theme.colors.primarySoft, borderColor: 'transparent', opacity: pressed ? 0.7 : 1 }]}
+      >
+        <View style={[styles.icon, { backgroundColor: theme.colors.card }]}>
+          <Ionicons name="sparkles-outline" size={22} color={theme.colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Body weight="semibold">Puis-je me le permettre ?</Body>
+          <Caption>Teste une envie avant de l’acheter</Caption>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.primary} />
+      </Pressable>
       <View style={{ gap: spacing.sm }}>
         {CHOICES.map((choice) => (
           <Pressable
