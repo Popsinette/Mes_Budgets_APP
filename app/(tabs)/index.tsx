@@ -28,11 +28,11 @@ import {
 } from '@/src/features/envelopes/repository';
 import { getAnnualCharges, listFixedForMonth, setFixedChecked, type FixedItemForMonth } from '@/src/features/fixed/repository';
 import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
-import { AccountCard } from '@/src/components/AccountCard';
+import { FadeIn } from '@/src/components/ui/FadeIn';
+import { HomeHero } from '@/src/components/HomeHero';
+import { TodoCard } from '@/src/components/TodoCard';
 import { ExpenseList } from '@/src/components/ExpenseList';
-import { ClosurePrompt } from '@/src/components/ClosurePrompt';
 import { HabitsDue } from '@/src/components/HabitsDue';
-import { ForecastPill } from '@/src/components/ForecastPill';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
 import { currentMonthKey, currentWeekKey, numericDate, shiftMonthKey, weekProgressLabel } from '@/src/utils/dates';
@@ -59,21 +59,17 @@ export default function BudgetScreen() {
     <Screen bottomInset={90}>
       <AppHeader title="Mon budget" />
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
-      <ForecastPill month={month} />
-      {month >= shiftMonthKey(currentMonthKey(), -1) && month <= currentMonthKey() ? <ClosurePrompt /> : null}
-      {month === currentMonthKey() ? (
-        <AccountCard />
-      ) : month > currentMonthKey() ? (
-        <Caption style={{ textAlign: 'center' }}>
-          Mois à venir : le prévisionnel est ton plan (revenus − charges − enveloppes − épargne), sans tenir compte de
-          ton solde actuel.
-        </Caption>
-      ) : null}
+      <FadeIn key={month}>
+        <HomeHero month={month} />
+        {month >= shiftMonthKey(currentMonthKey(), -1) && month <= currentMonthKey() ? <TodoCard month={month} onShowTab={setTab} /> : null}
+      </FadeIn>
       <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />
-      {tab === 'variables' ? <VariablesTab month={month} /> : null}
-      {tab === 'fixes' ? <FixedTab month={month} kind="charge" /> : null}
-      {tab === 'revenus' ? <FixedTab month={month} kind="income" /> : null}
-      {tab === 'sante' ? <HealthTab month={month} /> : null}
+      <FadeIn key={`${tab}-${month}`}>
+        {tab === 'variables' ? <VariablesTab month={month} /> : null}
+        {tab === 'fixes' ? <FixedTab month={month} kind="charge" /> : null}
+        {tab === 'revenus' ? <FixedTab month={month} kind="income" /> : null}
+        {tab === 'sante' ? <HealthTab month={month} /> : null}
+      </FadeIn>
     </Screen>
   );
 }
@@ -93,10 +89,6 @@ function VariablesTab({ month }: { month: string }) {
   const { data: expenses } = useLiveQuery((db) => searchExpenses(db, { month, query: '' }), [month]);
   const weekly = (envelopes ?? []).filter((e) => e.period === 'week');
   const monthly = (envelopes ?? []).filter((e) => e.period === 'month');
-  const all = envelopes ?? [];
-  const budget = all.reduce((s, e) => s + e.budget_cents, 0);
-  const spent = all.reduce((s, e) => s + e.spent_cents, 0);
-  const left = budget - spent;
   const latest = (expenses ?? []).slice(0, 8);
 
   const confirmDelete = (expense: Expense) =>
@@ -111,22 +103,6 @@ function VariablesTab({ month }: { month: string }) {
   return (
     <>
       {month === currentMonthKey() ? <HabitsDue /> : null}
-      <Card style={{ gap: spacing.sm }}>
-        <View style={styles.overviewRow}>
-          <View style={{ flex: 1 }}>
-            <Caption>Mes variables du mois</Caption>
-            <Money cents={left} size={26} weight="bold" tone={left < 0 ? 'danger' : 'text'} />
-            <Caption>{left < 0 ? 'de dépassement' : 'encore disponibles'}</Caption>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Caption>Dépensé</Caption>
-            <Money cents={spent} size={15} weight="semibold" />
-            <Caption>sur {formatCents(budget)}</Caption>
-          </View>
-        </View>
-        <ProgressBar ratio={budget > 0 ? spent / budget : 0} height={8} />
-      </Card>
-
       <SectionHeader title="Chaque semaine" />
       <View style={styles.grid}>
         {weekly.map((envelope) => (
@@ -516,7 +492,6 @@ function SectionTitle({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; l
 
 const styles = StyleSheet.create({
   annual: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  overviewRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   addRow: { flexDirection: 'row', gap: spacing.sm },
   monthlyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
   monthlyHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

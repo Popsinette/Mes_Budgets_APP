@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { listDueHabits, recordHabit, skipHabit, type DueHabit } from '@/src/features/habits/repository';
@@ -15,6 +16,8 @@ export function HabitsDue() {
   const theme = useTheme();
   const db = useSQLiteContext();
   const { data } = useLiveQuery((db) => listDueHabits(db, todayIso()), []);
+  // Deux lignes par défaut : la liste ne doit pas repousser les enveloppes hors de l'écran.
+  const [all, setAll] = useState(false);
   if (!data || data.length === 0) return null;
 
   const record = async (h: DueHabit) => {
@@ -35,7 +38,7 @@ export function HabitsDue() {
           <Caption tone="primary">Gérer</Caption>
         </Pressable>
       </View>
-      {data.slice(0, 5).map((h) => (
+      {data.slice(0, all ? 12 : 2).map((h) => (
         <View key={`${h.id}-${h.due_date}`} style={[styles.row, { borderTopColor: theme.colors.hairline }]}>
           <View style={{ flex: 1 }}>
             <Body size={14} weight="medium" numberOfLines={1}>
@@ -68,7 +71,13 @@ export function HabitsDue() {
           </Pressable>
         </View>
       ))}
-      {data.length > 5 ? <Caption>… et {data.length - 5} autres.</Caption> : null}
+      {data.length > 2 ? (
+        <Pressable onPress={() => setAll(!all)} accessibilityRole="button" hitSlop={8} style={{ paddingTop: spacing.xs }}>
+          <Caption tone="primary" style={{ textAlign: 'center' }}>
+            {all ? 'Réduire' : `Voir les ${data.length - 2} autres`}
+          </Caption>
+        </Pressable>
+      ) : null}
     </Card>
   );
 }

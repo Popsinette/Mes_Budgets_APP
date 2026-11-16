@@ -6,19 +6,19 @@ import { useEffect } from 'react';
 import { getMeta, OPEN_ON_EXPENSE_KEY } from '@/src/features/backup/repository';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View, type ColorValue } from 'react-native';
-import { useTheme } from '@/src/theme';
+import { fonts, useTheme } from '@/src/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 function tabIcon(active: IconName, inactive: IconName) {
   return ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-    <Ionicons name={focused ? active : inactive} size={26} color={color as string} />
+    <Ionicons name={focused ? active : inactive} size={23} color={color as string} />
   );
 }
 
 /** Onglet Cagnottes : une tirelire (absente d'Ionicons, prise chez Material Community Icons). */
 function piggyIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
-  return <MaterialCommunityIcons name={focused ? 'piggy-bank' : 'piggy-bank-outline'} size={28} color={color as string} />;
+  return <MaterialCommunityIcons name={focused ? 'piggy-bank' : 'piggy-bank-outline'} size={25} color={color as string} />;
 }
 
 /** Bouton + central, en relief au-dessus de la barre (dégradé lavande → pivoine) : ouvre le choix d'ajout. */
@@ -66,7 +66,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: { fontFamily: fonts.bodyMedium, fontSize: 11, marginTop: 1 },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarStyle: {
@@ -74,8 +75,8 @@ export default function TabsLayout() {
           borderTopWidth: 0,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
-          height: 74,
-          paddingTop: 10,
+          height: 76,
+          paddingTop: 8,
           shadowColor: theme.dark ? '#000' : '#5B4FC4',
           shadowOpacity: theme.dark ? 0.3 : 0.08,
           shadowRadius: 16,
@@ -101,7 +102,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="synthese"
-        options={{ title: 'Synthèse', tabBarAccessibilityLabel: 'Synthèse', tabBarIcon: tabIcon('pie-chart', 'pie-chart-outline') }}
+        options={{ title: 'Plan', tabBarAccessibilityLabel: 'Plan du mois et synthèse', tabBarIcon: tabIcon('map', 'map-outline') }}
       />
     </Tabs>
   );
