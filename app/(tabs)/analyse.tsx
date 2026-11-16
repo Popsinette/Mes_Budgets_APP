@@ -9,6 +9,7 @@ import { FlowChart } from '@/src/components/charts/FlowChart';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
 import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { ProgressBar } from '@/src/components/ui/ProgressBar';
+import { FadeIn } from '@/src/components/ui/FadeIn';
 import { Segmented } from '@/src/components/ui/Segmented';
 import { LineChart, type LinePoint } from '@/src/components/charts/LineChart';
 import { InsightsCard } from '@/src/components/InsightsCard';
@@ -66,9 +67,11 @@ export default function AnalysisScreen() {
       <AppHeader title="Où va mon argent" />
       <MonthSwitcher month={month} onChange={setMonth} />
       <Segmented segments={SECTIONS} value={section} onChange={setSection} />
-      {section === 'mois' ? <MonthSection month={month} /> : null}
-      {section === 'tendances' ? <TrendSection month={month} /> : null}
-      {section === 'epargne' ? <SavingsSection month={month} /> : null}
+      <FadeIn key={`${section}-${month}`}>
+        {section === 'mois' ? <MonthSection month={month} /> : null}
+        {section === 'tendances' ? <TrendSection month={month} /> : null}
+        {section === 'epargne' ? <SavingsSection month={month} /> : null}
+      </FadeIn>
     </Screen>
   );
 }
@@ -118,6 +121,7 @@ function MonthSection({ month }: { month: MonthKey }) {
 
   return (
     <>
+      <BalanceCard income={income} expense={summary.expense_cents} balance={summary.balance_cents} />
       <InsightsCard month={month} />
 
       <View style={styles.tiles}>
@@ -139,9 +143,9 @@ function MonthSection({ month }: { month: MonthKey }) {
         ) : (
           <StatTile
             icon="wallet-outline"
-            label="Économies du mois"
-            value={formatCents(summary.balance_cents, { signed: true })}
-            hint="revenus − dépenses"
+            label="Mis en cagnotte"
+            value={formatCents(summary.savings_done_cents)}
+            hint="versé pendant le mois"
             color={theme.colors.secondary}
           />
         )}
@@ -502,6 +506,38 @@ function SavingsSection({ month }: { month: MonthKey }) {
         </Pressable>
       </Card>
     </>
+  );
+}
+
+/** Bilan du mois : revenus, dépenses et ce qui reste (les « économies du mois »), avec le taux d'épargne. */
+function BalanceCard({ income, expense, balance }: { income: number; expense: number; balance: number }) {
+  const theme = useTheme();
+  const rate = pct(balance, income);
+  return (
+    <Card style={{ gap: spacing.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Caption>{balance < 0 ? 'Dépensé en trop ce mois-ci' : 'Économies du mois'}</Caption>
+          <Money cents={balance} signed size={30} weight="xbold" tone={balance < 0 ? 'danger' : 'text'} />
+        </View>
+        {income > 0 && balance > 0 ? (
+          <View style={{ backgroundColor: theme.colors.successSoft, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 }}>
+            <Caption color={theme.colors.success}>{rate} % de tes revenus</Caption>
+          </View>
+        ) : null}
+      </View>
+      <ProgressBar ratio={income > 0 ? expense / income : 0} height={8} />
+      <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Caption>Revenus</Caption>
+          <Money cents={income} size={15} weight="semibold" />
+        </View>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <Caption>Dépenses</Caption>
+          <Money cents={expense} size={15} weight="semibold" />
+        </View>
+      </View>
+    </Card>
   );
 }
 

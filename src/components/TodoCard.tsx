@@ -8,7 +8,7 @@ import { Body, Caption, Eyebrow } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getTodos, settleLate, type Todo } from '@/src/features/handover/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { monthKeyLabel } from '@/src/utils/dates';
+import { currentMonthKey, monthKeyLabel, type MonthKey } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 type Row = {
@@ -28,11 +28,13 @@ const monthName = (m: string) => monthKeyLabel(m).split(' ')[0];
  * moins important — passer au mois suivant, cocher une facture passée,
  * confirmer un revenu, pointer ses dépenses. Rien à faire → rien d'affiché.
  */
-export function TodoCard({ onShowTab }: { onShowTab: (tab: 'fixes' | 'revenus') => void }) {
+export function TodoCard({ month, onShowTab }: { month: MonthKey; onShowTab: (tab: 'fixes' | 'revenus') => void }) {
   const theme = useTheme();
   const db = useSQLiteContext();
   const { data } = useLiveQuery((db) => getTodos(db), []);
-  if (!data || data.length === 0) return null;
+  // Sur le mois précédent, seul le passage de mois le concerne : le reste parle du mois en cours.
+  const todos = (data ?? []).filter((t) => month === currentMonthKey() || t.key === 'handover');
+  if (todos.length === 0) return null;
 
   const tap = (run: () => Promise<void>) => () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -40,7 +42,7 @@ export function TodoCard({ onShowTab }: { onShowTab: (tab: 'fixes' | 'revenus') 
   };
   const names = (t: Todo) => `${t.names.join(', ')}${t.count > t.names.length ? '…' : ''} · ${formatCents(t.cents)}`;
 
-  const rows: Row[] = data.map((t): Row => {
+  const rows: Row[] = todos.map((t): Row => {
     switch (t.key) {
       case 'handover': {
         const p = t.prompt!;

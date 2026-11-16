@@ -61,7 +61,7 @@ export default function BudgetScreen() {
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
       <FadeIn key={month}>
         <HomeHero month={month} />
-        {month >= shiftMonthKey(currentMonthKey(), -1) && month <= currentMonthKey() ? <TodoCard onShowTab={setTab} /> : null}
+        {month >= shiftMonthKey(currentMonthKey(), -1) && month <= currentMonthKey() ? <TodoCard month={month} onShowTab={setTab} /> : null}
       </FadeIn>
       <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />
       <FadeIn key={`${tab}-${month}`}>

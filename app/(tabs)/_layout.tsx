@@ -102,7 +102,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="synthese"
-        options={{ title: 'Plan', tabBarAccessibilityLabel: 'Plan du mois et synthèse', tabBarIcon: tabIcon('pie-chart', 'pie-chart-outline') }}
+        options={{ title: 'Plan', tabBarAccessibilityLabel: 'Plan du mois et synthèse', tabBarIcon: tabIcon('map', 'map-outline') }}
       />
     </Tabs>
   );

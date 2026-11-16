@@ -103,8 +103,8 @@ type MoneyProps = Omit<BaseProps, 'children'> & {
 };
 
 /**
- * Montant — Schibsted Grotesk en chiffres tabulaires. La signature de l'app :
- * les nombres s'alignent proprement d'une ligne à l'autre.
+ * Montant — Schibsted Grotesk, la signature de l'app. Espacement naturel des
+ * chiffres (les chiffres tabulaires écartaient la virgule et les milliers).
  */
 export function Money({
   cents,
@@ -130,9 +130,7 @@ export function Money({
       {...rest}
       style={[
         styles.money,
-        // Grands chiffres d'affiche : espacement naturel (les chiffres tabulaires
-        // écartent trop la virgule) ; l'alignement ne sert qu'aux listes.
-        size >= 20 ? styles.moneyDisplay : styles.moneyTabular,
+        size >= 20 && styles.moneyDisplay,
         { fontFamily: family, fontSize: size, color: color ?? toneColor(theme, tone) },
         style,
       ]}
@@ -170,9 +168,6 @@ const styles = StyleSheet.create({
   },
   money: {
     letterSpacing: -0.3,
-  },
-  moneyTabular: {
-    fontVariant: ['tabular-nums'],
   },
   moneyDisplay: {
     letterSpacing: -0.8,
