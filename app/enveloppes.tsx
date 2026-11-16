@@ -91,7 +91,7 @@ export default function EnvelopesModal() {
       {data?.ready ? <Button label={`Repartir de ma base pour ${short}`} variant="secondary" onPress={resetFromBase} /> : null}
       {data?.ready && month <= currentMonthKey() ? (
         <Button
-          label={`Clôturer ${short}`}
+          label={month < currentMonthKey() ? `Clôturer ${short} et passer au mois suivant` : 'Préparer le mois suivant'}
           variant="secondary"
           onPress={() => router.push({ pathname: '/cloture', params: { month } })}
         />

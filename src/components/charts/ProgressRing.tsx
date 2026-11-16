@@ -21,7 +21,7 @@ export function ProgressRing({ ratio, color, size = 52, strokeWidth = 4.5, child
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size}>
-        <G rotation={-90} originX={size / 2} originY={size / 2}>
+        <G transform={`rotate(-90 ${size / 2} ${size / 2})`}>
           <Circle
             cx={size / 2}
             cy={size / 2}

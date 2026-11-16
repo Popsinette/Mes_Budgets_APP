@@ -130,6 +130,9 @@ export function Money({
       {...rest}
       style={[
         styles.money,
+        // Grands chiffres d'affiche : espacement naturel (les chiffres tabulaires
+        // écartent trop la virgule) ; l'alignement ne sert qu'aux listes.
+        size >= 20 ? styles.moneyDisplay : styles.moneyTabular,
         { fontFamily: family, fontSize: size, color: color ?? toneColor(theme, tone) },
         style,
       ]}
@@ -167,6 +170,11 @@ const styles = StyleSheet.create({
   },
   money: {
     letterSpacing: -0.3,
+  },
+  moneyTabular: {
     fontVariant: ['tabular-nums'],
+  },
+  moneyDisplay: {
+    letterSpacing: -0.8,
   },
 });
