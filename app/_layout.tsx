@@ -88,6 +88,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="ajouter" options={{ presentation: 'modal' }} />
               <Stack.Screen name="cloture" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="simuler" options={{ presentation: 'modal' }} />
               <Stack.Screen name="compte" options={{ presentation: 'modal' }} />
               <Stack.Screen name="depense" options={{ presentation: 'modal' }} />
               <Stack.Screen name="depenses" options={{ presentation: 'modal' }} />

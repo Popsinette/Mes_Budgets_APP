@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { AllocateCard } from '@/src/components/AllocateCard';
 import { OutlookCard } from '@/src/components/OutlookCard';
 import { PlanCard } from '@/src/components/PlanCard';
 import { AppHeader } from '@/src/components/ui/AppHeader';
@@ -35,6 +36,7 @@ export default function PlanScreen() {
       <MonthSwitcher month={month} onChange={setMonth} />
       <FadeIn key={month}>
         {summary ? <PlanCard summary={summary} month={month} /> : <Skeleton height={280} radius={radius.lg} />}
+        <AllocateCard month={month} />
         <View style={styles.actions}>
           <Action icon="options-outline" label="Enveloppes" hint="Ajuster" onPress={() => router.push('/enveloppes')} />
           <Action
@@ -43,7 +45,7 @@ export default function PlanScreen() {
             hint={`Préparer ${nextName}`}
             onPress={() => router.push({ pathname: '/cloture', params: { month: handoverMonth } })}
           />
-          <Action icon="calendar-outline" label="Mon année" hint="Échéances" onPress={() => router.push('/annee')} />
+          <Action icon="help-circle-outline" label="Une envie ?" hint="Puis-je ?" onPress={() => router.push('/simuler')} />
         </View>
         <OutlookCard />
       </FadeIn>

@@ -30,6 +30,7 @@ import { getAnnualCharges, listFixedForMonth, setFixedChecked, type FixedItemFor
 import { listHealthForMonth, setHealthSettled, type HealthExpense } from '@/src/features/health/repository';
 import { FadeIn } from '@/src/components/ui/FadeIn';
 import { HomeHero } from '@/src/components/HomeHero';
+import { StreakStrip } from '@/src/components/StreakStrip';
 import { TodoCard } from '@/src/components/TodoCard';
 import { ExpenseList } from '@/src/components/ExpenseList';
 import { HabitsDue } from '@/src/components/HabitsDue';
@@ -61,6 +62,7 @@ export default function BudgetScreen() {
       <MonthSwitcher month={month} onChange={setMonth} subtitle={weekProgressLabel(month)} />
       <FadeIn key={month}>
         <HomeHero month={month} />
+        {month === currentMonthKey() ? <StreakStrip /> : null}
         {month >= shiftMonthKey(currentMonthKey(), -1) && month <= currentMonthKey() ? <TodoCard month={month} onShowTab={setTab} /> : null}
       </FadeIn>
       <Segmented segments={SEGMENTS} value={tab} onChange={setTab} />

@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { AllocateCard } from '@/src/components/AllocateCard';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -558,6 +559,8 @@ function PrepareStep({
           </Body>
         </View>
       </Card>
+
+      <AllocateCard month={handover.next} />
 
       {handover.amounts_differ ? (
         <Card style={{ gap: spacing.sm }}>
