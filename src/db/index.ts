@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getOrCreateDatabaseKey } from './key';
+import { loadBudgetCalendar } from '@/src/features/handover/repository';
+import { useSelectedMonth } from '@/src/store/month';
+import { currentMonthKey } from '@/src/utils/dates';
 import { migrateDatabase } from './schema';
 
 export const DATABASE_NAME = 'mesbudgets.db';
@@ -22,4 +25,7 @@ export async function onDatabaseInit(db: SQLiteDatabase): Promise<void> {
   }
   await db.execAsync('PRAGMA foreign_keys = ON;');
   await migrateDatabase(db);
+  // Un mois commencé avant le 1er (« Passer à décembre ») devient le mois affiché.
+  await loadBudgetCalendar(db);
+  useSelectedMonth.setState({ month: currentMonthKey() });
 }

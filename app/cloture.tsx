@@ -16,14 +16,14 @@ import { Body, Caption, Eyebrow, Money } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { closeEnvelope, undoClosure, type ClosureAction, type ClosureLine } from '@/src/features/closure/repository';
 import {
-  ensureMonth,
   resetMonthFromBase,
   resolveEnvelopeId,
   type EnvelopeForMonth,
 } from '@/src/features/envelopes/repository';
 import {
+  cancelEarlyStart,
   closeAllEnvelopes,
-  finishHandover,
+  switchToNextMonth,
   getMonthHandover,
   settleLooseEnd,
   startMonthLike,
@@ -34,8 +34,8 @@ import {
 import { listPots, type PotWithBalance } from '@/src/features/savings/repository';
 import { useSelectedMonth } from '@/src/store/month';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, daysInMonthOf, isoDayInMonth, monthKeyLabel, todayIso } from '@/src/utils/dates';
-import { notify } from '@/src/utils/dialogs';
+import { daysInMonthOf, earlyStartOf, isoDayInMonth, monthKeyLabel, numericDate, shiftMonthKey, todayIso } from '@/src/utils/dates';
+import { confirmAction, notify } from '@/src/utils/dialogs';
 import { formatCents } from '@/src/utils/money';
 
 type Step = 0 | 1 | 2;
@@ -48,8 +48,10 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * début du suivant. 1) terminer le mois (tout cocher), 2) ranger les restes
  * en une décision, 3) préparer le plan du mois qui commence.
  *
- * Ouvert avant la fin du mois (`month` = mois en cours), il ne montre que la
- * préparation du mois suivant.
+ * Ouvert avant la fin du mois (`month` = mois en cours), le même parcours
+ * fait basculer dès aujourd'hui sur le mois suivant (le jour de la paie) :
+ * il devient le mois en cours et reçoit les nouvelles dépenses. Le compte
+ * peut repartir de 0 € à ce moment-là.
  */
 export default function HandoverModal() {
   const db = useSQLiteContext();
@@ -57,8 +59,10 @@ export default function HandoverModal() {
   const globalMonth = useSelectedMonth((s) => s.month);
   const setMonth = useSelectedMonth((s) => s.setMonth);
   const month = params.month ?? globalMonth;
-  const early = month >= currentMonthKey();
-  const [step, setStep] = useState<Step>(early ? 2 : params.step === 'prepare' ? 2 : 0);
+  // Le mois n'est pas fini : on bascule avant le 1er.
+  const early = todayIso() < `${shiftMonthKey(month, 1)}-01`;
+  const [step, setStep] = useState<Step>(params.step === 'prepare' ? 2 : 0);
+  const [resetAccount, setResetAccount] = useState(false);
   const { data } = useLiveQuery(
     async (db) => ({ handover: await getMonthHandover(db, month), pots: await listPots(db, month) }),
     [month],
@@ -70,23 +74,25 @@ export default function HandoverModal() {
   const nextName = monthKeyLabel(handover.next).split(' ')[0];
 
   const finish = async () => {
-    if (early) await ensureMonth(db, handover.next);
-    else await finishHandover(db, month);
-    if (!early) setMonth(handover.next);
-    router.back();
+    try {
+      const next = await switchToNextMonth(db, month, { today: todayIso(), resetAccount });
+      setMonth(next);
+      router.back();
+    } catch (error) {
+      notify('Bascule impossible', error instanceof Error ? error.message : String(error));
+    }
   };
 
   return (
     <Screen>
-      <ModalHeader title={early ? `Préparer ${nextName}` : `Passer à ${nextName}`} />
-      {early ? (
+      <ModalHeader title={`Passer à ${nextName}`} />
+      {early && !handover.closure.done ? (
         <Caption>
-          {cap(name)} n’est pas fini : tu peux déjà regarder le plan de {nextName} et ajuster tes enveloppes. Les restes
-          de {name} se rangeront une fois le mois terminé.
+          {cap(name)} n’est pas fini, mais tu peux passer à {nextName} dès aujourd’hui (le jour de ta paie, par
+          exemple) : les dépenses notées à partir d’aujourd’hui iront dans {nextName}.
         </Caption>
-      ) : (
-        <Stepper step={step} onChange={setStep} labels={[cap(name), 'Restes', cap(nextName)]} />
-      )}
+      ) : null}
+      <Stepper step={step} onChange={setStep} labels={[cap(name), 'Restes', cap(nextName)]} />
 
       <FadeIn key={step}>
         {step === 0 ? (
@@ -94,7 +100,15 @@ export default function HandoverModal() {
         ) : step === 1 ? (
           <RestsStep handover={handover} pots={pots} name={name} nextName={nextName} onNext={() => setStep(2)} />
         ) : (
-          <PrepareStep handover={handover} name={name} nextName={nextName} early={early} onFinish={() => void finish()} />
+          <PrepareStep
+            handover={handover}
+            name={name}
+            nextName={nextName}
+            early={early}
+            resetAccount={resetAccount}
+            onResetAccount={setResetAccount}
+            onFinish={() => void finish()}
+          />
         )}
       </FadeIn>
     </Screen>
@@ -510,12 +524,16 @@ function PrepareStep({
   name,
   nextName,
   early,
+  resetAccount,
+  onResetAccount,
   onFinish,
 }: {
   handover: MonthHandover;
   name: string;
   nextName: string;
   early: boolean;
+  resetAccount: boolean;
+  onResetAccount: (value: boolean) => void;
   onFinish: () => void;
 }) {
   const theme = useTheme();
@@ -625,11 +643,93 @@ function PrepareStep({
         />
       </View>
 
-      <Button label={early ? `${cap(nextName)} est prêt` : `C’est parti pour ${nextName}`} onPress={onFinish} />
-      {!early && handover.closure.done ? (
-        <Caption style={{ textAlign: 'center' }}>Le passage de {name} est déjà terminé.</Caption>
-      ) : null}
+      {handover.closure.done ? (
+        <DoneCard handover={handover} name={name} nextName={nextName} />
+      ) : (
+        <>
+          <ResetCard value={resetAccount} onChange={onResetAccount} name={name} nextName={nextName} />
+          <Button label={early ? `Passer à ${nextName} dès aujourd’hui` : `C’est parti pour ${nextName}`} onPress={onFinish} />
+        </>
+      )}
     </>
+  );
+}
+
+/** « Mon compte repart de 0 € » : on ne garde aucune miette du mois qui se termine. */
+function ResetCard({
+  value,
+  onChange,
+  name,
+  nextName,
+}: {
+  value: boolean;
+  onChange: (value: boolean) => void;
+  name: string;
+  nextName: string;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={() => onChange(!value)}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel="Mon compte repart de 0 €"
+      style={[
+        styles.choice,
+        {
+          backgroundColor: value ? theme.colors.primarySoft : theme.colors.card,
+          borderColor: value ? theme.colors.primary : theme.dark ? theme.colors.border : 'transparent',
+        },
+      ]}
+    >
+      <View style={styles.row}>
+        <IconDot icon="refresh-outline" color={theme.colors.primary} soft={value ? theme.colors.card : theme.colors.primarySoft} />
+        <View style={{ flex: 1 }}>
+          <Body weight="semibold">Mon compte repart de 0 €</Body>
+          <Caption>
+            Pas de miettes de {name} : ton solde est remis à 0 € maintenant. Tu pointes ensuite ta paie et tes dépenses de{' '}
+            {nextName} au fil de l’eau.
+          </Caption>
+        </View>
+        <Ionicons
+          name={value ? 'checkbox' : 'square-outline'}
+          size={22}
+          color={value ? theme.colors.primary : theme.colors.textMuted}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
+/** Passage déjà fait : rappel, et annulation d'une bascule faite avant le 1er. */
+function DoneCard({ handover, name, nextName }: { handover: MonthHandover; name: string; nextName: string }) {
+  const db = useSQLiteContext();
+  const setMonth = useSelectedMonth((s) => s.setMonth);
+  const start = earlyStartOf(handover.next);
+  const cancel = () =>
+    confirmAction({
+      title: `Revenir en ${name} ?`,
+      message: `${cap(name)} redevient le mois en cours. Les dépenses déjà notées dans ${nextName} y restent.`,
+      confirmLabel: `Revenir en ${name}`,
+      onConfirm: () => {
+        void cancelEarlyStart(db, handover.next).then(() => {
+          setMonth(handover.month);
+          router.back();
+        });
+      },
+    });
+  return (
+    <Card style={{ gap: spacing.sm }}>
+      <Body weight="semibold">
+        {start ? `${cap(nextName)} a commencé le ${numericDate(start).slice(0, 5)}` : `Le passage de ${name} est terminé`}
+      </Body>
+      {start ? (
+        <>
+          <Caption>Les dépenses notées depuis vont dans {nextName}.</Caption>
+          <SmallButton label={`Annuler et revenir en ${name}`} onPress={cancel} />
+        </>
+      ) : null}
+    </Card>
   );
 }
 

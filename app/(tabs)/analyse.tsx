@@ -36,7 +36,7 @@ import { radius, spacing, useTheme } from '@/src/theme';
 import {
   currentMonthKey,
   currentWeekKey,
-  daysInMonthOf,
+  monthDayProgress,
   monthOfWeek,
   numericDate,
   shiftMonthKey,
@@ -81,7 +81,8 @@ function elapsedRatio(month: MonthKey): number {
   const current = currentMonthKey();
   if (month < current) return 1;
   if (month > current) return 0;
-  return new Date().getDate() / daysInMonthOf(month);
+  const { day, days } = monthDayProgress(month);
+  return Math.max(1, day) / days;
 }
 
 /* ─────────────── Ce mois ─────────────── */
@@ -107,7 +108,7 @@ function MonthSection({ month }: { month: MonthKey }) {
   const { summary, flow, envelopes, weeks, top, detail, previous } = data;
   const prevName = shortMonthLabel(shiftMonthKey(month, -1));
   const elapsed = elapsedRatio(month);
-  const days = daysInMonthOf(month);
+  const days = monthDayProgress(month).days;
   const daysPassed = Math.max(1, Math.round(elapsed * days));
   const daysLeft = Math.max(1, days - daysPassed + 1);
   const variableSpent = summary.variables_spent_cents + summary.postes_spent_cents;

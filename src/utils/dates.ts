@@ -8,8 +8,13 @@ export function monthKeyFromDate(date: Date): MonthKey {
   return format(date, 'yyyy-MM');
 }
 
+/**
+ * Mois budgétaire en cours : le mois civil, sauf si le mois suivant a déjà
+ * commencé (« Passer à décembre » le jour de la paie, voir `setEarlyStarts`).
+ */
 export function currentMonthKey(): MonthKey {
-  return monthKeyFromDate(new Date());
+  const now = new Date();
+  return budgetMonthOfDay(toIsoDay(now), monthKeyFromDate(now));
 }
 
 export function shiftMonthKey(month: MonthKey, offset: number): MonthKey {
@@ -152,4 +157,54 @@ export function monthGrid(month: MonthKey): Array<string | null> {
 /** Nombre de jours du mois. */
 export function daysInMonthOf(month: MonthKey): number {
   return getDaysInMonth(parse(month, 'yyyy-MM', new Date()));
+}
+
+/* ─── Mois qui commence avant le 1er ───
+ * On peut passer au mois suivant avant la fin du mois civil (le jour de la
+ * paie, par exemple). Le mois `M` commence alors à une date `S` du mois
+ * précédent : à partir de `S`, l'app considère que l'on est en `M` (mois en
+ * cours, compte, enveloppes des nouvelles dépenses). Les débuts anticipés
+ * sont gardés dans `app_meta` (`month_start:<mois>`) et chargés au démarrage
+ * (`loadBudgetCalendar`). */
+
+let earlyStarts: Record<MonthKey, string> = {};
+
+/** Remplace la liste des débuts anticipés : mois → date ISO du premier jour. */
+export function setEarlyStarts(starts: Record<MonthKey, string>): void {
+  earlyStarts = { ...starts };
+}
+
+/** Date à laquelle `month` a commencé avant le 1er, ou null. */
+export function earlyStartOf(month: MonthKey): string | null {
+  return earlyStarts[month] ?? null;
+}
+
+/** Mois budgétaire d'un jour, `base` étant son mois habituel (mois civil, ou mois de la semaine). */
+export function budgetMonthOfDay(isoDay: string, base: MonthKey): MonthKey {
+  for (const [month, start] of Object.entries(earlyStarts)) {
+    if (base < month && isoDay >= start && isoDay < `${month}-01`) return month;
+  }
+  return base;
+}
+
+/** Mois dont les enveloppes reçoivent une dépense datée `isoDay` (semaine : mois de son jeudi ; montant fixe : mois civil). */
+export function envelopeMonthOfDay(period: 'week' | 'month', isoDay: string): MonthKey {
+  return budgetMonthOfDay(isoDay, period === 'week' ? monthOfWeek(weekKeyOf(isoDay)) : isoDay.slice(0, 7));
+}
+
+/** Premier et dernier jour (ISO) du mois budgétaire : début anticipé éventuel, veille du début anticipé du suivant. */
+export function budgetMonthBounds(month: MonthKey): { first: string; last: string } {
+  const next = earlyStartOf(shiftMonthKey(month, 1));
+  return {
+    first: earlyStartOf(month) ?? `${month}-01`,
+    last: next ? toIsoDay(addDays(parseIso(next), -1)) : isoDayInMonth(month, 31),
+  };
+}
+
+/** Jour du mois budgétaire (1 = premier jour, borné) et nombre de jours qu'il compte. */
+export function monthDayProgress(month: MonthKey, now: Date = new Date()): { day: number; days: number } {
+  const { first, last } = budgetMonthBounds(month);
+  const days = differenceInCalendarDays(parseIso(last), parseIso(first)) + 1;
+  const day = differenceInCalendarDays(now, parseIso(first)) + 1;
+  return { day: Math.max(0, Math.min(days, day)), days };
 }

@@ -7,7 +7,7 @@ import {
   type EnvelopePeriod,
 } from '@/src/features/envelopes/repository';
 import { invalidateQueries } from '@/src/store/invalidation';
-import { monthKeyLabel, monthOfWeek, toIsoDay, weekKeyOf, type MonthKey } from '@/src/utils/dates';
+import { envelopeMonthOfDay, monthKeyLabel, toIsoDay, type MonthKey } from '@/src/utils/dates';
 
 /**
  * Habitudes : dépenses qui reviennent sans être des factures (cantine chaque
@@ -140,7 +140,7 @@ export async function listDueHabits(db: SQLiteDatabase, today: string, lookbackD
 
 /** Mois dont l'enveloppe reçoit la dépense : mois du jeudi (semaine) ou mois civil (montant fixe). */
 function envelopeMonth(period: EnvelopePeriod, date: string): MonthKey {
-  return period === 'week' ? monthOfWeek(weekKeyOf(date)) : date.slice(0, 7);
+  return envelopeMonthOfDay(period, date);
 }
 
 /** Note l'échéance : une vraie dépense dans l'enveloppe du même nom du mois concerné. */

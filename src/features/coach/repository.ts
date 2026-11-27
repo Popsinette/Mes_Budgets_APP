@@ -12,7 +12,10 @@ import {
 import { getMonthSummary, getPlanOutlook } from '@/src/features/summary/repository';
 import { categoryPalette } from '@/src/theme/palette';
 import {
+  budgetMonthBounds,
+  budgetMonthOfDay,
   daysInMonthOf,
+  monthDayProgress,
   isoDayInMonth,
   monthKeyFromDate,
   monthOfWeek,
@@ -59,7 +62,7 @@ export type PurchaseCheck = {
 };
 
 export async function checkPurchase(db: SQLiteDatabase, amountCents: number, now: Date = new Date()): Promise<PurchaseCheck> {
-  const month = monthKeyFromDate(now);
+  const month = budgetMonthOfDay(toIsoDay(now), monthKeyFromDate(now));
   const week = weekKeyOf(toIsoDay(now));
   const [summary, envelopes, pots, outlook] = await Promise.all([
     getMonthSummary(db, month),
@@ -242,7 +245,8 @@ const MAX_MONTHS = 12;
 export async function getStreaks(db: SQLiteDatabase, now: Date = new Date()): Promise<Streaks> {
   const today = toIsoDay(now);
   const currentWeek = weekKeyOf(today);
-  const month = monthKeyFromDate(now);
+  const month = budgetMonthOfDay(today, monthKeyFromDate(now));
+  const { first } = budgetMonthBounds(month);
 
   // Dépensé / budget de chaque semaine, mois par mois (un mois pas ouvert n'a pas de semaine jugée).
   const cache = new Map<MonthKey, Map<WeekKey, { spent: number; budget: number }> | null>();
@@ -284,7 +288,7 @@ export async function getStreaks(db: SQLiteDatabase, now: Date = new Date()): Pr
 
   const spentDays = await db.getFirstAsync<{ n: number }>(
     'SELECT COUNT(DISTINCT date) AS n FROM expenses WHERE date >= ? AND date <= ?',
-    [`${month}-01`, today],
+    [first, today],
   );
 
   return {
@@ -292,6 +296,6 @@ export async function getStreaks(db: SQLiteDatabase, now: Date = new Date()): Pr
     best_weeks: best,
     week_on_track: thisWeek && thisWeek.budget > 0 ? thisWeek.spent <= thisWeek.budget : null,
     months_held: monthsHeld,
-    no_spend_days: Math.max(0, now.getDate() - (spentDays?.n ?? 0)),
+    no_spend_days: Math.max(0, monthDayProgress(month, now).day - (spentDays?.n ?? 0)),
   };
 }
