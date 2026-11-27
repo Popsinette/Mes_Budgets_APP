@@ -4,6 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { AllocateCard } from '@/src/components/AllocateCard';
+import { RealityCard } from '@/src/components/RealityCard';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { CategoryIcon } from '@/src/components/ui/CategoryIcon';
@@ -578,6 +579,7 @@ function PrepareStep({
         </View>
       </Card>
 
+      <RealityCard month={handover.next} />
       <AllocateCard month={handover.next} />
 
       {handover.amounts_differ ? (

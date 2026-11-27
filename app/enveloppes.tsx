@@ -10,6 +10,7 @@ import { MonthSwitcher } from '@/src/components/ui/MonthSwitcher';
 import { Screen } from '@/src/components/ui/Screen';
 import { SectionHeader } from '@/src/components/ui/SectionHeader';
 import { Body, Caption, Money } from '@/src/components/ui/Text';
+import { RealityCard } from '@/src/components/RealityCard';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import {
   isMonthReady,
@@ -68,6 +69,8 @@ export default function EnvelopesModal() {
           ? `${short.charAt(0).toUpperCase() + short.slice(1)} n’a pas encore commencé : il reprend ta base ci-dessous. Dès que tu y modifies une enveloppe ou notes une dépense, il a ses propres enveloppes.`
           : `Les enveloppes de ${monthName}, propres à ce mois : les modifier ne change aucun autre mois.`}
       </Caption>
+
+      <RealityCard month={month} />
 
       <SectionHeader title={`Variables · ${formatCents(weeklyTotal)} par semaine`} />
       <Caption>

@@ -8,7 +8,7 @@ import { Body, Caption, Eyebrow } from '@/src/components/ui/Text';
 import { useLiveQuery } from '@/src/db/useLiveQuery';
 import { getTodos, settleLate, type Todo } from '@/src/features/handover/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, monthKeyLabel, type MonthKey } from '@/src/utils/dates';
+import { currentMonthKey, monthKeyLabel, shortDayLabel, type MonthKey } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 type Row = {
@@ -84,6 +84,13 @@ export function TodoCard({ month, onShowTab }: { month: MonthKey; onShowTab: (ta
           subtitle: names(t),
           onPress: () => onShowTab('revenus'),
           action: { label: t.count === 1 ? 'Reçu' : 'Reçus', run: tap(() => settleLate(db, 'income')) },
+        };
+      case 'low-balance':
+        return {
+          icon: 'warning-outline',
+          title: `Découvert prévu le ${shortDayLabel(t.names[0])}`,
+          subtitle: `Ton compte passerait à ${formatCents(t.cents)}. Vois quand et pourquoi.`,
+          onPress: () => router.push('/compte'),
         };
       default:
         return {

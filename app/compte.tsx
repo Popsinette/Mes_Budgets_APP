@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { TimelineCard } from '@/src/components/TimelineCard';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { AmountField } from '@/src/components/ui/FormField';
@@ -236,6 +237,8 @@ function AccountDetail({ status, onEdit }: { status: AccountStatus; onEdit: () =
           À partir de {formatCents(status.account.start_cents)} saisis le {startLabel(status.account.start_at)}
         </Caption>
       </View>
+
+      <TimelineCard />
 
       <Card style={{ gap: spacing.sm }}>
         <Body weight="semibold">Depuis la saisie du solde</Body>
