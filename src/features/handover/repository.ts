@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getAccount, setAccountBalance } from '@/src/features/account/repository';
+import { getAccountTimeline } from '@/src/features/guide/repository';
 import {
   closeEnvelope,
   getMonthClosure,
@@ -317,7 +318,7 @@ export async function getHandoverPrompt(db: SQLiteDatabase, now: Date = new Date
 
 /* ─────────────── « À faire » : ce qui demande un geste aujourd'hui ─────────────── */
 
-export type TodoKey = 'handover' | 'late-charges' | 'late-incomes' | 'uncleared';
+export type TodoKey = 'handover' | 'late-charges' | 'late-incomes' | 'low-balance' | 'uncleared';
 
 export type Todo = {
   key: TodoKey;
@@ -329,8 +330,8 @@ export type Todo = {
 
 /**
  * Les gestes en attente, du plus important au moins important : passage de
- * mois, factures dont la date est passée, revenus attendus, dépenses à
- * pointer (seulement si le compte est suivi).
+ * mois, factures dont la date est passée, revenus attendus, découvert prévu
+ * avant la fin du mois, dépenses à pointer (ces deux-là si le compte est suivi).
  */
 export async function getTodos(db: SQLiteDatabase, now: Date = new Date()): Promise<Todo[]> {
   const today = toIsoDay(now);
@@ -360,6 +361,13 @@ export async function getTodos(db: SQLiteDatabase, now: Date = new Date()): Prom
   };
   push('late-charges', late('charge'));
   push('late-incomes', late('income'));
+  // Découvert prévu avant la fin du mois (compte suivi) : le point le plus bas.
+  if (account) {
+    const timeline = await getAccountTimeline(db, now);
+    if (timeline && timeline.low.balance_cents < 0) {
+      todos.push({ key: 'low-balance', count: 1, cents: timeline.low.balance_cents, names: [timeline.low.date] });
+    }
+  }
   // Le pointage ne sert qu'au compte : inutile de le réclamer s'il n'est pas suivi.
   if (account && (uncleared?.n ?? 0) > 0) {
     todos.push({ key: 'uncleared', count: uncleared!.n, cents: uncleared!.total, names: [] });
