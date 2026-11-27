@@ -148,7 +148,7 @@ describe('passage de mois', () => {
   it('propose de préparer le mois suivant dans les derniers jours', async () => {
     await spend(db, SEP, 'Courses', 40000, '2026-09-10');
     await finishHandover(db, SEP);
-    expect(await getHandoverPrompt(db, new Date('2026-10-27T12:00:00'))).toBeNull();
+    expect(await getHandoverPrompt(db, new Date('2026-10-24T12:00:00'))).toBeNull();
     expect(await getHandoverPrompt(db, new Date('2026-10-29T12:00:00'))).toMatchObject({
       kind: 'ending',
       month: OCT,

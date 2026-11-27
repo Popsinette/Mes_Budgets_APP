@@ -25,7 +25,7 @@ import {
 import { HABIT_FREQUENCY_LABELS, saveHabit, type HabitFrequency } from '@/src/features/habits/repository';
 import { getExpenseSuggestions, matchSuggestion, type ExpenseSuggestion } from '@/src/features/quick/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, currentWeekKey, isoDayInMonth, monthOfWeek, todayIso, weekKeyOf } from '@/src/utils/dates';
+import { currentMonthKey, currentWeekKey, envelopeMonthOfDay, isoDayInMonth, todayIso } from '@/src/utils/dates';
 import { useSelectedMonth } from '@/src/store/month';
 import { DatePickerGrid } from '@/src/components/ui/DatePickerGrid';
 import { confirmAction, notify } from '@/src/utils/dialogs';
@@ -67,8 +67,9 @@ function ExpenseForm({
   const [cleared, setCleared] = useState(Boolean(expense?.cleared_at));
   // Enveloppes proposées : celles du mois de la date (variables : mois de la
   // semaine ; postes : mois civil). Chaque mois a les siennes.
-  const weekMonth = monthOfWeek(weekKeyOf(date));
-  const calMonth = date.slice(0, 7);
+  // (Un mois commencé avant le 1er reçoit les dépenses datées depuis son début.)
+  const weekMonth = envelopeMonthOfDay('week', date);
+  const calMonth = envelopeMonthOfDay('month', date);
   const { data: options } = useLiveQuery(
     async (db) => {
       const [a, b] = await Promise.all([
@@ -332,7 +333,7 @@ function ImpactPreview({
   editing: Expense | null;
 }) {
   const theme = useTheme();
-  const month = envelope ? envelope.month : date.slice(0, 7);
+  const month = envelope ? envelope.month : envelopeMonthOfDay('month', date);
   const { data } = useLiveQuery(
     async (db) => {
       const [summary, list] = await Promise.all([

@@ -4,7 +4,7 @@ import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { listFixedForMonth } from '@/src/features/fixed/repository';
 import { listPots } from '@/src/features/savings/repository';
 import { getBalanceHistory, getMonthSummary, SPENDING_GROUPS, type SpendingGroup } from '@/src/features/summary/repository';
-import { currentMonthKey, currentWeekKey, daysInMonthOf, monthsBetween, numericDate, type MonthKey } from '@/src/utils/dates';
+import { currentMonthKey, currentWeekKey, monthDayProgress, monthsBetween, numericDate, type MonthKey } from '@/src/utils/dates';
 import { formatCents } from '@/src/utils/money';
 
 /**
@@ -101,9 +101,8 @@ export async function getInsights(db: SQLiteDatabase, month: MonthKey): Promise<
   // 3. Rythme du budget variable (mois en cours uniquement).
   const budget = summary.variables_budget_cents;
   if (isCurrent && budget > 0) {
-    const today = new Date().getDate();
-    const days = daysInMonthOf(month);
-    const elapsed = today / days;
+    const { day: today, days } = monthDayProgress(month);
+    const elapsed = Math.max(1, today) / days;
     const spentRatio = summary.variables_spent_cents / budget;
     if (spentRatio > elapsed + 0.1) {
       const projected = Math.round(summary.variables_spent_cents / elapsed);

@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { getAccount } from '@/src/features/account/repository';
+import { getAccount, setAccountBalance } from '@/src/features/account/repository';
 import {
   closeEnvelope,
   getMonthClosure,
@@ -16,9 +16,12 @@ import { listFixedForMonth } from '@/src/features/fixed/repository';
 import { hasMonthPlan, listPots, plannedFor, setPlanDone } from '@/src/features/savings/repository';
 import { getMonthSummary, type MonthSummary } from '@/src/features/summary/repository';
 import { invalidateQueries } from '@/src/store/invalidation';
+import { getMeta, setMeta } from '@/src/features/backup/repository';
 import {
+  budgetMonthOfDay,
   currentWeekKey,
-  daysInMonthOf,
+  monthDayProgress,
+  setEarlyStarts,
   isoDayInMonth,
   monthKeyFromDate,
   shiftMonthKey,
@@ -232,29 +235,81 @@ export async function finishHandover(db: SQLiteDatabase, month: MonthKey): Promi
   return next;
 }
 
+const startKey = (month: MonthKey) => `month_start:${month}`;
+
+/** Charge les débuts de mois anticipés (`month_start:<mois>`) : à appeler au démarrage et après chaque changement. */
+export async function loadBudgetCalendar(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    "SELECT key, value FROM app_meta WHERE key LIKE 'month_start:%' AND value IS NOT NULL",
+  );
+  setEarlyStarts(Object.fromEntries(rows.map((r) => [r.key.slice('month_start:'.length), r.value])));
+}
+
+/**
+ * Passe au mois suivant, même avant la fin du mois civil (le jour de la paie) :
+ * - le mois est clôturé et le suivant ouvert (`finishHandover`) ;
+ * - si `today` est avant le 1er, le mois suivant commence dès aujourd'hui :
+ *   il devient le mois en cours et reçoit les dépenses datées d'aujourd'hui ;
+ * - `resetAccount` : le compte repart de 0 € maintenant — les revenus et
+ *   dépenses cochés / pointés ensuite s'ajoutent à partir de là ; les
+ *   dépenses de ce mois (et d'avant) encore à pointer sont soldées.
+ */
+export async function switchToNextMonth(
+  db: SQLiteDatabase,
+  month: MonthKey,
+  input: { today: string; resetAccount: boolean },
+): Promise<MonthKey> {
+  const next = shiftMonthKey(month, 1);
+  if (input.today < `${next}-01`) await setMeta(db, startKey(next), input.today);
+  await finishHandover(db, month);
+  await loadBudgetCalendar(db);
+  if (input.resetAccount) {
+    // Pas de miettes : les dépenses des mois clôturés encore « à pointer » sont
+    // considérées comme passées avant la remise à 0 €.
+    const leftovers = await db.getAllAsync<{ id: number }>(
+      `SELECT x.id FROM expenses x JOIN envelopes e ON e.id = x.envelope_id
+       WHERE x.cleared_at IS NULL AND e.month <= ?`,
+      [month],
+    );
+    await setAccountBalance(db, 0, [], leftovers.map((r) => r.id));
+  }
+  invalidateQueries();
+  return next;
+}
+
+/** Annule un début anticipé : le mois précédent redevient le mois en cours (les dépenses déjà notées restent où elles sont). */
+export async function cancelEarlyStart(db: SQLiteDatabase, month: MonthKey): Promise<void> {
+  await setMeta(db, startKey(month), null);
+  await setMonthClosureDone(db, shiftMonthKey(month, -1), false);
+  await loadBudgetCalendar(db);
+  invalidateQueries();
+}
+
 export type HandoverPrompt =
   | { kind: 'finished'; month: MonthKey; next: MonthKey; pending: number }
   | { kind: 'ending'; month: MonthKey; next: MonthKey; days_left: number };
 
-/** Nombre de jours avant la fin du mois à partir duquel on propose de préparer le suivant. */
-export const PREPARE_DAYS = 4;
+/** Nombre de jours avant la fin du mois à partir duquel on propose de passer au suivant (paie de fin de mois). */
+export const PREPARE_DAYS = 6;
 
 /**
  * Faut-il proposer le passage de mois ?
  * - `finished` : le mois précédent est fini et pas encore clôturé ;
- * - `ending`   : le mois en cours se termine dans quelques jours et le suivant
- *   n'est pas encore ouvert → « prépare-le ».
+ * - `ending`   : le mois en cours se termine dans quelques jours et n'est pas
+ *   encore clôturé → « passe au suivant dès aujourd'hui, ou prépare-le ».
  */
 export async function getHandoverPrompt(db: SQLiteDatabase, now: Date = new Date()): Promise<HandoverPrompt | null> {
-  const current = monthKeyFromDate(now);
+  const current = budgetMonthOfDay(toIsoDay(now), monthKeyFromDate(now));
   const previous = shiftMonthKey(current, -1);
   const closure = await getMonthClosure(db, previous);
   if (closure.ready && !closure.done) {
     return { kind: 'finished', month: previous, next: current, pending: closure.pending };
   }
-  const daysLeft = daysInMonthOf(current) - now.getDate();
+  const progress = monthDayProgress(current, now);
+  const daysLeft = progress.days - progress.day;
   const next = shiftMonthKey(current, 1);
-  if (daysLeft < PREPARE_DAYS && (await isMonthReady(db, current)) && !(await isMonthReady(db, next))) {
+  // Le mois se termine et n'est pas encore clôturé (même si le suivant a déjà été ouvert pour le préparer).
+  if (daysLeft < PREPARE_DAYS && (await isMonthReady(db, current)) && (await getMeta(db, `closure_done:${current}`)) !== '1') {
     return { kind: 'ending', month: current, next, days_left: daysLeft };
   }
   return null;
@@ -278,8 +333,8 @@ export type Todo = {
  * pointer (seulement si le compte est suivi).
  */
 export async function getTodos(db: SQLiteDatabase, now: Date = new Date()): Promise<Todo[]> {
-  const month = monthKeyFromDate(now);
   const today = toIsoDay(now);
+  const month = budgetMonthOfDay(today, monthKeyFromDate(now));
   const [prompt, fixed, uncleared, account] = await Promise.all([
     getHandoverPrompt(db, now),
     listFixedForMonth(db, month),
@@ -314,8 +369,8 @@ export async function getTodos(db: SQLiteDatabase, now: Date = new Date()): Prom
 
 /** Coche les revenus ou les factures du mois dont la date est passée. */
 export async function settleLate(db: SQLiteDatabase, kind: 'income' | 'charge', now: Date = new Date()): Promise<void> {
-  const month = monthKeyFromDate(now);
   const today = toIsoDay(now);
+  const month = budgetMonthOfDay(today, monthKeyFromDate(now));
   const items = (await listFixedForMonth(db, month)).filter(
     (f) => f.kind === kind && !f.checked && isoDayInMonth(month, f.day) < today,
   );

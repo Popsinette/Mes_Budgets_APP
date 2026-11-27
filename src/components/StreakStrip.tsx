@@ -19,14 +19,14 @@ export function StreakStrip() {
     {
       icon: 'flame',
       value: data.weeks_in_budget,
-      label: data.weeks_in_budget > 1 ? 'semaines tenues' : 'semaine tenue',
+      label: data.weeks_in_budget > 1 ? 'semaines' : 'semaine',
       hint:
         data.week_on_track === false
           ? 'Ça déborde'
           : data.best_weeks > data.weeks_in_budget
-            ? `Record : ${data.best_weeks}`
+            ? `tenues · record ${data.best_weeks}`
             : data.weeks_in_budget > 0
-              ? 'Ton record !'
+              ? 'tenues · record !'
               : 'Repart lundi',
       color: alive && data.weeks_in_budget > 0 ? theme.colors.warning : theme.colors.textMuted,
       soft: alive && data.weeks_in_budget > 0 ? theme.colors.warningSoft : theme.colors.cardMuted,

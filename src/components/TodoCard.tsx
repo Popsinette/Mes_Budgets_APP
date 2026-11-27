@@ -64,7 +64,7 @@ export function TodoCard({ month, onShowTab }: { month: MonthKey; onShowTab: (ta
                 p.days_left === 0
                   ? `${cap(monthName(p.next))} commence demain`
                   : `${cap(monthName(p.next))} arrive dans ${p.days_left + 1} jours`,
-              subtitle: 'Jette un œil à ton plan et ajuste tes enveloppes.',
+              subtitle: `Paie arrivée ? Passe à ${monthName(p.next)} dès aujourd’hui, ou prépare son plan.`,
               onPress: open,
               strong: true,
             };

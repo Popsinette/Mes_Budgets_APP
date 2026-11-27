@@ -10,7 +10,7 @@ import { getAccountStatus } from '@/src/features/account/repository';
 import { listEnvelopesForMonth } from '@/src/features/envelopes/repository';
 import { getMonthSummary } from '@/src/features/summary/repository';
 import { radius, spacing, useTheme } from '@/src/theme';
-import { currentMonthKey, currentWeekKey, daysInMonthOf, monthKeyLabel, type MonthKey } from '@/src/utils/dates';
+import { currentMonthKey, currentWeekKey, monthDayProgress, monthKeyLabel, type MonthKey } from '@/src/utils/dates';
 import { clampRatio, formatCents } from '@/src/utils/money';
 
 const INK = '#FFFFFF';
@@ -50,8 +50,8 @@ export function HomeHero({ month }: { month: MonthKey }) {
 
   const { summary, envelopes } = data;
   const name = monthKeyLabel(month).split(' ')[0];
-  const days = daysInMonthOf(month);
-  const today = new Date().getDate();
+  // Jour du mois budgétaire : un mois commencé avant le 1er compte depuis son début.
+  const { day: today, days } = monthDayProgress(month);
   const daysLeft = days - today + 1;
   const weekly = envelopes.filter((e) => e.period === 'week');
   const weekLeft = weekly.reduce((s, e) => s + e.weekly_cents - e.week_spent_cents, 0);
